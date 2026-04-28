@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1a1410" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<title>Wraithgrove</title>
+<!-- Stripe SDK — web IAP fallback (Concern 3) -->
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0a08; touch-action: none; overscroll-behavior: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #e8d8b4; }
+  #app { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  #stage { position: relative; flex: 1 1 auto; overflow: hidden; }
+  #game-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #tab-content { position: absolute; inset: 0; pointer-events: none; }
+  #tab-content > .tab-panel { position: absolute; inset: 0; pointer-events: auto; display: none; overflow: hidden; }
+  #tab-content > .tab-panel.active { display: block; }
+
+  /* Bottom nav */
+  #nav-bar {
+    flex: 0 0 auto; display: flex; height: 64px; background: #1a1208;
+    border-top: 1px solid #3a2818; box-shadow: 0 -4px 12px rgba(0,0,0,0.6);
+    z-index: 50;
+  }
+  .nav-tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 120ms; gap: 2px; color: #a89878;
+  }
+  .nav-tab.active { color: #f0d890; background: linear-gradient(to top, rgba(232, 200, 120, 0.15), transparent); }
+  .nav-tab:active { background: rgba(232, 200, 120, 0.1); }
+  .nav-tab .icon { width: 26px; height: 26px; }
+  .nav-tab .label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+
+  /* Top currency strip */
+  #top-strip {
+    position: absolute; top: 0; left: 0; right: 0; height: 36px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0));
+    z-index: 40; pointer-events: none; font-size: 12px;
+  }
+  #top-strip .group { display: flex; gap: 12px; align-items: center; pointer-events: auto; }
+  #top-strip .currency { display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.55); padding: 4px 8px; border-radius: 12px; min-width: 64px; }
+  #top-strip .currency .glyph { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  #top-strip .currency.coins .glyph { background: radial-gradient(#ffe89a, #d8a838); border: 1px solid #b08820; }
+  #top-strip .currency.diamonds .glyph { background: linear-gradient(135deg, #98c8ff, #4a7ad8); border: 1px solid #3060a0; transform: rotate(45deg); border-radius: 2px; }
+  #top-strip .currency.cards .glyph { background: linear-gradient(135deg, #d88060, #a85020); border: 1px solid #802808; border-radius: 2px; }
+  #top-strip .currency .val { color: #f0e0b4; font-weight: 600; }
+  #top-strip .power { display: flex; align-items: center; gap: 4px; background: rgba(40,20,8,0.8); padding: 4px 10px; border-radius: 12px; border: 1px solid #604020; }
+  #top-strip .power .label { color: #c8a868; font-size: 10px; letter-spacing: 1px; }
+  #top-strip .power .val { color: #ffd870; font-weight: 700; font-size: 13px; }
+
+  /* Boot overlay */
+  #boot-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #2a1a10 0%, #0a0805 70%); z-index: 200; transition: opacity 600ms ease-out;
+  }
+  #boot-overlay.hidden { opacity: 0; pointer-events: none; }
+  #boot-title { font-size: 32px; letter-spacing: 6px; color: #f0d890; margin-bottom: 8px; text-shadow: 0 0 24px rgba(240,216,144,0.5); font-weight: 300; }
+  #boot-sub { font-size: 11px; letter-spacing: 4px; color: #6a5a40; margin-bottom: 32px; text-transform: uppercase; }
+  #boot-status { font-size: 11px; color: #8a7a5a; min-height: 1em; letter-spacing: 1px; }
+  #boot-tap { font-size: 12px; color: #b0a070; margin-top: 28px; opacity: 0; transition: opacity 400ms; letter-spacing: 2px; }
+  #boot-tap.show { opacity: 1; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+  /* Generic modal */
+  .modal-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.75); z-index: 100;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-card {
+    background: linear-gradient(to bottom, #2a1c10, #1a1006);
+    border: 2px solid #604020; border-radius: 12px;
+    padding: 20px; min-width: 280px; max-width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    animation: modal-pop 200ms ease-out;
+  }
+  @keyframes modal-pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-title { font-size: 16px; color: #f0d890; margin-bottom: 12px; letter-spacing: 1px; text-align: center; }
+  .modal-body { font-size: 13px; color: #d8c898; line-height: 1.5; margin-bottom: 16px; }
+  .modal-btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    background: linear-gradient(to bottom, #4a3220, #2e1c0c);
+    border: 1px solid #806040; border-radius: 6px; color: #f0d890;
+    padding: 10px 18px; cursor: pointer; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+    font-weight: 600; transition: transform 80ms;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.primary { background: linear-gradient(to bottom, #806020, #5a3c0a); border-color: #b08840; color: #fff0c8; }
+  .btn.danger { background: linear-gradient(to bottom, #6a2818, #3a1408); border-color: #a04030; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Common card / tile */
+  .card-tile {
+    background: linear-gradient(to bottom, #2a1c10, #1a1006);
+    border: 1px solid #604020; border-radius: 6px;
+    padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .card-tile.locked { opacity: 0.55; position: relative; }
+  .card-tile.locked::after {
+    content: '🔒'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; opacity: 0.6;
+  }
+  .card-tile .name { font-size: 10px; letter-spacing: 1px; color: #d0b878; text-align: center; }
+  .card-tile .level { font-size: 9px; color: #a08858; }
+  .card-tile .icon-box {
+    width: 48px; height: 48px; background: #0a0604; border: 1px solid #3a2818; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+
+  .err-overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.92); z-index: 300; padding: 24px; text-align: center; font-size: 13px; color: #e08070;
+  }
+  .err-overlay.show { display: flex; }
+
+  /* Tab-specific override slots */
+  .tab-panel { background: #0c0a08; }
+  #tab-hunt { background: transparent; }
+  .tab-panel .scroll { position: absolute; inset: 36px 0 0 0; overflow-y: auto; padding: 12px 12px 16px 12px; }
+  .tab-panel h2 { font-size: 14px; color: #f0d890; letter-spacing: 2px; text-transform: uppercase; margin: 8px 0 12px 0; text-align: center; }
+  .tab-panel .scene-row {
+    background: linear-gradient(to bottom, #1c1610, #0c0a06);
+    border: 1px solid #3a2818; border-radius: 8px; padding: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px;
+  }
+
+  /* Hunt mode HUD-overlay (drawn over canvas) */
+  #hunt-hud { position: absolute; inset: 36px 0 0 0; pointer-events: none; }
+  #hunt-hud .top-bar {
+    position: absolute; top: 6px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; font-size: 11px;
+  }
+  #hunt-hud .stage-banner {
+    position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55); padding: 4px 12px; border-radius: 10px;
+    font-size: 10px; letter-spacing: 1px; color: #d0b878;
+  }
+  #hunt-hud .skill-btn {
+    position: absolute; top: 8px; right: 12px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: radial-gradient(#604028, #2a1808);
+    border: 2px solid #b08840; pointer-events: auto; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #ffd870;
+  }
+  #hunt-hud .menu-btn {
+    position: absolute; top: 6px; right: 78px; width: 32px; height: 32px;
+    background: rgba(0,0,0,0.6); border-radius: 50%;
+    pointer-events: auto; cursor: pointer; border: 1px solid #604020;
+    color: #c8a868; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  #hunt-hud .joystick-zone { position: absolute; left: 0; bottom: 0; width: 50%; height: 60%; pointer-events: none; }
+  #hunt-hud .joystick-vis {
+    position: absolute; width: 96px; height: 96px; border-radius: 50%;
+    border: 2px solid rgba(232,200,120,0.4); background: rgba(0,0,0,0.3);
+    display: none;
+  }
+  #hunt-hud .joystick-vis .knob {
+    position: absolute; width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(232,200,120,0.6); top: 30px; left: 30px;
+  }
+  #hunt-hud .joystick-vis.active { display: block; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="stage">
+    <canvas id="game-canvas"></canvas>
+    <div id="top-strip">
+      <div class="group">
+        <div class="currency coins"><span class="glyph"></span><span class="val" data-bind="coins">0</span></div>
+        <div class="currency diamonds"><span class="glyph"></span><span class="val" data-bind="diamonds">0</span></div>
+        <div class="currency cards"><span class="glyph"></span><span class="val" data-bind="cards">0</span></div>
+      </div>
+      <div class="power" data-show-on="ascend forge relics duel">
+        <span class="label">PWR</span><span class="val" data-bind="power">0</span>
+      </div>
+    </div>
+    <div id="tab-content">
+      <div class="tab-panel" id="tab-duel"></div>
+      <div class="tab-panel" id="tab-ascend"></div>
+      <div class="tab-panel active" id="tab-hunt">
+        <div id="hunt-hud">
+          <div class="stage-banner" id="hunt-stage-banner">stage —</div>
+          <div class="menu-btn" id="hunt-menu-btn">⚙</div>
+          <div class="skill-btn" id="hunt-skill-btn">✦</div>
+          <div class="joystick-zone"></div>
+          <div class="joystick-vis" id="hunt-joystick"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-forge"></div>
+      <div class="tab-panel" id="tab-relics"></div>
+    </div>
+  </div>
+  <nav id="nav-bar">
+    <div class="nav-tab" data-tab="duel">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l6-6M21 3l-6 6M9 3l12 12M3 9l12 12"/></svg>
+      <span class="label">Duel</span>
+    </div>
+    <div class="nav-tab" data-tab="ascend">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M12 5l-6 8h12z"/></svg>
+      <span class="label">Ascend</span>
+    </div>
+    <div class="nav-tab active" data-tab="hunt">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l4 4 8 8 2 2-2 2-2-2-8-8-4-4z"/><circle cx="6" cy="18" r="2"/></svg>
+      <span class="label">Hunt</span>
+    </div>
+    <div class="nav-tab" data-tab="forge">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>
+      <span class="label">Forge</span>
+    </div>
+    <div class="nav-tab" data-tab="relics">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/></svg>
+      <span class="label">Relics</span>
+    </div>
+  </nav>
+</div>
+
+<div id="modal-root"></div>
+
+<div id="boot-overlay">
+  <div id="boot-title">WRAITHGROVE</div>
+  <div id="boot-sub">survive alone</div>
+  <div id="boot-status">awakening...</div>
+  <div id="boot-tap">tap to begin</div>
+</div>
+
+<div id="err-overlay" class="err-overlay">
+  <div id="err-msg"></div>
+</div>
+
+<script>
+  window.WG = window.WG || {};
+  WG.BUILD = { name: 'Wraithgrove', version: '0.2.0-mvp', built: '2026-04-27', anchor: 'Klovur' };
+
+  WG.Boot = (function () {
+    const overlay = document.getElementById('boot-overlay');
+    const status = document.getElementById('boot-status');
+    const tap = document.getElementById('boot-tap');
+    function setStatus(msg) { if (status) status.textContent = msg; }
+    function ready() {
+      tap.classList.add('show'); setStatus('');
+      const handler = () => {
+        overlay.removeEventListener('pointerdown', handler);
+        overlay.classList.add('hidden');
+        setTimeout(() => { overlay.style.display = 'none'; }, 700);
+        if (WG.Game && typeof WG.Game.start === 'function') WG.Game.start();
+      };
+      overlay.addEventListener('pointerdown', handler);
+    }
+    function fatal(msg) {
+      const err = document.getElementById('err-overlay');
+      const m = document.getElementById('err-msg');
+      m.textContent = msg;
+      err.classList.add('show');
+    }
+    return { setStatus, ready, fatal };
+  })();
+
+  // Capacitor lifecycle wiring (no-op in browser preview; active in native wrap)
+  if (window.Capacitor && window.Capacitor.Plugins) {
+    const { SplashScreen, StatusBar, Haptics, App } = window.Capacitor.Plugins;
+
+    // Hide splash after boot is ready
+    WG.Boot._origReady = WG.Boot.ready;
+    WG.Boot.ready = function () {
+      WG.Boot._origReady();
+      if (SplashScreen) SplashScreen.hide().catch(() => {});
+      if (StatusBar) StatusBar.setBackgroundColor({ color: '#0c0a08' }).catch(() => {});
+    };
+
+    // Pause game on app background; resume on foreground
+    if (App) {
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive && WG.Engine) WG.Engine.pause();
+        else if (isActive && WG.Engine) WG.Engine.resume();
+      });
+    }
+
+    // Haptic helpers (called from hunt-render for hit feedback in native)
+    WG.Haptics = {
+      impact: (style = 'medium') => Haptics && Haptics.impact({ style }).catch(() => {}),
+      vibrate: (duration = 50) => Haptics && Haptics.vibrate({ duration }).catch(() => {}),
+    };
+  }
+
+  WG.Loader = (function () {
+    const MODULES = [
+      'js/core/wg-engine.js',
+      'js/core/wg-state.js',
+      'js/core/wg-display.js',
+      'js/core/wg-input.js',
+      'js/core/wg-render.js',
+      'js/core/wg-cache.js',
+      'js/meta/meta-iap.js',
+      'js/meta/meta-ads.js',
+      'js/meta/meta-account.js',
+      'js/meta/meta-events.js',
+      'js/hunt/hunt-stage.js',
+      'js/hunt/hunt-player.js',
+      'js/hunt/hunt-enemies.js',
+      'js/hunt/hunt-weapons.js',
+      'js/hunt/hunt-pickups.js',
+      'js/hunt/hunt-bosses.js',
+      'js/hunt/hunt-waves.js',
+      'js/hunt/hunt-results.js',
+      'js/hunt/hunt-render.js',
+      'js/hunt/hunt-tutorial.js',
+      'js/ascend/ascend-character.js',
+      'js/ascend/ascend-skins.js',
+      'js/ascend/ascend-equipment.js',
+      'js/ascend/ascend-stats.js',
+      'js/ascend/ascend-render.js',
+      'js/forge/forge-buildings.js',
+      'js/forge/forge-craft.js',
+      'js/forge/forge-daily.js',
+      'js/forge/forge-render.js',
+      'js/relics/relics-catalog.js',
+      'js/relics/relics-collection.js',
+      'js/relics/relics-equip.js',
+      'js/relics/relics-render.js',
+      'js/duel/duel-match.js',
+      'js/duel/duel-roster.js',
+      'js/duel/duel-rank.js',
+      'js/duel/duel-render.js',
+      'js/wg-game.js',
+    ];
+    function loadOne(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src + '?v=' + WG.BUILD.version;
+        s.onload = () => resolve(src);
+        s.onerror = () => reject(new Error('failed: ' + src));
+        document.head.appendChild(s);
+      });
+    }
+    async function loadAll() {
+      for (let i = 0; i < MODULES.length; i++) {
+        const src = MODULES[i];
+        WG.Boot.setStatus('loading ' + src.split('/').pop().replace('.js', ''));
+        try { await loadOne(src); }
+        catch (err) { WG.Boot.fatal('module load failed: ' + src + '\n' + err.message); throw err; }
+      }
+    }
+    return { loadAll };
+  })();
+
+  WG.Display = (function () {
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let logicalW = 0, logicalH = 0, dpr = window.devicePixelRatio || 1;
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      const stage = document.getElementById('stage');
+      logicalW = stage.clientWidth; logicalH = stage.clientHeight;
+      canvas.width = Math.floor(logicalW * dpr);
+      canvas.height = Math.floor(logicalH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (WG.Engine && typeof WG.Engine.onResize === 'function') WG.Engine.onResize(logicalW, logicalH);
+    }
+    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('orientationchange', resize, { passive: true });
+    return { canvas, ctx, get width(){return logicalW;}, get height(){return logicalH;}, get dpr(){return dpr;}, resize };
+  })();
+
+  (async function boot() {
+    try {
+      WG.Display.resize();
+      await WG.Loader.loadAll();
+      WG.Boot.setStatus('initializing...');
+      if (!WG.Game || typeof WG.Game.init !== 'function') throw new Error('WG.Game.init missing');
+      await WG.Game.init();
+      WG.Boot.ready();
+    } catch (err) {
+      console.error('[boot]', err);
+      WG.Boot.fatal('boot failed: ' + (err && err.message || err));
+    }
+  })();
+</script>
+
+</body>
+</html>

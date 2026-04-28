@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wraithgrove — Privacy Policy</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #1a1410; background: #f5f1e8; }
+  h1 { font-size: 28px; letter-spacing: 1px; margin-bottom: 4px; }
+  h2 { font-size: 18px; letter-spacing: 1px; margin-top: 32px; padding-top: 12px; border-top: 1px solid #c8b888; }
+  h3 { font-size: 14px; margin-top: 16px; color: #604020; }
+  p, li { font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 12px 0; }
+  th, td { border: 1px solid #c8b888; padding: 6px 10px; text-align: left; }
+  th { background: #e8d8b4; }
+  code { background: #e8d8b4; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .effective { font-size: 12px; color: #604020; }
+  .fill { background: #fff3cd; border: 1px solid #e8c840; border-radius: 3px; padding: 1px 5px; font-size: 12px; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<h1>Wraithgrove Privacy Policy</h1>
+<p class="effective">Effective: <span class="fill">[ARCHITECT FILL: publication date]</span></p>
+
+<h2>1. Who we are</h2>
+<p>Wraithgrove is a mobile game published by <span class="fill">[ARCHITECT FILL: legal entity name]</span>, registered in <span class="fill">[ARCHITECT FILL: jurisdiction / country]</span>. If you have questions about this policy or about your data, contact us at <span class="fill">[ARCHITECT FILL: privacy@ email address]</span>.</p>
+
+<h2>2. What data we collect</h2>
+<p>Wraithgrove is built on the principle of collecting as little as possible. We collect only what is necessary to deliver the game across devices and to enforce the entitlements you have purchased.</p>
+
+<h3>Anonymous data — collected for every player</h3>
+<ul>
+  <li><strong>Device identifier:</strong> A randomly generated string stored in local app storage (<code>wg_device_id</code>). It never leaves the device except when syncing a purchased entitlement to our server. It is not linked to your real-world identity, Apple ID, Google account, or any advertising profile.</li>
+  <li><strong>Game activity events:</strong> Stage starts, stage clears, stage failures, level-ups, ad views, IAP attempts, duel results, forge upgrades, and relic gains. These events include your anonymous device ID and session count. They are sent to our own server — not to any third-party analytics platform. We use them to balance gameplay and detect abuse.</li>
+  <li><strong>Ad-related device signals:</strong> When you are shown an ad through the Google AdMob SDK (described in §3), AdMob collects device identifiers (IDFA on iOS, GAID on Android), approximate geolocation (country level), and session metadata for the purpose of serving and measuring advertisements. This is governed by Google's privacy policy, not this one. You can limit this collection using the OS-level Limit Ad Tracking setting (described in §5).</li>
+</ul>
+
+<h3>Data tied to your identity — only if you opt in</h3>
+<ul>
+  <li><strong>Email address:</strong> Collected only if you choose Account Upgrade for cross-device save sync. We use it solely to link your save state to your account. We do not use it for marketing without separate explicit consent.</li>
+  <li><strong>In-App Purchase records:</strong> When you make a purchase, we receive a transaction record from Apple, Google, or Stripe (depending on your platform). This record includes the SKU identifier, price tier, and a transaction ID. We store it on our server to enforce your entitlement (e.g., ad removal) across devices.</li>
+</ul>
+
+<h2>3. Third-party SDKs we name explicitly</h2>
+
+<p>Most privacy policies omit the names of advertising SDKs. We do not. Every SDK that touches your device or handles your data is named here.</p>
+
+<table>
+  <tr><th>SDK</th><th>Vendor</th><th>Purpose</th><th>Data shared with vendor</th></tr>
+  <tr>
+    <td><strong>Capacitor</strong></td>
+    <td>Ionic / Appflow</td>
+    <td>Wraps the web game in a native iOS and Android shell. Provides the plugin bridge.</td>
+    <td>None directly. Capacitor is a local bridge; it does not send data to Ionic's servers.</td>
+  </tr>
+  <tr>
+    <td><strong>Apple StoreKit</strong></td>
+    <td>Apple Inc.</td>
+    <td>Processes In-App Purchases on iOS. Validates receipts and handles refunds.</td>
+    <td>Purchase receipts are processed by Apple under Apple's privacy policy. We receive a transaction record; we do not receive payment card details.</td>
+  </tr>
+  <tr>
+    <td><strong>Google Play Billing</strong></td>
+    <td>Google LLC</td>
+    <td>Processes In-App Purchases on Android. Validates purchase tokens and handles refunds.</td>
+    <td>Purchase tokens are validated by Google under Google's privacy policy. We receive a transaction record; we do not receive payment card details.</td>
+  </tr>
+  <tr>
+    <td><strong>Stripe Checkout</strong></td>
+    <td>Stripe, Inc.</td>
+    <td>Processes In-App Purchases on the web / PWA channel. Handles payment and issues purchase confirmation.</td>
+    <td>Payment information (card details) is collected and processed by Stripe under Stripe's privacy policy and PCI-DSS compliance. We never store card numbers. We receive a payment-intent event from the Stripe webhook.</td>
+  </tr>
+  <tr>
+    <td><strong>Google AdMob</strong></td>
+    <td>Google LLC</td>
+    <td>Serves rewarded-video and interstitial ads within the game. Used only in the native iOS and Android builds; not active in the web preview.</td>
+    <td>Device advertising identifiers (IDFA / GAID), approximate country-level location, and session metadata are shared with Google for ad targeting and measurement. This is subject to Google's privacy policy and your OS-level ad-tracking preferences.</td>
+  </tr>
+</table>
+
+<h3>AdMob creative restrictions</h3>
+<p>We have configured AdMob with the following restrictions (documented in the project's <code>AD_SDK_LOCKDOWN.md</code>):</p>
+<ul>
+  <li>Creatives that auto-redirect to another app store or app URL without a user tap are blocked.</li>
+  <li>Creatives that deep-link into other apps without user consent are blocked.</li>
+  <li>Creatives that simulate system alerts or native UI dialogs are blocked.</li>
+  <li>AdMob's <code>isExternal: false</code> flag is set on all ad units so clicks open in the system browser, not an in-app WebView.</li>
+</ul>
+<p>If you encounter an ad that violates these restrictions, please report it to <span class="fill">[ARCHITECT FILL: privacy@ email address]</span> with a screenshot and we will report it to Google and request removal.</p>
+
+<h2>4. In-App Purchases — full SKU list</h2>
+
+<p>Wraithgrove offers 12 purchasable items. None are subscriptions. All prices are displayed in your local currency at checkout. There are no loot boxes — every purchase delivers a fixed, disclosed grant.</p>
+
+<table>
+  <tr><th>SKU ID</th><th>Type</th><th>USD price</th><th>What you receive</th></tr>
+  <tr><td><code>coin_pack_pocket</code></td><td>Currency</td><td>$0.99</td><td>500 Coins</td></tr>
+  <tr><td><code>coin_pack_pouch</code></td><td>Currency</td><td>$2.99</td><td>1,800 Coins + 5 Diamonds</td></tr>
+  <tr><td><code>coin_pack_chest</code></td><td>Currency</td><td>$4.99</td><td>3,500 Coins + 15 Diamonds</td></tr>
+  <tr><td><code>coin_pack_hoard</code></td><td>Currency</td><td>$9.99</td><td>8,000 Coins + 40 Diamonds</td></tr>
+  <tr><td><code>coin_pack_vault</code></td><td>Currency</td><td>$19.99</td><td>18,000 Coins + 100 Diamonds</td></tr>
+  <tr><td><code>diamond_starter</code></td><td>Currency</td><td>$0.99</td><td>30 Diamonds</td></tr>
+  <tr><td><code>card_pack_basic</code></td><td>Currency</td><td>$2.99</td><td>10 Relic Cards</td></tr>
+  <tr><td><code>card_pack_premier</code></td><td>Currency</td><td>$9.99</td><td>40 Relic Cards + 20 Diamonds</td></tr>
+  <tr><td><code>starter_bundle</code></td><td>Bundle</td><td>$4.99</td><td>2,000 Coins + 25 Diamonds + 5 Relic Cards</td></tr>
+  <tr><td><code>champion_bundle</code></td><td>Bundle</td><td>$9.99</td><td>4,500 Coins + 60 Diamonds + 12 Relic Cards</td></tr>
+  <tr><td><code>ad_removal</code></td><td>Entitlement</td><td>$4.99</td><td>Permanent ad removal + Premium Unlock. Cross-device transferable via Account Upgrade.</td></tr>
+  <tr><td><code>mega_bundle</code></td><td>Bundle</td><td>$99.99</td><td>200,000 Coins + 1,500 Diamonds + 250 Relic Cards. One-time purchase.</td></tr>
+</table>
+
+<p>Virtual currency (Coins, Diamonds, Relic Cards) has no cash value and cannot be redeemed for real money. Refund rights are governed by the platform you purchased through (Apple App Store, Google Play, or Stripe — see §5 of the Terms of Service for details).</p>
+
+<h2>5. What we do NOT do</h2>
+<ul>
+  <li>We do not sell your personal data to third parties.</li>
+  <li>We do not collect your contacts, photo library, microphone audio, camera feed, or precise GPS location.</li>
+  <li>We do not embed third-party analytics SDKs such as Firebase Analytics, Adjust, AppsFlyer, Amplitude, or Mixpanel. All game-event analytics go to our own server only.</li>
+  <li>We do not share your save state, progress data, or purchase history with advertising partners.</li>
+  <li>We do not run persistent background processes, access your contacts or calendar, or track your location outside the app session.</li>
+</ul>
+
+<h2>6. Your rights</h2>
+
+<h3>Access and export</h3>
+<p>Email <span class="fill">[ARCHITECT FILL: privacy@ email address]</span> with the subject line "Data Request — Export". Include either your account email (if you completed Account Upgrade) or your in-app device ID (visible in-game at Settings → About). Within 30 days we will send you a JSON file containing all data we hold tied to that identifier.</p>
+
+<h3>Deletion</h3>
+<p>Email <span class="fill">[ARCHITECT FILL: privacy@ email address]</span> with the subject line "Data Request — Delete". Include the same identifier as above. Within 30 days of confirmation we will permanently delete all records tied to your account or device ID from our servers. Note: this also deletes your entitlement records, which means purchased items (including Ad Removal) will no longer be restorable through our system. Apple, Google, and Stripe maintain their own transaction records under their own retention policies; we cannot delete those on your behalf.</p>
+
+<h3>Limit ad personalization</h3>
+<p><strong>iOS:</strong> Settings → Privacy &amp; Security → Tracking → disable Wraithgrove. AdMob will continue to serve ads but they will be context-based rather than personalized.<br>
+<strong>Android:</strong> Settings → Google → Ads → "Opt out of Ads Personalization". Same effect.<br>
+<strong>Ad Removal purchase:</strong> Purchasing the <code>ad_removal</code> SKU eliminates all ads from the game entirely, including AdMob. This is the most complete opt-out available.</p>
+
+<h3>Children</h3>
+<p>Wraithgrove is rated 9+ on the Apple App Store and Teen on Google Play. We do not knowingly collect personal data from users below the age of digital consent in their jurisdiction (13 in the US under COPPA; 16 in the EU under GDPR; locally variable elsewhere). If you believe a child's data has been collected, contact us immediately for deletion.</p>
+
+<h2>7. Data residency and retention</h2>
+<p>Save state and IAP entitlement records are stored on Cloudflare Workers KV with primary residency in <span class="fill">[ARCHITECT FILL: Cloudflare region, e.g. "Western Europe" or "Eastern US"]</span> and global edge replication for low-latency reads. Cloudflare's infrastructure is subject to Cloudflare's privacy policy. We retain your data for as long as your account is active or until you request deletion. Stripe payment processing is PCI-DSS compliant; we never store, log, or transmit payment card numbers through our systems.</p>
+
+<h2>8. Changes to this policy</h2>
+<p>If we make a material change to this policy — for example, adding a new SDK, changing what data is collected, or changing how long we retain data — we will notify active players via an in-app banner at least 30 days before the change takes effect. The prior version of this policy will remain linked at the bottom of this page for reference.</p>
+
+<h2>9. Contact</h2>
+<p>For any privacy-related question, access request, or deletion request:<br>
+<span class="fill">[ARCHITECT FILL: privacy@ email address]</span><br>
+<span class="fill">[ARCHITECT FILL: legal entity name, address, jurisdiction]</span></p>
+
+<hr style="margin-top:40px;border-color:#c8b888;">
+<p style="font-size:11px;color:#888;">Past versions: <span class="fill">[ARCHITECT FILL: link to prior versions when they exist]</span></p>
+
+</body>
+</html>
