@@ -87,16 +87,14 @@
         r: 9 + rand() * 4,
       });
     }
-    const cabins = [];
-    const numCabins = 1; // Stage 1 has one visible cabin per observation
-    for (let i = 0; i < numCabins; i++) {
-      cabins.push({
-        x: mapW * 0.35 + rand() * (mapW * 0.3),
-        y: mapH * 0.35 + rand() * (mapH * 0.3),
-      });
-    }
+    // Cave: fixed pre-built landmark (Wood Siege Stage 1 has a Cave, not a cabin).
+    const caves = [{
+      x: mapW * 0.35 + rand() * (mapW * 0.3),
+      y: mapH * 0.35 + rand() * (mapH * 0.3),
+    }];
+    // Campfires: ambient lighting only at this stage (real day/night logic is V2).
     const fires = [];
-    const numFires = pick(2, 3);
+    const numFires = pick(1, 2);
     for (let i = 0; i < numFires; i++) {
       fires.push({
         x: inset + rand() * (mapW - inset*2),
@@ -104,7 +102,17 @@
         flicker: rand() * Math.PI * 2,
       });
     }
-    _stagePropsCache[stage.id] = { stumps, cabins, fires };
+    // Construction sites — dashed-circle build slots with name + cost progress.
+    // Visual-only V0; real wood-collection logic + activation is V2.
+    const constructions = [
+      { x: inset + rand() * (mapW - inset*2),
+        y: inset + rand() * (mapH - inset*2),
+        name: 'Turret', have: 0, need: 4 },
+      { x: inset + rand() * (mapW - inset*2),
+        y: inset + rand() * (mapH - inset*2),
+        name: 'Campfire', have: 0, need: 30 },
+    ];
+    _stagePropsCache[stage.id] = { stumps, caves, fires, constructions };
     return _stagePropsCache[stage.id];
   }
 
@@ -245,53 +253,85 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // Cabin / shelter — peaked-roof landmark structure.
   // ─────────────────────────────────────────────────────────────────────────────
-  function drawCabin(ctx, sx, sy) {
+  // Cave — rocky landmark with dark entrance (Wood Siege Stage 1 has this, not a cabin).
+  // HD source: light-grey rounded rock formation with black oval cave mouth.
+  function drawCave(ctx, sx, sy) {
     if (sx < -60 || sx > D().width + 60 || sy < -60 || sy > D().height + 60) return;
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath(); ctx.ellipse(sx, sy + 28, 36, 8, 0, 0, Math.PI*2); ctx.fill();
-    // Body — log structure
-    ctx.fillStyle = '#6a3818';
-    ctx.fillRect(sx - 28, sy - 6, 56, 32);
-    // Horizontal log shading
-    ctx.strokeStyle = '#3a1c08'; ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(sx - 28, sy - 6 + i*8);
-      ctx.lineTo(sx + 28, sy - 6 + i*8);
-      ctx.stroke();
-    }
-    // Roof — wedge (dark shingles)
-    ctx.fillStyle = '#3a200a';
-    ctx.beginPath();
-    ctx.moveTo(sx - 32, sy - 4);
-    ctx.lineTo(sx,      sy - 28);
-    ctx.lineTo(sx + 32, sy - 4);
-    ctx.closePath(); ctx.fill();
-    // Roof highlight
-    ctx.fillStyle = '#5a3018';
-    ctx.beginPath();
-    ctx.moveTo(sx - 30, sy - 4);
-    ctx.lineTo(sx,      sy - 26);
-    ctx.lineTo(sx - 6,  sy - 4);
-    ctx.closePath(); ctx.fill();
-    // Door
-    ctx.fillStyle = '#1a0a02';
-    ctx.fillRect(sx - 6, sy + 6, 12, 20);
-    ctx.strokeStyle = '#0a0400'; ctx.strokeRect(sx - 6, sy + 6, 12, 20);
-    // Hanging lantern
-    const t = performance.now() / 600;
-    const lampGlow = 0.7 + 0.2 * Math.sin(t);
-    ctx.fillStyle = `rgba(248, 184, 80, ${lampGlow * 0.4})`;
-    ctx.beginPath(); ctx.arc(sx + 22, sy - 2, 14, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#f8b850';
-    ctx.fillRect(sx + 21, sy - 4, 3, 4);
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 22, 38, 8, 0, 0, Math.PI*2); ctx.fill();
+    // Rock body — cluster of rounded boulders, mid-grey w/ darker shading
+    ctx.fillStyle = '#5a5654';
+    ctx.beginPath(); ctx.ellipse(sx - 12, sy + 4, 22, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 14, sy + 6, 20, 16, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy - 8, 28, 22, 0, 0, Math.PI*2); ctx.fill();
+    // Top highlights (lighter)
+    ctx.fillStyle = '#7a7672';
+    ctx.beginPath(); ctx.ellipse(sx - 4, sy - 14, 14, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 12, sy - 4, 8, 5, 0, 0, Math.PI*2); ctx.fill();
+    // Bottom shadow
+    ctx.fillStyle = '#3a3634';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 14, 26, 8, 0, 0, Math.PI*2); ctx.fill();
+    // Cave mouth — dark oval entrance
+    ctx.fillStyle = '#0a0808';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 4, 12, 10, 0, 0, Math.PI*2); ctx.fill();
+    // Cave inner glow hint
+    ctx.fillStyle = 'rgba(60,40,20,0.6)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 4, 8, 7, 0, 0, Math.PI*2); ctx.fill();
   }
 
-  function drawCabins(ctx, props) {
-    for (const c of props.cabins) {
+  function drawCaves(ctx, props) {
+    for (const c of props.caves) {
       const s = w2s(c.x, c.y);
-      drawCabin(ctx, s.x, s.y);
+      drawCave(ctx, s.x, s.y);
+    }
+  }
+
+  // Construction sites — pre-marked dashed-circle build slots with name + cost.
+  // HD source (screenshot 3): "Turret 0/4" and "Campfire 0/30" with white dashed
+  // outline and small wood-icon + progress fraction text. V0 visual-only.
+  function drawConstructionSites(ctx, props) {
+    if (!props.constructions) return;
+    const t = performance.now() / 1000;
+    for (const c of props.constructions) {
+      const s = w2s(c.x, c.y);
+      if (s.x < -60 || s.x > D().width + 60 || s.y < -60 || s.y > D().height + 60) continue;
+      const r = 28;
+      // Dashed circle outline
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = -t * 8;
+      ctx.strokeStyle = 'rgba(232, 224, 200, 0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      // Subtle tint inside
+      ctx.fillStyle = 'rgba(232, 224, 200, 0.06)';
+      ctx.beginPath(); ctx.arc(s.x, s.y, r - 1, 0, Math.PI * 2); ctx.fill();
+      // Padlock icon (small) above center
+      ctx.fillStyle = '#d8d0b0';
+      ctx.fillRect(s.x - 3, s.y - 4, 6, 5);
+      ctx.strokeStyle = '#d8d0b0'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y - 5, 2.5, Math.PI, 0);
+      ctx.stroke();
+      // Name label above circle
+      ctx.fillStyle = '#f0e8c8';
+      ctx.font = 'bold 10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(c.name, s.x, s.y - r - 8);
+      // Progress label inside (have/need)
+      ctx.fillStyle = '#f0e8c8';
+      ctx.font = '9px system-ui';
+      // Tiny wood-icon (brown rect)
+      ctx.fillStyle = '#8a5828';
+      ctx.fillRect(s.x - 14, s.y + 9, 5, 3);
+      ctx.fillStyle = '#5a3010';
+      ctx.fillRect(s.x - 14, s.y + 9, 5, 1);
+      ctx.fillStyle = '#f0e8c8';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${c.have}/${c.need}`, s.x - 7, s.y + 12);
+      ctx.textAlign = 'left';
     }
   }
 
@@ -541,6 +581,27 @@
   // No attack ring — Wood Siege has none.
   // ─────────────────────────────────────────────────────────────────────────────
   function drawAnimeGirl(ctx, sx, sy) {
+    // Scythe weapon — held to the player's right side, white curved blade.
+    // HD source (screenshot 3): default character holds a white/bone scythe.
+    // Drawn FIRST so the body overlaps the haft a bit.
+    ctx.strokeStyle = '#5a4628';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx + 7, sy + 4);
+    ctx.lineTo(sx + 14, sy - 14);
+    ctx.stroke();
+    // Blade — white curved scythe head
+    ctx.strokeStyle = '#f0eee0';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(sx + 14, sy - 14, 7, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.stroke();
+    ctx.strokeStyle = '#a89c80';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(sx + 14, sy - 14, 6, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.stroke();
+
     // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath(); ctx.ellipse(sx, sy + 14, 9, 3, 0, 0, Math.PI*2); ctx.fill();
@@ -602,41 +663,93 @@
   // HUD — basic update for v0. Banner shows "Highest Wave Reached".
   // Avatar mini-portrait + resource counters are V1.
   // ─────────────────────────────────────────────────────────────────────────────
+  // HUD — matches Wood Siege HD source (screenshot 3):
+  //   Top: "Highest Wave Reached: X/5 Waves" + 5 numbered wave dots
+  //   Mid-left: level bar + HP + in-stage coin/wood counters
+  //   Mid-right: "Hidden Relic" labeled skill button (DOM, updated externally)
   function drawHud(ctx) {
     const p = runtime.player;
     if (!p) return;
-    // top-left: level + xp + HP number
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(8, 40, 130, 32);
+    const w = D().width;
+
+    // Wave dots row — 5 numbered circles across the top
+    const currentWave = (runtime.wave && runtime.wave.index) || 1;
+    const totalWaves = (runtime.wave && runtime.wave.total) || 5;
+    const dotR = 11, dotGap = 8;
+    const totalW = totalWaves * (dotR*2) + (totalWaves-1) * dotGap;
+    const startX = w/2 - totalW/2 + dotR;
+    for (let i = 1; i <= totalWaves; i++) {
+      const dx = startX + (i-1) * (dotR*2 + dotGap);
+      const dy = 88;
+      const active = (i === currentWave);
+      const cleared = (i < currentWave);
+      ctx.fillStyle = active ? '#d04848' : (cleared ? '#5a5040' : '#2a2418');
+      ctx.beginPath(); ctx.arc(dx, dy, dotR, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = active ? '#f0c8a0' : (cleared ? '#7a6e58' : '#403828');
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(dx, dy, dotR, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = active ? '#fff0d0' : (cleared ? '#c8c0a8' : '#7a7058');
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(i), dx, dy + 4);
+      ctx.textAlign = 'left';
+    }
+
+    // Top-left: in-stage resource counters (coin + wood)
+    const coins = (runtime.runCoins || 0);
+    const wood  = (runtime.runWood  || 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(8, 76, 78, 50);
+    // Coin
+    ctx.fillStyle = '#ffd870';
+    ctx.beginPath(); ctx.arc(20, 90, 6, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#a8801c'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(20, 90, 6, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#f0e8c8';
+    ctx.font = 'bold 12px system-ui';
+    ctx.fillText(String(coins), 32, 94);
+    // Wood
+    ctx.fillStyle = '#8a5828';
+    ctx.fillRect(15, 110, 10, 6);
+    ctx.fillStyle = '#5a3010';
+    ctx.fillRect(15, 110, 10, 2);
+    ctx.fillStyle = '#f0e8c8';
+    ctx.fillText(String(wood), 32, 117);
+
+    // Mid: level bar (smaller, below wave dots)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(94, 76, w - 200, 22);
     ctx.fillStyle = '#f0d890';
     ctx.font = 'bold 11px system-ui';
-    ctx.fillText('Lvl ' + p.level, 14, 53);
-    ctx.fillStyle = '#3a3022'; ctx.fillRect(14, 56, 116, 5);
-    ctx.fillStyle = '#a8d878'; ctx.fillRect(14, 56, 116 * (p.xp / p.xpToNext), 5);
+    ctx.fillText('Lv.' + p.level, 100, 91);
+    ctx.fillStyle = '#3a3022';
+    ctx.fillRect(126, 86, w - 240, 6);
+    ctx.fillStyle = '#a8d878';
+    ctx.fillRect(126, 86, (w - 240) * (p.xp / p.xpToNext), 6);
+
+    // Player HP indicator (below player sprite, drawn elsewhere). Numeric shown here:
     ctx.fillStyle = '#f0d890';
     ctx.font = '10px system-ui';
-    ctx.fillText(Math.ceil(p.hp) + ' / ' + p.maxHp, 14, 70);
+    ctx.fillText(Math.ceil(p.hp) + ' / ' + p.maxHp, 100, 124);
 
-    // top-center: Highest Wave Reached
+    // Top-center banner text: "Highest Wave Reached: X/5 Waves"
     const banner = document.getElementById('hunt-stage-banner');
     if (banner && runtime.stage) {
-      const elapsed = runtime.elapsed;
-      const elapsedM = (elapsed / 60).toFixed(1);
       const stageId = runtime.stage.id;
       const key = 'wg_hwr_' + stageId;
       let high = 0;
-      try { high = parseFloat(localStorage.getItem(key) || '0'); } catch(e) {}
-      const elapsedSec = elapsed;
-      if (elapsedSec / 60 > high) {
-        high = elapsedSec / 60;
-        try { localStorage.setItem(key, high.toFixed(2)); } catch(e) {}
+      try { high = parseInt(localStorage.getItem(key) || '0', 10); } catch(e) {}
+      if (currentWave - 1 > high) {
+        high = currentWave - 1;
+        try { localStorage.setItem(key, String(high)); } catch(e) {}
       }
-      banner.textContent = `Highest Wave Reached: ${high.toFixed(1)} Mins`;
+      banner.textContent = `Highest Wave Reached: ${high}/${totalWaves} Waves`;
     }
 
-    // skill button cooldown overlay
+    // Skill button (DOM): label "Hidden Relic" + cooldown overlay
     const skillBtn = document.getElementById('hunt-skill-btn');
     if (skillBtn) {
+      skillBtn.title = 'Hidden Relic';
       if (p.skillReady) {
         skillBtn.style.opacity = '1';
         skillBtn.textContent = '✦';
@@ -713,10 +826,11 @@
     WG.Render.clear(ctx, biome.ground);
     drawTiles(ctx, biome);
     drawPineForest(ctx);
-    drawCampfireLight(ctx, props);   // Light radii under sprites
+    drawCampfireLight(ctx, props);     // Light radii under sprites
+    drawConstructionSites(ctx, props); // Dashed-circle build slots (Wood Siege key element)
     drawStumps(ctx, props);
-    drawCabins(ctx, props);
-    drawCampfireFlame(ctx, props);   // Flames over the light
+    drawCaves(ctx, props);             // Rocky cave landmark (NOT a cabin)
+    drawCampfireFlame(ctx, props);     // Flames over the light
     drawDrops(ctx);
     if (window.WG.HuntPickups) WG.HuntPickups.draw(ctx, w2s, runtime);
     drawCreatures(ctx);
