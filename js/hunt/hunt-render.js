@@ -82,18 +82,36 @@
 
     const mapW = runtime.mapW, mapH = runtime.mapH;
     const inset = 80;
-    const stumps = [];
-    const numStumps = pick(10, 14);
-    for (let i = 0; i < numStumps; i++) {
+    // Choppable trees scattered DENSELY through the play area (Wood Siege register).
+    // 40-55 per stage. Cleared zone around map center (where player base sits) so
+    // the spawn area is open. Each tree: trunk-base position (.x, .y), HP, hit anim.
+    const stumps = [];  // field name preserved for back-compat; entries are trees
+    const cx = mapW / 2, cy = mapH / 2;
+    const clearingR = 150; // open zone around base center
+    const numTrees = pick(40, 55);
+    let placed = 0, attempts = 0;
+    while (placed < numTrees && attempts < numTrees * 6) {
+      attempts++;
+      const tx = inset + rand() * (mapW - inset*2);
+      const ty = inset + rand() * (mapH - inset*2);
+      const dx = tx - cx, dy = ty - cy;
+      if (dx*dx + dy*dy < clearingR * clearingR) continue; // skip clearing
+      // Spread them — reject if too close to a previously-placed tree
+      let collide = false;
+      for (let j = 0; j < stumps.length; j++) {
+        const ddx = tx - stumps[j].x, ddy = ty - stumps[j].y;
+        if (ddx*ddx + ddy*ddy < 32*32) { collide = true; break; }
+      }
+      if (collide) continue;
       stumps.push({
-        x: inset + rand() * (mapW - inset*2),
-        y: inset + rand() * (mapH - inset*2),
-        r: 9 + rand() * 4,
-        hp: 5,
-        maxHp: 5,
-        lastHit: 0,     // performance.now() timestamp of last hit (for flash anim)
-        dropped: false, // true once chopped to zero — render skips
+        x: tx, y: ty,
+        r: 14,            // hit-radius (player must get within this + range to chop)
+        hp: 5, maxHp: 5,
+        lastHit: 0,
+        dropped: false,
+        hash: hash2(Math.floor(tx), Math.floor(ty)) >>> 0, // for visual variation
       });
+      placed++;
     }
     // Cave: fixed pre-built landmark (Wood Siege Stage 1 has a Cave, not a cabin).
     const caves = [{
@@ -224,20 +242,31 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // Stumps — brown wood circles with concentric rings + small axe wedge.
   // ─────────────────────────────────────────────────────────────────────────────
+  // Draw a choppable tree (stacked-triangle pine) at trunk-base (sx, sy).
+  // Replaces the prior stump-circle visual — Wood Siege has standing trees, not stumps.
   function drawStump(ctx, sx, sy, r, stumpData) {
-    if (sx < -20 || sx > D().width + 20 || sy < -20 || sy > D().height + 20) return;
-    // Hit-flash: lighter body for ~120ms after hit
+    if (sx < -32 || sx > D().width + 32 || sy < -56 || sy > D().height + 16) return;
+    // Hit-flash + wobble on recent hit
     const sinceHit = stumpData ? (performance.now() - stumpData.lastHit) : 9999;
-    const flash = sinceHit < 120 ? (1 - sinceHit / 120) : 0;
-    // Wobble: subtle x-offset on recent hit
-    const wobble = flash * Math.sin(sinceHit / 12) * 1.5;
+    const flash = sinceHit < 140 ? (1 - sinceHit / 140) : 0;
+    const wobble = flash * Math.sin(sinceHit / 10) * 2;
     sx += wobble;
-    // Drop shadow
+    const h = (stumpData && stumpData.hash) || 12345;
+    // Ground shadow under trunk
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(sx, sy + r*0.55, r*1.05, r*0.4, 0, 0, Math.PI*2); ctx.fill();
-    // Body (light wood — flashes brighter on hit)
-    ctx.fillStyle = flash > 0 ? `rgb(${0x8a + flash*60},${0x58 + flash*60},${0x28 + flash*40})` : '#8a5828';
-    ctx.beginPath(); ctx.ellipse(sx, sy, r, r*0.85, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy, 8, 3, 0, 0, Math.PI*2); ctx.fill();
+    // Trunk
+    ctx.fillStyle = '#2a1808';
+    ctx.fillRect(sx - 2, sy - 7, 4, 7);
+    // Foliage — 3 stacked triangles, sized by hash, brighter on hit
+    const flashBoost = flash * 30;
+    ctx.fillStyle = `rgb(${20 + flashBoost},${48 + flashBoost*1.5},${24 + flashBoost})`;
+    ctx.beginPath(); ctx.moveTo(sx, sy - 33); ctx.lineTo(sx - 9, sy - 19); ctx.lineTo(sx + 9, sy - 19); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = `rgb(${26 + flashBoost},${58 + flashBoost*1.5},${24 + flashBoost})`;
+    ctx.beginPath(); ctx.moveTo(sx, sy - 25); ctx.lineTo(sx - 11, sy - 11); ctx.lineTo(sx + 11, sy - 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = `rgb(${28 + flashBoost},${66 + flashBoost*1.5},${32 + flashBoost})`;
+    ctx.beginPath(); ctx.moveTo(sx, sy - 17); ctx.lineTo(sx - 13, sy - 3);  ctx.lineTo(sx + 13, sy - 3);  ctx.closePath(); ctx.fill();
+    return; // skip the old stump-circle code below
     // Outer ring (darker bark)
     ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(sx, sy, r, r*0.85, 0, 0, Math.PI*2); ctx.stroke();
@@ -258,17 +287,18 @@
   }
 
   function drawStumps(ctx, props) {
-    for (const s of props.stumps) {
-      if (s.dropped) continue;  // skip chopped stumps
+    // Sort by Y so closer trees draw over farther ones (top-down layering)
+    const sorted = props.stumps.slice().sort((a, b) => a.y - b.y);
+    for (const s of sorted) {
+      if (s.dropped) continue;
       const ss = w2s(s.x, s.y);
       drawStump(ctx, ss.x, ss.y, s.r, s);
-      // HP bar above stump if damaged
       if (s.hp < s.maxHp && s.hp > 0) {
-        const bw = s.r * 1.8, bh = 2;
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(ss.x - bw/2, ss.y - s.r - 6, bw, bh);
+        const bw = 18, bh = 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(ss.x - bw/2, ss.y - 40, bw, bh);
         ctx.fillStyle = '#a8d878';
-        ctx.fillRect(ss.x - bw/2, ss.y - s.r - 6, bw * (s.hp / s.maxHp), bh);
+        ctx.fillRect(ss.x - bw/2, ss.y - 40, bw * (s.hp / s.maxHp), bh);
       }
     }
   }
