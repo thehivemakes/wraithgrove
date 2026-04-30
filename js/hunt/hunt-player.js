@@ -114,6 +114,32 @@
           hits++;
         }
       }
+      // Stumps in melee range get chopped by the same swing.
+      // XP + wood + coins drop on chop. (Wood Siege: XP from chopping trees.)
+      if (window.WG.HuntRender && WG.HuntRender.getStageProps && runtime.stage) {
+        const props = WG.HuntRender.getStageProps(runtime.stage);
+        const stumpR = r * 0.85; // slightly tighter range for stumps so player aims at them
+        for (const s of props.stumps) {
+          if (s.dropped) continue;
+          const dx = s.x - p.x, dy = s.y - p.y;
+          if (dx*dx + dy*dy < (stumpR + s.r) * (stumpR + s.r)) {
+            s.hp -= 1;
+            s.lastHit = performance.now();
+            hits++;
+            WG.Engine.emit('stump:hit', { stump: s });
+            if (s.hp <= 0) {
+              s.dropped = true;
+              // Drop wood, coin, and grant XP
+              runtime.drops.push({ x: s.x, y: s.y, type: 'coin', vx:0, vy:0 });
+              runtime.drops.push({ x: s.x + 6, y: s.y + 4, type: 'coin', vx:0, vy:0 });
+              p.xp += 2;
+              if (p.xp >= p.xpToNext) levelUp();
+              runtime.runWood = (runtime.runWood || 0) + 1;
+              WG.Engine.emit('stump:chopped', { stump: s });
+            }
+          }
+        }
+      }
       if (hits > 0) WG.Engine.emit('player:swing', { weapon: w, hits });
       p.attackTimer = w.cooldown * (p.cooldownMul || 1);
     }

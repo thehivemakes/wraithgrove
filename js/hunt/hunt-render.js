@@ -89,6 +89,10 @@
         x: inset + rand() * (mapW - inset*2),
         y: inset + rand() * (mapH - inset*2),
         r: 9 + rand() * 4,
+        hp: 5,
+        maxHp: 5,
+        lastHit: 0,     // performance.now() timestamp of last hit (for flash anim)
+        dropped: false, // true once chopped to zero — render skips
       });
     }
     // Cave: fixed pre-built landmark (Wood Siege Stage 1 has a Cave, not a cabin).
@@ -220,13 +224,19 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // Stumps — brown wood circles with concentric rings + small axe wedge.
   // ─────────────────────────────────────────────────────────────────────────────
-  function drawStump(ctx, sx, sy, r) {
+  function drawStump(ctx, sx, sy, r, stumpData) {
     if (sx < -20 || sx > D().width + 20 || sy < -20 || sy > D().height + 20) return;
+    // Hit-flash: lighter body for ~120ms after hit
+    const sinceHit = stumpData ? (performance.now() - stumpData.lastHit) : 9999;
+    const flash = sinceHit < 120 ? (1 - sinceHit / 120) : 0;
+    // Wobble: subtle x-offset on recent hit
+    const wobble = flash * Math.sin(sinceHit / 12) * 1.5;
+    sx += wobble;
     // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(sx, sy + r*0.55, r*1.05, r*0.4, 0, 0, Math.PI*2); ctx.fill();
-    // Body (light wood)
-    ctx.fillStyle = '#8a5828';
+    // Body (light wood — flashes brighter on hit)
+    ctx.fillStyle = flash > 0 ? `rgb(${0x8a + flash*60},${0x58 + flash*60},${0x28 + flash*40})` : '#8a5828';
     ctx.beginPath(); ctx.ellipse(sx, sy, r, r*0.85, 0, 0, Math.PI*2); ctx.fill();
     // Outer ring (darker bark)
     ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 1.5;
@@ -249,8 +259,17 @@
 
   function drawStumps(ctx, props) {
     for (const s of props.stumps) {
+      if (s.dropped) continue;  // skip chopped stumps
       const ss = w2s(s.x, s.y);
-      drawStump(ctx, ss.x, ss.y, s.r);
+      drawStump(ctx, ss.x, ss.y, s.r, s);
+      // HP bar above stump if damaged
+      if (s.hp < s.maxHp && s.hp > 0) {
+        const bw = s.r * 1.8, bh = 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(ss.x - bw/2, ss.y - s.r - 6, bw, bh);
+        ctx.fillStyle = '#a8d878';
+        ctx.fillRect(ss.x - bw/2, ss.y - s.r - 6, bw * (s.hp / s.maxHp), bh);
+      }
     }
   }
 
@@ -1030,6 +1049,29 @@
       for (let i = 0; i < 4; i++)
         WG.Render.spawnParticles({ x: p.x, y: p.y, life: 0.25, color: '#f0e0a0', size: 2 });
     });
+    WG.Engine.on('stump:hit', ({ stump }) => {
+      // Wood-chip particle burst at the stump
+      for (let i = 0; i < 6; i++) {
+        const a = Math.random() * Math.PI * 2;
+        WG.Render.spawnParticles({
+          x: stump.x + Math.cos(a) * stump.r * 0.7,
+          y: stump.y + Math.sin(a) * stump.r * 0.5,
+          angle: a, speed: 70 + Math.random() * 60,
+          life: 0.45, color: '#c89058', size: 2,
+        });
+      }
+    });
+    WG.Engine.on('stump:chopped', ({ stump }) => {
+      // Bigger burst on full chop — wood pieces fly out
+      for (let i = 0; i < 14; i++) {
+        const a = Math.random() * Math.PI * 2;
+        WG.Render.spawnParticles({
+          x: stump.x, y: stump.y,
+          angle: a, speed: 100 + Math.random() * 80,
+          life: 0.7, color: i % 2 === 0 ? '#a06028' : '#5a3010', size: 3,
+        });
+      }
+    });
     WG.Engine.on('boss:spawned', ({ boss }) => {
       pulseEdges(boss._typeData.accent + '88', 0.7, 600);
       for (let i = 0; i < 20; i++) {
@@ -1056,5 +1098,6 @@
     });
   }
 
-  window.WG.HuntRender = { init, drawFrame, setRuntime, w2s };
+  // Expose getStageProps so hunt-player can damage stumps on swing.
+  window.WG.HuntRender = { init, drawFrame, setRuntime, w2s, getStageProps };
 })();
