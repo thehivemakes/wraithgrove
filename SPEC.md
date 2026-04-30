@@ -1,7 +1,7 @@
 # Wraithgrove SPEC — Wood Siege clone, current truth
 
 **Last updated:** 2026-04-29
-**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.8.0-grid-forest`)
+**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.9.0-tree-barriers-spinning-scythe`)
 **Mirror:** https://thehivemakes.github.io/wraithgrove/
 **Source target:** Wood Siege (`com.dream.sfgame`, SF Group / Shifeng Shenzhen, English-localized)
 
@@ -91,12 +91,12 @@ Wraithgrove's prior naming (Duel/Ascend/Hunt/Forge/Relics) is acceptable for IP-
 
 ### Player ✅ GROUNDED
 - **Anime schoolgirl** (default): black pigtails, white blouse, dark short skirt, black tights
-- **Default weapon: white scythe** (curved bone-colored blade) — auto-attacks on cooldown ring (no visible reach indicator in source)
-- **Attack range** is implicit — sword/scythe swings in arc, hits anything in radius
+- **Default weapon: white scythe** — **rotates 360° around the player continuously** (Vampire Survivors style). Anything inside the rotation radius is the auto-attack hit zone. Cooldown timer governs how often damage ticks; the rotation is always-on visual.
 - **Movement:** virtual joystick bottom-half, top-down camera follow
 
 ### Tree-chopping ✅ GROUNDED
 - Trees fill the map on a ~30-pixel grid; player chops INTO the forest
+- **Trees are BARRIERS — player cannot walk through standing trees** (collision blocks movement). Only chopped (`dropped`) trees are walkable. Player must chop trees to expand playable space.
 - Each tree: ~5 HP, takes 5 swings to fell
 - On chop: drops wood (1) + coins (~2) + grants XP (~2) + visual wood-chip burst + audio reward
 - **XP from chopping trees** is the primary level-up source in Battle
@@ -266,7 +266,8 @@ Each character has **staged appearances unlocked through Rebirth events** at sta
 - Hexagonal wave indicator dots in HUD (5 dots, color-state per active/cleared/pending)
 - "Highest Wave Reached: X/5 Waves" persistent banner with localStorage
 - 2× camera zoom (matches HD source tightness)
-- Anime-girl player sprite with **scythe swing animation** (rotates on attack with motion-trail)
+- Anime-girl player sprite with **scythe rotating 360° continuously** around player (5 rad/s with 5-position motion trail) — auto-attack damage cadence governed by cooldown timer
+- **Tree barrier collision** — player cannot walk through standing trees, only chopped ones (3-iteration stability loop, normal-velocity damping)
 - **Pagoda landmark** at map center (red walls + dark tile roof + glowing orange windows + upturned eaves)
 - **Choppable trees on dense grid** (~600+ per stage, jittered 30-px spacing, 80-unit spawn clearing)
 - Tree chop mechanic: 5 HP per tree, hit flash + wobble, HP bar overlay, drops wood + coins + XP, particle bursts
@@ -319,6 +320,7 @@ Each character has **staged appearances unlocked through Rebirth events** at sta
 
 ## §18 — Changelog
 
+- **2026-04-29 v0.9** — Trees are barriers (player collision blocks movement until chopped) + scythe rotates 360° continuously around player (Vampire Survivors model). Architect feedback corrections.
 - **2026-04-29 v0.8** — Initial spec written. Map-as-uniform-forest model grounded from Architect in-game screenshot. Tree count target ~600/stage on jittered grid. Construction sites moved to fixed 4-Turret + 1-Campfire array around base.
 - **2026-04-29 v0.7** — Trees rendered as standing pines (was stumps), 40-55 scattered (was 10-14). Architect later flagged this as still wrong (trees should be uniform across map).
 - **2026-04-29 v0.6** — Choppable mechanic added: HP, hit flash, particle bursts, wood/coin/XP drops.
