@@ -6,6 +6,9 @@
 // has none. All v0 props are VISUAL ONLY (no collision/interaction yet).
 (function(){'use strict';
   const D = () => window.WG.Display;
+  // ZOOM — Wood Siege HD source shows tight zoom on player + base; previously
+  // Wraithgrove rendered at 1× and felt too far away. 2.0× lands close to source.
+  const ZOOM = 2.0;
   const camera = { x: 0, y: 0 };
   let runtime = null;
   let _edgePulse = null;
@@ -36,8 +39,9 @@
   function updateCamera() {
     if (!runtime || !runtime.player) return;
     const p = runtime.player;
-    const vw = D().width, vh = D().height;
-    let cx = p.x - vw/2, cy = p.y - vh/2 + 32;
+    // Viewport in WORLD units = screen pixels / ZOOM
+    const vw = D().width / ZOOM, vh = D().height / ZOOM;
+    let cx = p.x - vw/2, cy = p.y - vh/2 + 16;
     if (runtime.mapW <= vw) cx = (runtime.mapW - vw)/2;
     else cx = Math.max(0, Math.min(runtime.mapW - vw, cx));
     if (runtime.mapH <= vh) cy = (runtime.mapH - vh)/2;
@@ -703,27 +707,42 @@
   // V0: facing south (down). Direction-aware sprite is V1.
   // No attack ring — Wood Siege has none.
   // ─────────────────────────────────────────────────────────────────────────────
-  function drawAnimeGirl(ctx, sx, sy) {
-    // Scythe weapon — held to the player's right side, white curved blade.
-    // HD source (screenshot 3): default character holds a white/bone scythe.
-    // Drawn FIRST so the body overlaps the haft a bit.
+  function drawAnimeGirl(ctx, sx, sy, swingPhase) {
+    // Scythe weapon — animated swing on attack. swingPhase: 0 = mid-swing peak, 1 = at rest.
+    // Pivot at the player's hand (sx+7, sy+4). Rotate the entire scythe assembly.
+    const phase = (typeof swingPhase === 'number') ? swingPhase : 1;
+    // Swing arc: -1.0 rad (hard back) at phase=0, +0.0 rad (rest forward) at phase=1
+    const swingAngle = -1.0 * (1 - phase) * (1 - phase);  // ease-out curve
+    ctx.save();
+    ctx.translate(sx + 7, sy + 4);
+    ctx.rotate(swingAngle);
+    // Haft (relative to pivot)
     ctx.strokeStyle = '#5a4628';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(sx + 7, sy + 4);
-    ctx.lineTo(sx + 14, sy - 14);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(7, -18);
     ctx.stroke();
     // Blade — white curved scythe head
     ctx.strokeStyle = '#f0eee0';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(sx + 14, sy - 14, 7, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.arc(7, -18, 7, Math.PI * 0.85, Math.PI * 1.85, false);
     ctx.stroke();
     ctx.strokeStyle = '#a89c80';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(sx + 14, sy - 14, 6, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.arc(7, -18, 6, Math.PI * 0.85, Math.PI * 1.85, false);
     ctx.stroke();
+    // Swing motion-trail arc (only visible during fresh swing)
+    if (phase < 0.4) {
+      ctx.strokeStyle = `rgba(248, 240, 200, ${(0.4 - phase) * 0.7})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, -Math.PI * 0.7, Math.PI * 0.1);
+      ctx.stroke();
+    }
+    ctx.restore();
 
     // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -778,7 +797,11 @@
     const p = runtime.player;
     if (!p) return;
     const s = w2s(p.x, p.y);
-    drawAnimeGirl(ctx, s.x, s.y);
+    // Swing phase: 0 right after a swing, 1 fully reset. Peak swing in first 0.18s.
+    const cd = (p.attackCooldown || 0.5) * (p.cooldownMul || 1);
+    const elapsedSinceSwing = Math.max(0, cd - p.attackTimer);
+    const swingPhase = Math.min(1, elapsedSinceSwing / 0.18);
+    drawAnimeGirl(ctx, s.x, s.y, swingPhase);
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
 
@@ -961,19 +984,26 @@
     const props = getStageProps(runtime.stage);
 
     WG.Render.clear(ctx, biome.ground);
+
+    // World rendering — zoomed by ZOOM factor (closer to player, like Wood Siege HD)
+    ctx.save();
+    ctx.scale(ZOOM, ZOOM);
     drawTiles(ctx, biome);
     drawPineForest(ctx);
-    drawCampfireLight(ctx, props);     // Light radii under sprites
-    drawConstructionSites(ctx, props); // Dashed-circle build slots (Wood Siege key element)
+    drawCampfireLight(ctx, props);
+    drawConstructionSites(ctx, props);
     drawStumps(ctx, props);
-    drawCaves(ctx, props);             // Rocky cave landmark (NOT a cabin)
-    drawCampfireFlame(ctx, props);     // Flames over the light
+    drawCaves(ctx, props);
+    drawCampfireFlame(ctx, props);
     drawDrops(ctx);
     if (window.WG.HuntPickups) WG.HuntPickups.draw(ctx, w2s, runtime);
     drawCreatures(ctx);
     drawProjectiles(ctx);
     drawPlayer(ctx);
     WG.Render.drawParticles(ctx, w2s);
+    ctx.restore();
+
+    // Screen-space overlays — HUD, fog, modals (drawn at native scale)
     if (biome.lightFog > 0) {
       ctx.fillStyle = `rgba(0,0,0,${biome.lightFog})`;
       ctx.fillRect(0, 0, D().width, D().height);
