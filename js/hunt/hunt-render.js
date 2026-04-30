@@ -107,8 +107,8 @@
     // map is uniform forest, player chops INTO it to expand the playable clearing).
     // Skip cells within initial spawn clearing + building footprints.
     const stumps = [];
-    const TREE_SPACING = 30;
-    const initialClearingR = 80;  // small clearing around spawn so player can move
+    const TREE_SPACING = 22;       // tighter than 30 — Architect: 'denser, darker'
+    const initialClearingR = 80;   // small clearing around spawn so player can move
     function inFootprint(tx, ty) {
       // Avoid the pagoda itself
       for (const c of caves) {
@@ -210,12 +210,12 @@
     // Trunk
     ctx.fillStyle = '#2a1808';
     ctx.fillRect(sx + 9, sy + 26 + sizeJit, 4, 7);
-    // Foliage — three stacked triangles, getting wider as they go down
-    ctx.fillStyle = '#143018';
+    // Foliage — three stacked triangles, darker than before per Architect feedback
+    ctx.fillStyle = '#0a1c0a';
     ctx.beginPath(); ctx.moveTo(sx + 11, sy + 0);  ctx.lineTo(sx + 2,  sy + 14); ctx.lineTo(sx + 20, sy + 14); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#1a3a18';
+    ctx.fillStyle = '#102810';
     ctx.beginPath(); ctx.moveTo(sx + 11, sy + 8);  ctx.lineTo(sx,      sy + 22); ctx.lineTo(sx + 22, sy + 22); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#1c4220';
+    ctx.fillStyle = '#143018';
     ctx.beginPath(); ctx.moveTo(sx + 11, sy + 16); ctx.lineTo(sx - 2,  sy + 30); ctx.lineTo(sx + 24, sy + 30); ctx.closePath(); ctx.fill();
   }
 
@@ -270,13 +270,14 @@
     // Trunk
     ctx.fillStyle = '#2a1808';
     ctx.fillRect(sx - 2, sy - 7, 4, 7);
-    // Foliage — 3 stacked triangles, sized by hash, brighter on hit
+    // Foliage — 3 stacked triangles, sized by hash, brighter on hit.
+    // Architect: 'darker' — pulled green channels down ~12 across the board.
     const flashBoost = flash * 30;
-    ctx.fillStyle = `rgb(${20 + flashBoost},${48 + flashBoost*1.5},${24 + flashBoost})`;
+    ctx.fillStyle = `rgb(${10 + flashBoost},${32 + flashBoost*1.5},${14 + flashBoost})`;
     ctx.beginPath(); ctx.moveTo(sx, sy - 33); ctx.lineTo(sx - 9, sy - 19); ctx.lineTo(sx + 9, sy - 19); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = `rgb(${26 + flashBoost},${58 + flashBoost*1.5},${24 + flashBoost})`;
+    ctx.fillStyle = `rgb(${14 + flashBoost},${40 + flashBoost*1.5},${16 + flashBoost})`;
     ctx.beginPath(); ctx.moveTo(sx, sy - 25); ctx.lineTo(sx - 11, sy - 11); ctx.lineTo(sx + 11, sy - 11); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = `rgb(${28 + flashBoost},${66 + flashBoost*1.5},${32 + flashBoost})`;
+    ctx.fillStyle = `rgb(${18 + flashBoost},${48 + flashBoost*1.5},${22 + flashBoost})`;
     ctx.beginPath(); ctx.moveTo(sx, sy - 17); ctx.lineTo(sx - 13, sy - 3);  ctx.lineTo(sx + 13, sy - 3);  ctx.closePath(); ctx.fill();
     return; // skip the old stump-circle code below
     // Outer ring (darker bark)
@@ -770,10 +771,12 @@
   // ─────────────────────────────────────────────────────────────────────────────
   function drawAnimeGirl(ctx, sx, sy, weaponRange) {
     // Scythe rotates continuously 360° around the player (Vampire Survivors style).
-    // Always-on hit-zone — anything within `weaponRange` gets damaged on the auto-attack
-    // tick (governed by player.attackTimer in hunt-player.js). Rotation is purely visual
-    // continuity; damage cadence is the cooldown timer.
-    const range = weaponRange || 22;
+    // Architect: 'sword too far from character' — visual radius capped tight at 16
+    // even if weapon range is larger. Damage range is still the weapon's actual range
+    // (set in hunt-player.js autoAttack), so far-edge enemies still get hit even
+    // though the sprite stays close to the body.
+    const VISUAL_R = 16;
+    const range = Math.min(VISUAL_R, weaponRange || VISUAL_R);
     const t = performance.now() / 1000;
     const ROT_SPEED = 5.0;  // rad/s — fast enough to read as a whirling blade
     const angle = t * ROT_SPEED;
@@ -876,14 +879,16 @@
     const p = runtime.player;
     if (!p) return;
     const s = w2s(p.x, p.y);
-    // Pull weapon range from active melee weapon for the spinning-scythe radius
+    // Architect: scythe was too far from character. Cap visual radius to keep
+    // it tight to the player. Actual damage range still follows weapon stats.
     let weaponRange = 22;
     if (window.WG.HuntWeapons) {
       const meleeId = (p.heldPickupId || WG.State.get().player.slots.melee || 'branch_stick');
       const wep = WG.HuntWeapons.byId(meleeId);
       if (wep && wep.range) weaponRange = wep.range;
     }
-    drawAnimeGirl(ctx, s.x, s.y, weaponRange);
+    const visualRadius = Math.min(weaponRange, 16);
+    drawAnimeGirl(ctx, s.x, s.y, visualRadius);
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
 

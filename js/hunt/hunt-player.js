@@ -21,7 +21,8 @@
       cooldownMul: 1,
       level: 1,                  // in-stage level (Vampire Survivors style)
       xp: 0,
-      xpToNext: 5,
+      xpToNext: 12,              // Architect: HARDER. Base 12 (was 5), 1 xp/chop, 1.5x growth
+                                 // per level → 12, 18, 27, 40, 60, 90... real grind
       pickupRadius: 28,
       // active skill
       skillCd: 0,
@@ -133,6 +134,9 @@
 
   function autoAttack(dt) {
     const p = runtime.player;
+    // Pause attacks while level-up modal is up — prevents the chop cascade that
+    // generated more XP → more level-ups while the user was trying to pick a card.
+    if (runtime.pendingLevelUp) return;
     p.attackTimer -= dt;
     const w = activeMeleeFor(p);
     if (p.attackTimer <= 0) {
@@ -175,7 +179,9 @@
               // Drop wood, coin, and grant XP
               runtime.drops.push({ x: s.x, y: s.y, type: 'coin', vx:0, vy:0 });
               runtime.drops.push({ x: s.x + 6, y: s.y + 4, type: 'coin', vx:0, vy:0 });
-              p.xp += 2;
+              // Architect tuning: HARDER curve. 1 XP per chop (was 2), so leveling
+              // takes more sustained chopping. Combined with higher base xpToNext.
+              p.xp += 1;
               if (p.xp >= p.xpToNext) levelUp();
               runtime.runWood = (runtime.runWood || 0) + 1;
               WG.Engine.emit('stump:chopped', { stump: s });
