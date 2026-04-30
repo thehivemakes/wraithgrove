@@ -253,37 +253,66 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // Cabin / shelter — peaked-roof landmark structure.
   // ─────────────────────────────────────────────────────────────────────────────
-  // Cave — rocky landmark with dark entrance (Wood Siege Stage 1 has this, not a cabin).
-  // HD source: light-grey rounded rock formation with black oval cave mouth.
-  function drawCave(ctx, sx, sy) {
-    if (sx < -60 || sx > D().width + 60 || sy < -60 || sy > D().height + 60) return;
-    // Ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath(); ctx.ellipse(sx, sy + 22, 38, 8, 0, 0, Math.PI*2); ctx.fill();
-    // Rock body — cluster of rounded boulders, mid-grey w/ darker shading
-    ctx.fillStyle = '#5a5654';
-    ctx.beginPath(); ctx.ellipse(sx - 12, sy + 4, 22, 18, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(sx + 14, sy + 6, 20, 16, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(sx, sy - 8, 28, 22, 0, 0, Math.PI*2); ctx.fill();
-    // Top highlights (lighter)
-    ctx.fillStyle = '#7a7672';
-    ctx.beginPath(); ctx.ellipse(sx - 4, sy - 14, 14, 8, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(sx + 12, sy - 4, 8, 5, 0, 0, Math.PI*2); ctx.fill();
-    // Bottom shadow
-    ctx.fillStyle = '#3a3634';
-    ctx.beginPath(); ctx.ellipse(sx, sy + 14, 26, 8, 0, 0, Math.PI*2); ctx.fill();
-    // Cave mouth — dark oval entrance
-    ctx.fillStyle = '#0a0808';
-    ctx.beginPath(); ctx.ellipse(sx, sy + 4, 12, 10, 0, 0, Math.PI*2); ctx.fill();
-    // Cave inner glow hint
-    ctx.fillStyle = 'rgba(60,40,20,0.6)';
-    ctx.beginPath(); ctx.ellipse(sx, sy + 4, 8, 7, 0, 0, Math.PI*2); ctx.fill();
+  // Pagoda — Asian temple/shrine landmark (Wood Siege Stage 1, per HD source §L.2).
+  // Dark tile roof with upturned eaves, red walls, two glowing entry windows.
+  // CORRECTION 2026-04-29: previously drawn as a rocky cave; HD source shows pagoda.
+  function drawPagoda(ctx, sx, sy) {
+    if (sx < -70 || sx > D().width + 70 || sy < -70 || sy > D().height + 70) return;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 26, 40, 9, 0, 0, Math.PI*2); ctx.fill();
+    // Walls — red/maroon body
+    ctx.fillStyle = '#7a2828';
+    ctx.fillRect(sx - 28, sy - 4, 56, 30);
+    // Wall edge shadow
+    ctx.fillStyle = '#5a1818';
+    ctx.fillRect(sx + 22, sy - 4, 6, 30);
+    // Wall horizontal trim line
+    ctx.fillStyle = '#4a1010';
+    ctx.fillRect(sx - 28, sy + 8, 56, 1);
+    // Two glowing entry windows — orange firelight from inside
+    const t = performance.now() / 700;
+    const flicker = 0.75 + 0.15 * Math.sin(t * 1.7);
+    ctx.fillStyle = `rgba(248, 140, 40, ${flicker})`;
+    ctx.fillRect(sx - 22, sy + 2, 10, 14);
+    ctx.fillRect(sx + 12, sy + 2, 10, 14);
+    // Window frames
+    ctx.strokeStyle = '#3a0808'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(sx - 22.5, sy + 1.5, 11, 15);
+    ctx.strokeRect(sx + 11.5, sy + 1.5, 11, 15);
+    // Roof — dark tiles with upturned eaves
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.moveTo(sx - 36, sy - 2);
+    ctx.lineTo(sx - 30, sy - 16);
+    ctx.lineTo(sx + 30, sy - 16);
+    ctx.lineTo(sx + 36, sy - 2);
+    ctx.closePath(); ctx.fill();
+    // Upturned eave tips (the signature pagoda detail)
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath();
+    ctx.moveTo(sx - 36, sy - 2);
+    ctx.quadraticCurveTo(sx - 40, sy - 5, sx - 38, sy - 8);
+    ctx.lineTo(sx - 32, sy - 4);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx + 36, sy - 2);
+    ctx.quadraticCurveTo(sx + 40, sy - 5, sx + 38, sy - 8);
+    ctx.lineTo(sx + 32, sy - 4);
+    ctx.closePath(); ctx.fill();
+    // Roof ridge line (lighter)
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(sx - 30, sy - 16, 60, 2);
+    // Tiny center spire detail
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(sx - 1, sy - 22, 2, 6);
   }
 
   function drawCaves(ctx, props) {
+    // Function name preserved for back-compat; renders Pagoda per HD source.
     for (const c of props.caves) {
       const s = w2s(c.x, c.y);
-      drawCave(ctx, s.x, s.y);
+      drawPagoda(ctx, s.x, s.y);
     }
   }
 
@@ -528,11 +557,105 @@
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(20, sz+4), c.hp, c.maxHp);
   }
 
+  // Pumpkin-head folk-horror night enemy. matches screenshot_4 night-mode pumpkin head.
+  // Large orange jack-o-lantern head, dark stick body; glowing face pulses per-creature
+  // so a group doesn't flash in unison.
+  function drawPumpkin(ctx, sx, sy, c) {
+    const sz = c.size;
+    // Glow alpha 0.6–1.0; c.x as phase offset avoids group sync.
+    const glow = 0.8 + 0.2 * Math.sin(performance.now() / 280 + c.x * 0.01);
+    const headR = sz * 0.46;
+    const headCy = sy - sz * 0.3;
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz * 0.68, sz * 0.45, sz * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Leg lines — dark stick silhouette below torso
+    ctx.strokeStyle = '#1a1410'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(sx - sz * 0.07, sy + sz * 0.35); ctx.lineTo(sx - sz * 0.18, sy + sz * 0.68); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + sz * 0.07, sy + sz * 0.35); ctx.lineTo(sx + sz * 0.18, sy + sz * 0.68); ctx.stroke();
+
+    // Arm stubs — thin lines from upper torso
+    ctx.beginPath(); ctx.moveTo(sx - sz * 0.09, sy + sz * 0.02); ctx.lineTo(sx - sz * 0.36, sy + sz * 0.2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + sz * 0.09, sy + sz * 0.02); ctx.lineTo(sx + sz * 0.36, sy + sz * 0.2); ctx.stroke();
+
+    // Torso — thin dark rectangle
+    ctx.fillStyle = '#1a1410';
+    ctx.fillRect(sx - sz * 0.1, sy - sz * 0.05, sz * 0.2, sz * 0.4);
+
+    // Pumpkin-orange waist band
+    ctx.fillStyle = '#c06018';
+    ctx.fillRect(sx - sz * 0.13, sy + sz * 0.13, sz * 0.26, sz * 0.07);
+
+    // Head — large orange pumpkin circle (bigger than torso)
+    ctx.fillStyle = '#e07820';
+    ctx.beginPath(); ctx.arc(sx, headCy, headR, 0, Math.PI * 2); ctx.fill();
+
+    // Rib lines — 3 darker vertical bezier curves (pumpkin segments)
+    ctx.strokeStyle = '#a04810'; ctx.lineWidth = 1;
+    for (let i = -1; i <= 1; i++) {
+      const rx = sx + i * headR * 0.46;
+      ctx.beginPath();
+      ctx.moveTo(rx, headCy - headR * 0.85);
+      ctx.bezierCurveTo(rx + i * 2.5, headCy - headR * 0.3, rx + i * 2.5, headCy + headR * 0.3, rx, headCy + headR * 0.85);
+      ctx.stroke();
+    }
+
+    // Outer halo — f0a020 glow, alpha embedded in gradient so it pulses with glow
+    const gr = ctx.createRadialGradient(sx, headCy, headR * 0.35, sx, headCy, headR * 1.15);
+    gr.addColorStop(0, `rgba(240,160,32,${glow * 0.38})`);
+    gr.addColorStop(1, 'rgba(240,160,32,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(sx, headCy, headR * 1.15, 0, Math.PI * 2); ctx.fill();
+
+    // Face — glowing, alpha-pulsed (fff080 inner, f0a020 halo above)
+    ctx.globalAlpha = glow;
+    ctx.fillStyle = '#fff080';
+
+    // Left triangular eye (upward-pointing)
+    ctx.beginPath();
+    ctx.moveTo(sx - headR * 0.45, headCy - headR * 0.02);
+    ctx.lineTo(sx - headR * 0.17, headCy - headR * 0.02);
+    ctx.lineTo(sx - headR * 0.31, headCy - headR * 0.35);
+    ctx.closePath(); ctx.fill();
+
+    // Right triangular eye
+    ctx.beginPath();
+    ctx.moveTo(sx + headR * 0.17, headCy - headR * 0.02);
+    ctx.lineTo(sx + headR * 0.45, headCy - headR * 0.02);
+    ctx.lineTo(sx + headR * 0.31, headCy - headR * 0.35);
+    ctx.closePath(); ctx.fill();
+
+    // Jagged mouth — zigzag top edge (4 teeth), flat bottom
+    const mL = sx - headR * 0.37, mR = sx + headR * 0.37;
+    const mTop = headCy + headR * 0.15, mBot = headCy + headR * 0.42;
+    const qw = (mR - mL) / 4;
+    ctx.beginPath();
+    ctx.moveTo(mL, mTop);
+    ctx.lineTo(mL + qw,     mBot);
+    ctx.lineTo(mL + qw * 2, mTop);
+    ctx.lineTo(mL + qw * 3, mBot);
+    ctx.lineTo(mR,           mTop);
+    ctx.lineTo(mR,           mBot);
+    ctx.lineTo(mL,           mBot);
+    ctx.closePath(); ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    // Stem — small green-brown nub on top of head
+    ctx.fillStyle = '#3a3a1a';
+    ctx.fillRect(sx - 2, headCy - headR - 5, 4, 6);
+
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 0.85, Math.max(20, sz + 4), c.hp, c.maxHp);
+  }
+
   function drawCreatures(ctx) {
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
       const s = w2s(c.x, c.y);
-      drawZombie(ctx, s.x, s.y, c);
+      if (c.type === 'pumpkin_lantern') drawPumpkin(ctx, s.x, s.y, c);
+      else drawZombie(ctx, s.x, s.y, c);
     }
     if (runtime.boss && runtime.boss.hp > 0) {
       const b = runtime.boss;
@@ -672,24 +795,38 @@
     if (!p) return;
     const w = D().width;
 
-    // Wave dots row — 5 numbered circles across the top
+    // Wave indicators — HEXAGONAL dots (HD source §L.3 confirms hex shape, not circle).
+    // Pointy-top hexagons, purple/dark base with red glow on active wave.
     const currentWave = (runtime.wave && runtime.wave.index) || 1;
     const totalWaves = (runtime.wave && runtime.wave.total) || 5;
-    const dotR = 11, dotGap = 8;
-    const totalW = totalWaves * (dotR*2) + (totalWaves-1) * dotGap;
-    const startX = w/2 - totalW/2 + dotR;
+    const hexR = 12, hexGap = 10;
+    const totalW = totalWaves * (hexR*2) + (totalWaves-1) * hexGap;
+    const startX = w/2 - totalW/2 + hexR;
+    function hexPath(cx, cy, r) {
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = (Math.PI / 3) * k - Math.PI / 2; // pointy-top
+        const x = cx + r * Math.cos(a);
+        const y = cy + r * Math.sin(a);
+        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    }
     for (let i = 1; i <= totalWaves; i++) {
-      const dx = startX + (i-1) * (dotR*2 + dotGap);
+      const dx = startX + (i-1) * (hexR*2 + hexGap);
       const dy = 88;
       const active = (i === currentWave);
       const cleared = (i < currentWave);
-      ctx.fillStyle = active ? '#d04848' : (cleared ? '#5a5040' : '#2a2418');
-      ctx.beginPath(); ctx.arc(dx, dy, dotR, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = active ? '#f0c8a0' : (cleared ? '#7a6e58' : '#403828');
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(dx, dy, dotR, 0, Math.PI*2); ctx.stroke();
-      ctx.fillStyle = active ? '#fff0d0' : (cleared ? '#c8c0a8' : '#7a7058');
-      ctx.font = 'bold 11px system-ui';
+      // Fill — purple-dark base, brighter when active/cleared
+      ctx.fillStyle = active ? '#3a1838' : (cleared ? '#4a3850' : '#1a0e1c');
+      hexPath(dx, dy, hexR); ctx.fill();
+      // Border — red on active, lavender on cleared, dim on pending
+      ctx.strokeStyle = active ? '#e84838' : (cleared ? '#b896c8' : '#4a3858');
+      ctx.lineWidth = active ? 2 : 1.5;
+      hexPath(dx, dy, hexR); ctx.stroke();
+      // Number text
+      ctx.fillStyle = active ? '#ffe0d0' : (cleared ? '#e8c8e0' : '#7a6878');
+      ctx.font = 'bold 12px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText(String(i), dx, dy + 4);
       ctx.textAlign = 'left';
