@@ -768,41 +768,59 @@
   // V0: facing south (down). Direction-aware sprite is V1.
   // No attack ring — Wood Siege has none.
   // ─────────────────────────────────────────────────────────────────────────────
-  function drawAnimeGirl(ctx, sx, sy, swingPhase) {
-    // Scythe weapon — animated swing on attack. swingPhase: 0 = mid-swing peak, 1 = at rest.
-    // Pivot at the player's hand (sx+7, sy+4). Rotate the entire scythe assembly.
-    const phase = (typeof swingPhase === 'number') ? swingPhase : 1;
-    // Swing arc: -1.0 rad (hard back) at phase=0, +0.0 rad (rest forward) at phase=1
-    const swingAngle = -1.0 * (1 - phase) * (1 - phase);  // ease-out curve
+  function drawAnimeGirl(ctx, sx, sy, weaponRange) {
+    // Scythe rotates continuously 360° around the player (Vampire Survivors style).
+    // Always-on hit-zone — anything within `weaponRange` gets damaged on the auto-attack
+    // tick (governed by player.attackTimer in hunt-player.js). Rotation is purely visual
+    // continuity; damage cadence is the cooldown timer.
+    const range = weaponRange || 22;
+    const t = performance.now() / 1000;
+    const ROT_SPEED = 5.0;  // rad/s — fast enough to read as a whirling blade
+    const angle = t * ROT_SPEED;
+    // Faint reach circle (subtle, not a blocky ring)
+    ctx.strokeStyle = 'rgba(232,224,200,0.10)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(sx, sy, range, 0, Math.PI*2); ctx.stroke();
+    // Motion trail — ghosted scythe positions trailing behind the live blade
+    for (let i = 1; i <= 5; i++) {
+      const a = angle - i * 0.13;
+      const tx = sx + Math.cos(a) * range;
+      const ty = sy + Math.sin(a) * range;
+      ctx.fillStyle = `rgba(248, 240, 200, ${0.30 - i * 0.05})`;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3.5 - i * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Live scythe — drawn at the leading edge of the rotation
+    const wx = sx + Math.cos(angle) * range;
+    const wy = sy + Math.sin(angle) * range;
     ctx.save();
-    ctx.translate(sx + 7, sy + 4);
-    ctx.rotate(swingAngle);
-    // Haft (relative to pivot)
+    ctx.translate(wx, wy);
+    // Orient blade tangent to circle (perpendicular to radial)
+    ctx.rotate(angle + Math.PI / 2);
+    // Haft (small inward stub)
     ctx.strokeStyle = '#5a4628';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(7, -18);
+    ctx.moveTo(-3, 0);
+    ctx.lineTo(8, 0);
     ctx.stroke();
-    // Blade — white curved scythe head
+    // Curved scythe blade — sweeps the leading direction
     ctx.strokeStyle = '#f0eee0';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(7, -18, 7, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.arc(8, -2, 7, Math.PI * 0.4, Math.PI * 1.6, false);
     ctx.stroke();
     ctx.strokeStyle = '#a89c80';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(7, -18, 6, Math.PI * 0.85, Math.PI * 1.85, false);
+    ctx.arc(8, -2, 6, Math.PI * 0.4, Math.PI * 1.6, false);
     ctx.stroke();
-    // Swing motion-trail arc (only visible during fresh swing)
-    if (phase < 0.4) {
-      ctx.strokeStyle = `rgba(248, 240, 200, ${(0.4 - phase) * 0.7})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, 16, -Math.PI * 0.7, Math.PI * 0.1);
-      ctx.stroke();
-    }
+    // Tip glint
+    ctx.fillStyle = '#ffffe8';
+    ctx.beginPath();
+    ctx.arc(8 + Math.cos(Math.PI*0.4) * 7, -2 + Math.sin(Math.PI*0.4) * 7, 1.5, 0, Math.PI*2);
+    ctx.fill();
     ctx.restore();
 
     // Drop shadow
@@ -858,11 +876,14 @@
     const p = runtime.player;
     if (!p) return;
     const s = w2s(p.x, p.y);
-    // Swing phase: 0 right after a swing, 1 fully reset. Peak swing in first 0.18s.
-    const cd = (p.attackCooldown || 0.5) * (p.cooldownMul || 1);
-    const elapsedSinceSwing = Math.max(0, cd - p.attackTimer);
-    const swingPhase = Math.min(1, elapsedSinceSwing / 0.18);
-    drawAnimeGirl(ctx, s.x, s.y, swingPhase);
+    // Pull weapon range from active melee weapon for the spinning-scythe radius
+    let weaponRange = 22;
+    if (window.WG.HuntWeapons) {
+      const meleeId = (p.heldPickupId || WG.State.get().player.slots.melee || 'branch_stick');
+      const wep = WG.HuntWeapons.byId(meleeId);
+      if (wep && wep.range) weaponRange = wep.range;
+    }
+    drawAnimeGirl(ctx, s.x, s.y, weaponRange);
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
 

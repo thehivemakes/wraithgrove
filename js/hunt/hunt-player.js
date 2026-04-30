@@ -52,6 +52,47 @@
     return heldPickupWeapon() || meleeWeapon();
   }
 
+  // Tree collision — standing trees block player movement; only chopped (.dropped) ones
+  // are walkable. Iterates twice for stability when pinched between adjacent trees.
+  function resolveTreeCollisions(p) {
+    if (!window.WG.HuntRender || !WG.HuntRender.getStageProps || !runtime.stage) return;
+    const props = WG.HuntRender.getStageProps(runtime.stage);
+    if (!props || !props.stumps) return;
+    const PLAYER_R = 10;
+    const TREE_R = 9;
+    const minD = PLAYER_R + TREE_R;
+    const minD2 = minD * minD;
+    for (let iter = 0; iter < 3; iter++) {
+      let resolved = false;
+      for (let i = 0; i < props.stumps.length; i++) {
+        const t = props.stumps[i];
+        if (t.dropped) continue;
+        const dx = p.x - t.x, dy = p.y - t.y;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < minD2) {
+          if (d2 < 0.01) {
+            // Player exactly at tree center — push +x by default
+            p.x += minD;
+            resolved = true;
+            continue;
+          }
+          const d = Math.sqrt(d2);
+          const overlap = minD - d;
+          p.x += (dx / d) * overlap;
+          p.y += (dy / d) * overlap;
+          // Damp velocity along the collision normal to prevent jitter
+          const dotV = (p.vx * (dx/d) + p.vy * (dy/d));
+          if (dotV < 0) {
+            p.vx -= dotV * (dx/d);
+            p.vy -= dotV * (dy/d);
+          }
+          resolved = true;
+        }
+      }
+      if (!resolved) break;
+    }
+  }
+
   function move(dt, dirX, dirY) {
     const p = runtime.player;
     const sp = baseSpeed() + (p.speedBonus || 0);
@@ -67,6 +108,8 @@
     if (p.y < 16) p.y = 16;
     if (p.x > runtime.mapW - 16) p.x = runtime.mapW - 16;
     if (p.y > runtime.mapH - 16) p.y = runtime.mapH - 16;
+    // Tree barrier collision (trees are walls until chopped)
+    resolveTreeCollisions(p);
     if (Math.abs(dirX) > Math.abs(dirY)) p.facing = dirX > 0 ? 'E' : 'W';
     else if (Math.abs(dirY) > 0)         p.facing = dirY > 0 ? 'S' : 'N';
   }
