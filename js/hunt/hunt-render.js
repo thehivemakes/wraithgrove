@@ -82,62 +82,74 @@
 
     const mapW = runtime.mapW, mapH = runtime.mapH;
     const inset = 80;
-    // Choppable trees scattered DENSELY through the play area (Wood Siege register).
-    // 40-55 per stage. Cleared zone around map center (where player base sits) so
-    // the spawn area is open. Each tree: trunk-base position (.x, .y), HP, hit anim.
-    const stumps = [];  // field name preserved for back-compat; entries are trees
-    const cx = mapW / 2, cy = mapH / 2;
-    const clearingR = 150; // open zone around base center
-    const numTrees = pick(40, 55);
-    let placed = 0, attempts = 0;
-    while (placed < numTrees && attempts < numTrees * 6) {
-      attempts++;
-      const tx = inset + rand() * (mapW - inset*2);
-      const ty = inset + rand() * (mapH - inset*2);
-      const dx = tx - cx, dy = ty - cy;
-      if (dx*dx + dy*dy < clearingR * clearingR) continue; // skip clearing
-      // Spread them — reject if too close to a previously-placed tree
-      let collide = false;
-      for (let j = 0; j < stumps.length; j++) {
-        const ddx = tx - stumps[j].x, ddy = ty - stumps[j].y;
-        if (ddx*ddx + ddy*ddy < 32*32) { collide = true; break; }
-      }
-      if (collide) continue;
-      stumps.push({
-        x: tx, y: ty,
-        r: 14,            // hit-radius (player must get within this + range to chop)
-        hp: 5, maxHp: 5,
-        lastHit: 0,
-        dropped: false,
-        hash: hash2(Math.floor(tx), Math.floor(ty)) >>> 0, // for visual variation
-      });
-      placed++;
-    }
-    // Cave: fixed pre-built landmark (Wood Siege Stage 1 has a Cave, not a cabin).
+    const cxBase = mapW / 2, cyBase = mapH / 2;
+
+    // Pagoda/cave: fixed landmark at the base, slightly offset
     const caves = [{
-      x: mapW * 0.35 + rand() * (mapW * 0.3),
-      y: mapH * 0.35 + rand() * (mapH * 0.3),
+      x: cxBase + (rand() - 0.5) * 60,
+      y: cyBase + (rand() - 0.5) * 60,
     }];
-    // Campfires: ambient lighting only at this stage (real day/night logic is V2).
-    const fires = [];
-    const numFires = pick(1, 2);
-    for (let i = 0; i < numFires; i++) {
-      fires.push({
-        x: inset + rand() * (mapW - inset*2),
-        y: inset + rand() * (mapH - inset*2),
-        flicker: rand() * Math.PI * 2,
-      });
-    }
-    // Construction sites — dashed-circle build slots with name + cost progress.
-    // Visual-only V0; real wood-collection logic + activation is V2.
-    const constructions = [
-      { x: inset + rand() * (mapW - inset*2),
-        y: inset + rand() * (mapH - inset*2),
-        name: 'Turret', have: 0, need: 4 },
-      { x: inset + rand() * (mapW - inset*2),
-        y: inset + rand() * (mapH - inset*2),
-        name: 'Campfire', have: 0, need: 30 },
+    // Campfires (ambient light, decorative for now)
+    const fires = [
+      { x: cxBase + (rand() - 0.5) * 80, y: cyBase + 50 + rand() * 30, flicker: rand() * Math.PI * 2 },
     ];
+    // Construction sites — fixed positions arrayed around the base (Wood Siege has
+    // 4-6 fixed turret slots around the player's spawn, not random placement)
+    const constructions = [
+      { x: cxBase - 110, y: cyBase - 10,  name: 'Turret', have: 0, need: 4  },
+      { x: cxBase + 110, y: cyBase - 10,  name: 'Turret', have: 0, need: 4  },
+      { x: cxBase - 110, y: cyBase + 90,  name: 'Turret', have: 0, need: 4  },
+      { x: cxBase + 110, y: cyBase + 90,  name: 'Turret', have: 0, need: 4  },
+      { x: cxBase + 70,  y: cyBase + 30,  name: 'Campfire', have: 0, need: 30 },
+    ];
+
+    // DENSE forest covering the ENTIRE map on a jittered grid (Wood Siege register —
+    // map is uniform forest, player chops INTO it to expand the playable clearing).
+    // Skip cells within initial spawn clearing + building footprints.
+    const stumps = [];
+    const TREE_SPACING = 30;
+    const initialClearingR = 80;  // small clearing around spawn so player can move
+    function inFootprint(tx, ty) {
+      // Avoid the pagoda itself
+      for (const c of caves) {
+        const dx = tx - c.x, dy = ty - c.y;
+        if (dx*dx + dy*dy < 42*42) return true;
+      }
+      // Avoid construction sites
+      for (const cs of constructions) {
+        const dx = tx - cs.x, dy = ty - cs.y;
+        if (dx*dx + dy*dy < 36*36) return true;
+      }
+      // Avoid campfires
+      for (const f of fires) {
+        const dx = tx - f.x, dy = ty - f.y;
+        if (dx*dx + dy*dy < 28*28) return true;
+      }
+      return false;
+    }
+    for (let gy = TREE_SPACING/2; gy < mapH; gy += TREE_SPACING) {
+      for (let gx = TREE_SPACING/2; gx < mapW; gx += TREE_SPACING) {
+        // Per-cell deterministic jitter (~±35% of spacing)
+        const jh = hash2(Math.floor(gx), Math.floor(gy)) >>> 0;
+        const jx = ((jh % 1000) / 1000 - 0.5) * TREE_SPACING * 0.7;
+        const jy = (((jh >>> 10) % 1000) / 1000 - 0.5) * TREE_SPACING * 0.7;
+        const tx = gx + jx;
+        const ty = gy + jy;
+        // Skip initial spawn clearing
+        const dxc = tx - cxBase, dyc = ty - cyBase;
+        if (dxc*dxc + dyc*dyc < initialClearingR * initialClearingR) continue;
+        // Skip building footprints
+        if (inFootprint(tx, ty)) continue;
+        stumps.push({
+          x: tx, y: ty,
+          r: 12,
+          hp: 5, maxHp: 5,
+          lastHit: 0,
+          dropped: false,
+          hash: jh,
+        });
+      }
+    }
     _stagePropsCache[stage.id] = { stumps, caves, fires, constructions };
     return _stagePropsCache[stage.id];
   }
