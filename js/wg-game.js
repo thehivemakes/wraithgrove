@@ -30,6 +30,8 @@
       player: null,
       pendingLevelUp: false,
       kills: 0,
+      // SPEC W-Hard-Tuning-And-Monetization §B — limit ad-revive uses per run
+      reviveCount: 0,
     };
     huntRuntime = rt;
     WG.HuntRender.setRuntime(rt);
@@ -233,6 +235,83 @@
     if (tab === 'hunt') showHuntStageList();
   }
 
+  // SPEC W-Hard-Tuning-And-Monetization §B — ad-watch buff buttons in level select.
+  // Gold border + ad-icon for visual distinctness vs stage cards. Tap = scale-bounce
+  // + WG.Ads.showRewardedVideo → on success, WG.Buffs.activate(id, ms).
+  // The "ON" pill swaps in when the buff is currently active so a player who
+  // primed a buff sees it persist while they pick a stage.
+  function appendBuffStrip(parent) {
+    const wrap = document.createElement('div');
+    wrap.id = 'buff-strip';
+    wrap.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:0 0 12px 0;';
+    parent.appendChild(wrap);
+
+    const buttons = [
+      { id: 'damage_x2',     ms: 60000, title: '2× DAMAGE',  sub: '60s after watching ad' },
+      { id: 'wood_x2',       ms: 90000, title: '2× WOOD',    sub: '90s after watching ad' },
+      { id: 'instant_turret', ms: 0,    title: 'INSTANT TURRET', sub: 'Free build, one use' },
+      { id: 'revive',        ms: 0,     title: 'PRE-ARM REVIVE',  sub: 'One free death save' },
+    ];
+
+    function buildBtn(spec) {
+      const btn = document.createElement('button');
+      const active = (WG.Buffs && WG.Buffs.has && WG.Buffs.has(spec.id));
+      btn.style.cssText = [
+        'position:relative;cursor:pointer;text-align:left;',
+        'padding:9px 11px;border-radius:7px;',
+        'background:linear-gradient(135deg,#3a2a08,#1a1004);',
+        'border:1.5px solid #f0c060;',
+        'box-shadow:0 0 0 1px rgba(240,192,96,0.18) inset, 0 2px 6px rgba(0,0,0,0.5);',
+        'color:#f8e0a0;transition:transform 80ms ease;',
+      ].join('');
+      btn.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;background:#f0c060;color:#2a1a04;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:1px;">▶ AD</span>
+          <span style="font-size:12px;font-weight:700;letter-spacing:1px;color:#f8e0a0;">${spec.title}</span>
+          ${active ? '<span style="margin-left:auto;font-size:10px;background:#5aa040;color:#0a1a04;padding:1px 5px;border-radius:3px;font-weight:700;">ON</span>' : ''}
+        </div>
+        <div style="font-size:10px;color:#c0a060;margin-top:3px;letter-spacing:0.5px;">${spec.sub}</div>
+      `;
+      // Scale-bounce tap feedback
+      btn.addEventListener('pointerdown', () => { btn.style.transform = 'scale(0.94)'; });
+      btn.addEventListener('pointerup',   () => { btn.style.transform = 'scale(1)'; });
+      btn.addEventListener('pointerleave',() => { btn.style.transform = 'scale(1)'; });
+
+      btn.addEventListener('click', async () => {
+        if (active) return; // already on
+        btn.disabled = true;
+        const res = await WG.Ads.showRewardedVideo({ reward: 'buff:' + spec.id });
+        btn.disabled = false;
+        if (res && res.ok) {
+          WG.Buffs.activate(spec.id, spec.ms);
+          // Brief gold flash on the level-select panel for activation feedback.
+          flashScreen('#f0c060', 0.35, 320);
+          // Re-render to show ON pill.
+          const s = document.getElementById('hunt-stage-select');
+          if (s && s.parentNode) {
+            s.parentNode.removeChild(s);
+            showHuntStageList();
+          }
+        }
+      });
+      return btn;
+    }
+
+    for (const spec of buttons) wrap.appendChild(buildBtn(spec));
+  }
+
+  // Quick fullscreen flash overlay — non-blocking, fades out, removed on done.
+  function flashScreen(color, alpha, durationMs) {
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:fixed;inset:0;background:${color};opacity:${alpha};
+      pointer-events:none;z-index:300;transition:opacity ${durationMs}ms ease-out;
+    `;
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => { flash.style.opacity = '0'; });
+    setTimeout(() => { if (flash.parentNode) flash.parentNode.removeChild(flash); }, durationMs + 60);
+  }
+
   // SPEC §0 — Level select lives INSIDE the Hunt tab; mode tabs split Day/Night;
   // all 18 stages unlocked for now (worker spec). Card tap → startHunt(id, mode).
   function showHuntStageList() {
@@ -269,6 +348,10 @@
     nightTab.addEventListener('click', () => { currentLevelMode = 'night'; rerender(); });
     modeBar.appendChild(dayTab); modeBar.appendChild(nightTab);
     select.appendChild(modeBar);
+
+    // SPEC W-Hard-Tuning-And-Monetization §B — ad-watch buff buttons.
+    // Gold border + ad-icon, scale-bounce on tap, distinct from stage cards.
+    appendBuffStrip(select);
 
     const grid = document.createElement('div');
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:8px;';
@@ -338,6 +421,8 @@
     WG.Events.init();
     WG.IAP.init();
     WG.Ads.init();
+    if (WG.Buffs && WG.Buffs.init) WG.Buffs.init();
+    if (WG.Audio && WG.Audio.init) WG.Audio.init();
     WG.Input.init();
     WG.Render.init();
     WG.HuntStage.init();

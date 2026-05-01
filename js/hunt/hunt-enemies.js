@@ -1,13 +1,31 @@
 // WG.HuntEnemies — enemy roster + AI
 (function(){'use strict';
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Enemy roster. Tunables here are the single source of truth — render/UI must
+  // never hardcode HP/damage/speed/size/xp values. `mode` is consumed by the
+  // wave spawner: 'day' / 'night' / 'both'. Absence of `mode` is treated as
+  // 'both' for backwards compatibility with the original five types.
+  // ─────────────────────────────────────────────────────────────────────────────
   const TYPES = {
-    lurker:      { hp:10, speed:35, damage:5,  cooldown:1.0, size:14, color:'#1a0a08', accent:'#a82828', xp:2  },
-    walker:      { hp:22, speed:25, damage:9,  cooldown:1.3, size:18, color:'#7a2818', accent:'#3a1408', xp:4  },
-    sprite:      { hp:6,  speed:60, damage:3,  cooldown:0.6, size:10, color:'#5a2878', accent:'#2a1438', xp:2  },
-    brute_small: { hp:55, speed:18, damage:18, cooldown:2.0, size:24, color:'#9a2018', accent:'#4a1008', xp:8  },
-    caller:      { hp:14, speed:22, damage:8,  cooldown:1.6, size:16, color:'#3a2858', accent:'#1a1228', xp:5, ranged:true, projectileSpeed:140, projectileRange:260 },
+    lurker:          { name: 'Lurker',         hp:10, speed:35, damage:5,  cooldown:1.0, size:14, color:'#1a0a08', accent:'#a82828', xp:2,  mode:'both'  },
+    walker:          { name: 'Walker',         hp:22, speed:25, damage:9,  cooldown:1.3, size:18, color:'#7a2818', accent:'#3a1408', xp:4,  mode:'both'  },
+    sprite:          { name: 'Sprite',         hp:6,  speed:60, damage:3,  cooldown:0.6, size:10, color:'#5a2878', accent:'#2a1438', xp:2,  mode:'both'  },
+    brute_small:     { name: 'Brute',          hp:55, speed:18, damage:18, cooldown:2.0, size:24, color:'#9a2018', accent:'#4a1008', xp:8,  mode:'both'  },
+    caller:          { name: 'Caller',         hp:14, speed:22, damage:8,  cooldown:1.6, size:16, color:'#3a2858', accent:'#1a1228', xp:5,  mode:'both', ranged:true, projectileSpeed:140, projectileRange:260 },
+
+    // Day-baseline cloaked zombie. Existing `drawZombie` sprite is the canonical
+    // form; this is just a tagged id so day stages explicitly mix it in.
+    red_zombie:      { name: 'Red Zombie',     hp:22, speed:65, damage:6,  cooldown:1.3, size:18, color:'#a82820', accent:'#ffe0b0', xp:3,  mode:'both', ai:'walker' },
+
     // Night-mode folk-horror. matches screenshot_4 pumpkin-head creature register.
-    pumpkin_lantern: { name: 'Pumpkin Lantern', hp: 28, damage: 5, speed: 78, cooldown: 1.2, size: 18, color: '#e07820', accent: '#ffc848', xp: 4, ai: 'walker' },
+    pumpkin_lantern: { name: 'Pumpkin Lantern',hp:32, speed:70, damage:8,  cooldown:1.2, size:18, color:'#e07820', accent:'#ffc848', xp:4,  mode:'night', ai:'walker' },
+
+    // Hopping Chinese vampire. Conical hat + paper amulet. AI is plain walker for
+    // now; actual hop AI is V2 (would need a vertical bob + interval-step).
+    jiangshi:        { name: 'Jiangshi',       hp:50, speed:85, damage:12, cooldown:1.4, size:20, color:'#3a2018', accent:'#f8e8c8', xp:7,  mode:'night', ai:'walker' },
+
+    // Armored samurai grunt — both modes (boss-tier henchman across day/night).
+    samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:10, mode:'both', ai:'walker' },
   };
 
   let nextId = 1;
@@ -50,6 +68,29 @@
       c.retargetTimer = 0.5;
     }
     if (!c.target) return;
+
+    // W-Turret-And-Campfire-Combat: melee enemies that come within hit range of
+    // a built turret attack the turret instead of continuing toward the player.
+    // Ranged enemies ignore turrets — they keep firing at the player from range.
+    // Range is enemy-half-size + TURRET_HIT_RANGE so big enemies engage from a
+    // sensible distance instead of overlapping the wagon sprite.
+    if (!c._typeData.ranged && window.WG.HuntTurret && WG.HuntTurret.nearestTurretInRange) {
+      const TURRET_HIT_RANGE = WG.HuntTurret.TUNABLES.TURRET_HIT_RANGE;
+      const turret = WG.HuntTurret.nearestTurretInRange(c.x, c.y, TURRET_HIT_RANGE + c.size/2, runtime);
+      if (turret) {
+        const tdx = turret.x - c.x, tdy = turret.y - c.y;
+        if (Math.abs(tdx) > Math.abs(tdy)) c.facing = tdx > 0 ? 'E' : 'W';
+        else                                c.facing = tdy > 0 ? 'S' : 'N';
+        c.attackTimer -= dt;
+        if (c.attackTimer <= 0) {
+          WG.HuntTurret.damageTurret(turret, c.damage);
+          WG.Engine.emit('enemy:hit', { creature: c, target: 'turret' });
+          c.attackTimer = c.attackCooldown;
+        }
+        return;  // skip player-pursuit this tick
+      }
+    }
+
     const dx = c.target.x - c.x, dy = c.target.y - c.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
     const contactDist = c.size/2 + (c.target.size||10)/2;

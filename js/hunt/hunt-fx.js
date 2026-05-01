@@ -32,6 +32,19 @@
                       colors: ['#fff0c0'], shape: 'square', ring: true },
     bossKill:       { count: 30, life: 1.20, sMin: 200, sMax: 200, gravity:  60, size: 3,
                       colors: ['#ffd870', '#ff8040', '#ffffff'], shape: 'square', ring: true },
+
+    // W-Turret-And-Campfire-Combat — additive particle types.
+    // Muzzle flash: short bright burst at projectile origin on each turret shot.
+    muzzleFlash:    { count: 5,  life: 0.18, sMin:  90, sMax: 160, gravity:   0, size: 2,
+                      colors: ['#fff4c8', '#ffd070', '#ff8040'], shape: 'square' },
+    // Turret destruction: small radial explosion when a turret's HP hits 0.
+    turretExplode:  { count: 18, life: 0.65, sMin: 120, sMax: 220, gravity:  60, size: 2,
+                      colors: ['#ff8040', '#ffd870', '#7a4a28', '#3a1c08'], shape: 'square', ring: true },
+    // Campfire sparkle: faint green bits drifting up off the player while regenerating.
+    // Negative gravity so they rise. Small count per emission — the regen tick fires
+    // these continuously so cumulative density gives the "healing aura" read.
+    campfireSparkle:{ count: 1,  life: 0.85, sMin:  20, sMax:  40, gravity: -30, size: 2,
+                      colors: ['#a8f0a0', '#80e088', '#c8ffc8'], shape: 'sparkle' },
   };
 
   function _alloc() {
@@ -140,6 +153,15 @@
     WG.Engine.on('player:level', () => {
       const player = _runtimePlayer();
       if (player) burst(player.x, player.y, 'levelUp');
+    });
+    // W-Turret-And-Campfire-Combat — muzzle flash + destruction explosion.
+    // (campfireSparkle is emitted directly from hunt-turret.campfireRegenTick
+    //  on a per-tick rate-limited cadence, no event needed.)
+    WG.Engine.on('turret:fire', ({ x, y }) => {
+      if (x != null && y != null) burst(x, y, 'muzzleFlash');
+    });
+    WG.Engine.on('turret:destroyed', ({ turret }) => {
+      if (turret) burst(turret.x, turret.y, 'turretExplode');
     });
   }
 

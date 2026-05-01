@@ -20,6 +20,23 @@
   // Player swing squash timestamp (DOPAMINE_DESIGN §9 sprite techniques).
   let _lastSwingAt = 0;
 
+  // SPEC §0 — Night Mode lighting. Overlay alpha eases with (1 - torchAmount).
+  // Holes carved at player + every built campfire via destination-out compositing.
+  // Constants in world units (radii) and seconds (time-bases).
+  const NIGHT_OVERLAY_TOP        = '#02010a';   // sky band — deepest indigo
+  const NIGHT_OVERLAY_MID        = '#0a0818';   // horizon — slight warmth
+  const NIGHT_MAX_ALPHA          = 0.93;        // never fully opaque — keep fight legible
+  const NIGHT_PLAYER_LIGHT_R     = 80;          // SPEC §0: ~80px world units around player
+  const NIGHT_CAMPFIRE_LIGHT_R   = 140;         // SPEC §0: ~140px around any built campfire
+  const NIGHT_PLAYER_FLICKER     = 3;           // amplitude (world units) of torch breathing
+  const NIGHT_CAMPFIRE_FLICKER   = 6;           // amplitude (world units) of bonfire pulse
+
+  function _easeInOutCubic(t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+  }
+
   function addTrauma(amt) { _trauma = Math.min(1, _trauma + amt); }
   let _lastFrameMs = 0;
 
@@ -530,25 +547,83 @@
         ctx.fillStyle = '#1a0a02';
         ctx.beginPath(); ctx.arc(s.x - 11, s.y + 11, 3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(s.x + 11, s.y + 11, 3, 0, Math.PI*2); ctx.fill();
-        // Cannon barrel — angled upward, slowly rotating to track an imagined enemy
-        const aim = Math.sin(t * 0.6 + c.x * 0.01) * 0.4 - 0.5;  // -0.9 to -0.1 rad
+        // Cannon barrel — points along c.aimAngle. atan2 returns 0=east; canvas
+        // rotate is clockwise from up, so canvas rotation = aimAngle + PI/2.
+        // (HuntTurret keeps c.aimAngle smoothly lerped toward the live target.)
+        const aimWorld = (typeof c.aimAngle === 'number') ? c.aimAngle : -Math.PI / 2;
+        const aimCanvas = aimWorld + Math.PI / 2;
         ctx.save();
         ctx.translate(s.x, s.y - 2);
-        ctx.rotate(aim);
+        ctx.rotate(aimCanvas);
         ctx.fillStyle = '#4a4438';
         ctx.fillRect(-2, -14, 4, 14);
         ctx.fillStyle = '#7a7468';
         ctx.fillRect(-2, -16, 4, 2);  // muzzle
         ctx.restore();
-        // Faint muzzle glow
+        // Faint muzzle glow at the muzzle tip — pulses gently.
+        const muzzleX = s.x + Math.cos(aimWorld) * 14;
+        const muzzleY = s.y - 2 + Math.sin(aimWorld) * 14;
         ctx.fillStyle = `rgba(255, 200, 80, ${0.3 + Math.sin(t * 4) * 0.15})`;
         ctx.beginPath();
-        ctx.arc(s.x + Math.sin(aim) * 14, s.y - 2 - Math.cos(aim) * 14, 3, 0, Math.PI*2);
+        ctx.arc(muzzleX, muzzleY, 3, 0, Math.PI*2);
         ctx.fill();
+        // HP bar — only when damaged. Width 26, height 3, sits 12px above the
+        // wagon. Animated via c._hpDisplayed (lerped in HuntTurret.tickOne) so
+        // damage reads as a smooth sweep instead of a snap.
+        if (typeof c.hp === 'number' && c.hp < (c.maxHp || c.hp)) {
+          const barW = 26, barH = 3;
+          const barX = s.x - barW / 2;
+          const barY = s.y - 16;
+          const dispHp = (typeof c._hpDisplayed === 'number') ? c._hpDisplayed : c.hp;
+          const frac = Math.max(0, Math.min(1, dispHp / c.maxHp));
+          // Background
+          ctx.fillStyle = 'rgba(20, 12, 8, 0.85)';
+          ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+          // Damage taken (lighter red, behind fill — shows as shrinking sweep)
+          ctx.fillStyle = '#a02020';
+          ctx.fillRect(barX, barY, barW, barH);
+          // Current HP — green→yellow→red as health drops
+          const hue = 120 * frac; // 120=green, 0=red
+          ctx.fillStyle = `hsl(${hue}, 75%, 50%)`;
+          ctx.fillRect(barX, barY, barW * frac, barH);
+        }
       }
       // Campfire built sites: handled by drawCampfireLight + drawCampfireFlame
       // which iterate props.fires; the construction tick should push the fire
       // when c.built becomes true. Render-side no-op here.
+    }
+  }
+
+  // W-Turret-And-Campfire-Combat — faint pulsing ring on the ground showing
+  // the campfire's HP-regen radius. Reads radius from HuntTurret.TUNABLES so
+  // there's a single source of truth (no hardcoded 60). Highlights brighter
+  // when the player is actually inside (so the player sees "I'm regenerating").
+  function drawCampfireRegenRings(ctx, props) {
+    if (!props.constructions) return;
+    if (!window.WG.HuntTurret || !WG.HuntTurret.TUNABLES) return;
+    const radius = WG.HuntTurret.TUNABLES.CAMPFIRE_REGEN_RADIUS;
+    const t = performance.now() / 1000;
+    const px = runtime.player ? runtime.player.x : -9999;
+    const py = runtime.player ? runtime.player.y : -9999;
+    for (const c of props.constructions) {
+      if (!c.built || c.type !== 'campfire') continue;
+      const s = w2s(c.x, c.y);
+      if (s.x < -radius - 60 || s.x > D().width + radius + 60 ||
+          s.y < -radius - 60 || s.y > D().height + radius + 60) continue;
+      const dx = px - c.x, dy = py - c.y;
+      const inside = (dx*dx + dy*dy) <= radius * radius;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2 + c.x * 0.013);
+      // Faint filled circle on ground (hp regen "aura").
+      const baseAlpha = inside ? 0.12 : 0.05;
+      ctx.fillStyle = `rgba(150, 230, 160, ${baseAlpha + pulse * 0.05})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, radius, 0, Math.PI*2); ctx.fill();
+      // Pulsing outline ring.
+      ctx.strokeStyle = `rgba(180, 240, 180, ${(inside ? 0.55 : 0.30) + pulse * 0.20})`;
+      ctx.lineWidth = inside ? 2 : 1.2;
+      ctx.setLineDash([5, 6]);
+      ctx.lineDashOffset = -t * 12;
+      ctx.beginPath(); ctx.arc(s.x, s.y, radius, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
     }
   }
 
@@ -606,6 +681,104 @@
     }
   }
 
+  // SPEC §0 — Night Mode overlay. Screen-space dark fill with light holes carved
+  // at the player + every built campfire. Drawn AFTER world restore so it sits in
+  // pure screen space (avoids trauma-shake banding from a transformed fillRect).
+  // Hole positions use w2s + ZOOM so they track the camera without trauma jitter —
+  // intentional: world shakes around a steady torch.
+  //
+  // Edge cases:
+  //   - torchAmount undefined (Concern A standalone) → defaults to 1.0 → no overlay.
+  //   - Player exactly on campfire boundary → soft radial gradient, no hard edge.
+  //   - Multiple campfires overlap → each destination-out draw subtracts; overlapping
+  //     gradients compound naturally (brighter overlap, no clipping artifacts).
+  //   - Mode switched mid-tick → top-of-function guard: returns immediately if not 'night'.
+  function drawNightOverlay(ctx) {
+    if (!runtime || runtime.mode !== 'night') return;
+    const p = runtime.player;
+    const torchRaw = (p && typeof p.torchAmount === 'number') ? p.torchAmount : 1.0;
+    const torch = Math.max(0, Math.min(1, torchRaw));
+    // Smooth ease (Architect: not linear stair-step). Cubic in/out gives a slow
+    // initial darkening that accelerates through the danger zone.
+    const darkness = _easeInOutCubic(1 - torch);
+    if (darkness <= 0.001) return;
+
+    const W = D().width, H = D().height;
+    const t = performance.now() / 1000;
+
+    ctx.save();
+    ctx.globalAlpha = darkness * NIGHT_MAX_ALPHA;
+
+    // Considered overlay — vertical gradient with deeper indigo at top + horizon,
+    // slightly warmer mid-band (folk-horror register, not flat black).
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0,    NIGHT_OVERLAY_TOP);
+    skyGrad.addColorStop(0.55, NIGHT_OVERLAY_MID);
+    skyGrad.addColorStop(1,    NIGHT_OVERLAY_TOP);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle vignette dim at corners (tunnel-vision in the dark).
+    const vmid = Math.max(W, H);
+    const vGrad = ctx.createRadialGradient(W/2, H/2, vmid * 0.30, W/2, H/2, vmid * 0.85);
+    vGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    vGrad.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = vGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Carve light holes — destination-out subtracts alpha from the dark fill.
+    ctx.globalCompositeOperation = 'destination-out';
+
+    // Player torch hole (always carved when overlay is up — even if hp=0, the
+    // body still has a faint glow). Two-frequency flicker reads as living flame.
+    if (p) {
+      const ps = w2s(p.x, p.y);
+      const sx = ps.x * ZOOM, sy = ps.y * ZOOM;
+      const flick =
+        Math.sin(t * 7.3) * NIGHT_PLAYER_FLICKER +
+        Math.sin(t * 13.1 + 1.7) * NIGHT_PLAYER_FLICKER * 0.4;
+      const pr = (NIGHT_PLAYER_LIGHT_R + flick) * ZOOM;
+      const grad = ctx.createRadialGradient(sx, sy, pr * 0.18, sx, sy, pr);
+      grad.addColorStop(0,    'rgba(0,0,0,1)');
+      grad.addColorStop(0.55, 'rgba(0,0,0,0.85)');
+      grad.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(sx, sy, pr, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Campfire holes — props.fires preferred (built-campfire-tick pushes fire
+    // entities onto props.fires; see hunt-player.js constructionTick). Fallback
+    // to filtering constructions if a stage somehow has no fires array yet.
+    if (runtime.stage) {
+      const props = getStageProps(runtime.stage);
+      let fires = props.fires;
+      if (!fires || fires.length === 0) {
+        if (props.constructions) {
+          fires = props.constructions.filter(c => c.built && c.type === 'campfire');
+        }
+      }
+      if (fires) {
+        for (const f of fires) {
+          const fs = w2s(f.x, f.y);
+          const fx = fs.x * ZOOM, fy = fs.y * ZOOM;
+          const fphase = (typeof f.flicker === 'number') ? f.flicker : 0;
+          const ff =
+            Math.sin(t * 4.7 + fphase) * NIGHT_CAMPFIRE_FLICKER +
+            Math.sin(t * 9.2 + fphase * 1.7) * NIGHT_CAMPFIRE_FLICKER * 0.3;
+          const fr = (NIGHT_CAMPFIRE_LIGHT_R + ff) * ZOOM;
+          const fgrad = ctx.createRadialGradient(fx, fy, fr * 0.12, fx, fy, fr);
+          fgrad.addColorStop(0,    'rgba(0,0,0,1)');
+          fgrad.addColorStop(0.5,  'rgba(0,0,0,0.88)');
+          fgrad.addColorStop(1,    'rgba(0,0,0,0)');
+          ctx.fillStyle = fgrad;
+          ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
   function drawDrops(ctx) {
     for (const d of runtime.drops) {
       const s = w2s(d.x, d.y);
@@ -620,6 +793,37 @@
       } else if (d.type === 'fragment') {
         ctx.fillStyle = '#e0a8ff';
         ctx.beginPath(); ctx.moveTo(s.x, s.y-4); ctx.lineTo(s.x+4, s.y); ctx.lineTo(s.x, s.y+4); ctx.lineTo(s.x-4, s.y); ctx.closePath(); ctx.fill();
+      } else if (d.type === 'torch') {
+        // SPEC §0 — Field Torch drop. Small flickering orange flame on a stick,
+        // scaled-down version of drawCampfireFlame's two-triangle flame logic
+        // with a per-drop seed so adjacent torches don't pulse in lockstep.
+        const tt = performance.now() / 1000;
+        const seed = (typeof d._flickerSeed === 'number') ? d._flickerSeed : 0;
+        const flick = Math.sin(tt * 8 + seed) * 0.7 + Math.sin(tt * 14 + seed * 1.7) * 0.3;
+        // Stick (haft)
+        ctx.fillStyle = '#5a3010';
+        ctx.fillRect(s.x - 0.5, s.y - 1, 1, 5);
+        // Outer flame
+        ctx.fillStyle = '#f87018';
+        ctx.beginPath();
+        ctx.moveTo(s.x - 2, s.y - 1);
+        ctx.lineTo(s.x,     s.y - 5 + flick);
+        ctx.lineTo(s.x + 2, s.y - 1);
+        ctx.closePath(); ctx.fill();
+        // Inner core
+        ctx.fillStyle = '#fcc848';
+        ctx.beginPath();
+        ctx.moveTo(s.x - 1, s.y - 2);
+        ctx.lineTo(s.x,     s.y - 4 + flick * 0.6);
+        ctx.lineTo(s.x + 1, s.y - 2);
+        ctx.closePath(); ctx.fill();
+        // Subtle warm glow ring
+        const gr = 6 + flick * 0.3;
+        const grad = ctx.createRadialGradient(s.x, s.y - 3, 1, s.x, s.y - 3, gr);
+        grad.addColorStop(0, 'rgba(255, 200, 96, 0.50)');
+        grad.addColorStop(1, 'rgba(255, 160, 48, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(s.x, s.y - 3, gr, 0, Math.PI*2); ctx.fill();
       }
     }
   }
@@ -633,79 +837,434 @@
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill();
   }
 
-  // (Boss draws preserved from prior version — they're already procedural variety.
-  // V1 will redo them with hood/robe/aura registers per audit. V0 keeps them.)
-  function drawBoss_pale_bride(ctx, sx, sy, b, t) {
-    const sz = b.size;
-    ctx.fillStyle = b._typeData.color;
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.moveTo(sx + i*8, sy);
-      ctx.lineTo(sx + i*4, sy + sz);
-      ctx.lineTo(sx + i*8 + 4, sy + sz);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.fillStyle = '#f0e8d8';
-    ctx.beginPath(); ctx.ellipse(sx, sy, sz*0.32, sz*0.45, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#1a0828';
-    ctx.fillRect(sx - 6, sy - 6, 4, 5);
-    ctx.fillRect(sx + 2, sy - 6, 4, 5);
-    drawBossAura(ctx, sx, sy, sz, 'rgba(248, 240, 224, 0.25)', t);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Boss draws — every boss is a HUMANOID FIGURE first (head + robe + arms),
+  // not a colored shape. Identity comes from cloak color, headpiece, and
+  // accessory (sash / crown / antlers / staff / many-eyes / aura). All bosses
+  // share the same hit-flash + wobble FX as regular enemies, plus their per-
+  // identity drawBossAura halo. Caller passes `t = performance.now()/1000`.
+  // ─────────────────────────────────────────────────────────────────────────────
+  function _bossHitFx(b) {
+    // Bosses use the same _lastDamageAt timestamp the enemy:damaged emit sets.
+    return _creatureHitFx(b);
   }
-  function drawBoss_frozen_crone(ctx, sx, sy, b, t) {
+  function _bossDropShadow(ctx, sx, sy, sz) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.55, sz*0.55, sz*0.18, 0, 0, Math.PI*2); ctx.fill();
+  }
+  function _bossFlash(ctx, sx, sy, sz, fx) {
+    if (fx.flash <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = fx.flash;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.1, sz*0.6, sz*0.7, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Pale Bride — long white wedding-veil silhouette, dark eyes, red bridal sash.
+  function drawBoss_pale_bride(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
-    ctx.fillStyle = b._typeData.color;
-    ctx.beginPath(); ctx.ellipse(sx, sy, sz*0.42, sz*0.5, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#e8f0ff';
+    drawBossAura(ctx, sx, sy, sz, 'rgba(248, 240, 224, 0.28)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Long bridal gown — wide bottom trapezoid in cream
+    ctx.fillStyle = '#e8e0c8';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Subtle vertical pleats in shadow tone
+    ctx.strokeStyle = '#c8c0a8'; ctx.lineWidth = 1;
     for (let i = -2; i <= 2; i++) {
       ctx.beginPath();
-      ctx.moveTo(sx + i*6, sy - sz*0.2);
-      ctx.lineTo(sx + i*6 - 2, sy - sz*0.5);
-      ctx.lineTo(sx + i*6 + 2, sy - sz*0.5);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(sx + i * sz*0.10, sy - sz*0.05);
+      ctx.lineTo(sx + i * sz*0.18, sy + sz*0.50);
+      ctx.stroke();
     }
-    ctx.fillStyle = '#80c0ff';
-    ctx.fillRect(sx - 5, sy - 4, 3, 3);
-    ctx.fillRect(sx + 2, sy - 4, 3, 3);
-    drawBossAura(ctx, sx, sy, sz, 'rgba(168, 200, 232, 0.3)', t);
+    // Red bridal sash diagonal across torso
+    ctx.fillStyle = '#a01818';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.30, sy + sz*0.05);
+    ctx.lineTo(sx + sz*0.30, sy - sz*0.06);
+    ctx.lineTo(sx + sz*0.32, sy + sz*0.02);
+    ctx.lineTo(sx - sz*0.28, sy + sz*0.13);
+    ctx.closePath(); ctx.fill();
+    // Pale face
+    ctx.fillStyle = '#f4ecd8';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.28, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // Dark hollow eyes
+    ctx.fillStyle = '#1a0828';
+    ctx.fillRect(sx - sz*0.09, sy - sz*0.32, sz*0.06, sz*0.05);
+    ctx.fillRect(sx + sz*0.03, sy - sz*0.32, sz*0.06, sz*0.05);
+    // Long flowing veil — translucent white drape behind, 2 layers
+    ctx.fillStyle = 'rgba(248, 240, 224, 0.55)';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.34, sy - sz*0.34);
+    ctx.lineTo(sx + sz*0.34, sy - sz*0.34);
+    ctx.lineTo(sx + sz*0.50, sy + sz*0.40);
+    ctx.lineTo(sx - sz*0.50, sy + sz*0.40);
+    ctx.closePath(); ctx.fill();
+    // Crown of white blossoms at brow line
+    ctx.fillStyle = '#ffffff';
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.arc(sx + i * sz*0.10, sy - sz*0.46, 2.5, 0, Math.PI*2); ctx.fill();
+    }
+    _bossFlash(ctx, sx, sy, sz, fx);
   }
+
+  // Frozen Crone — ice-blue robe, jagged ice-crown.
+  function drawBoss_frozen_crone(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
+    const sz = b.size;
+    drawBossAura(ctx, sx, sy, sz, 'rgba(168, 200, 232, 0.32)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Robe — pale ice-blue trapezoid
+    ctx.fillStyle = '#7090b0';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.28, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.28, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.50, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.50, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Robe shadow side
+    ctx.fillStyle = '#506880';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.28, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.50, sy + sz*0.55);
+    ctx.lineTo(sx, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Frost-rimed hem (lighter blue-white sparkle line)
+    ctx.fillStyle = '#d8e8ff';
+    ctx.fillRect(sx - sz*0.50, sy + sz*0.50, sz*1.0, sz*0.05);
+    // Hunched arms — wide cuff sleeves coming forward
+    ctx.fillStyle = '#506880';
+    ctx.fillRect(sx - sz*0.40, sy - sz*0.05, sz*0.16, sz*0.30);
+    ctx.fillRect(sx + sz*0.24, sy - sz*0.05, sz*0.16, sz*0.30);
+    // Pale gnarled face under the hood-shadow
+    ctx.fillStyle = '#c8d8e8';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.30, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // Glowing ice-blue eyes
+    ctx.fillStyle = '#a8e0ff';
+    ctx.fillRect(sx - sz*0.09, sy - sz*0.32, sz*0.05, sz*0.04);
+    ctx.fillRect(sx + sz*0.04, sy - sz*0.32, sz*0.05, sz*0.04);
+    // Jagged ice crown — 5 sharp shards rising from the head
+    ctx.fillStyle = '#e8f0ff';
+    for (let i = -2; i <= 2; i++) {
+      const cx = sx + i * sz*0.12;
+      const ch = sz * (0.32 + Math.abs(i) * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, sy - sz*0.42);
+      ctx.lineTo(cx + 2, sy - sz*0.42);
+      ctx.lineTo(cx,     sy - sz*0.42 - ch);
+      ctx.closePath(); ctx.fill();
+    }
+    // Crown base band
+    ctx.fillStyle = '#a8c8e8';
+    ctx.fillRect(sx - sz*0.30, sy - sz*0.44, sz*0.60, 3);
+    _bossFlash(ctx, sx, sy, sz, fx);
+  }
+
+  // Autumn Lord — orange-brown cloak, antlered crown, pumpkin-mask face.
   function drawBoss_autumn_lord(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    drawBossAura(ctx, sx, sy, sz, 'rgba(232, 128, 56, 0.30)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Heavy cloak — deep orange-brown layered trapezoid
+    ctx.fillStyle = '#8a3a18';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.32, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.32, sy - sz*0.15);
+    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Orange under-robe peeking through
+    ctx.fillStyle = '#d06820';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.20, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.20, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.32, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.32, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Leather belt
+    ctx.fillStyle = '#3a1808';
+    ctx.fillRect(sx - sz*0.28, sy + sz*0.10, sz*0.56, sz*0.06);
+    // Sleeves — dark with orange cuffs
     ctx.fillStyle = '#5a2810';
-    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.1, sz*0.55, sz*0.4, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = b._typeData.color;
-    ctx.beginPath(); ctx.ellipse(sx, sy, sz*0.32, sz*0.42, 0, 0, Math.PI*2); ctx.fill();
-    drawBossAura(ctx, sx, sy, sz, 'rgba(232, 128, 56, 0.28)', t);
+    ctx.fillRect(sx - sz*0.42, sy - sz*0.05, sz*0.16, sz*0.30);
+    ctx.fillRect(sx + sz*0.26, sy - sz*0.05, sz*0.16, sz*0.30);
+    ctx.fillStyle = '#d06820';
+    ctx.fillRect(sx - sz*0.42, sy + sz*0.20, sz*0.16, sz*0.05);
+    ctx.fillRect(sx + sz*0.26, sy + sz*0.20, sz*0.16, sz*0.05);
+    // Pumpkin-mask face — round orange head with carved triangle eyes
+    ctx.fillStyle = '#e07820';
+    ctx.beginPath(); ctx.arc(sx, sy - sz*0.30, sz*0.20, 0, Math.PI*2); ctx.fill();
+    // Pumpkin rib lines
+    ctx.strokeStyle = '#a04810'; ctx.lineWidth = 1;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(sx + i * sz*0.08, sy - sz*0.46);
+      ctx.lineTo(sx + i * sz*0.08, sy - sz*0.14);
+      ctx.stroke();
+    }
+    // Triangle glowing eyes
+    ctx.fillStyle = '#ffe040';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.10, sy - sz*0.28);
+    ctx.lineTo(sx - sz*0.04, sy - sz*0.28);
+    ctx.lineTo(sx - sz*0.07, sy - sz*0.36);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.04, sy - sz*0.28);
+    ctx.lineTo(sx + sz*0.10, sy - sz*0.28);
+    ctx.lineTo(sx + sz*0.07, sy - sz*0.36);
+    ctx.closePath(); ctx.fill();
+    // Antlers — branching brown silhouettes either side of head
+    ctx.strokeStyle = '#3a1c08'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.16, sy - sz*0.42);
+    ctx.lineTo(sx - sz*0.34, sy - sz*0.62);
+    ctx.moveTo(sx - sz*0.26, sy - sz*0.52);
+    ctx.lineTo(sx - sz*0.40, sy - sz*0.50);
+    ctx.moveTo(sx - sz*0.30, sy - sz*0.56);
+    ctx.lineTo(sx - sz*0.42, sy - sz*0.64);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.16, sy - sz*0.42);
+    ctx.lineTo(sx + sz*0.34, sy - sz*0.62);
+    ctx.moveTo(sx + sz*0.26, sy - sz*0.52);
+    ctx.lineTo(sx + sz*0.40, sy - sz*0.50);
+    ctx.moveTo(sx + sz*0.30, sy - sz*0.56);
+    ctx.lineTo(sx + sz*0.42, sy - sz*0.64);
+    ctx.stroke();
+    _bossFlash(ctx, sx, sy, sz, fx);
   }
+
+  // Temple Warden — gold ceremonial robes, pillar staff in hand.
   function drawBoss_temple_warden(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
-    ctx.fillStyle = b._typeData.color;
-    ctx.fillRect(sx - sz*0.4, sy - sz*0.5, sz*0.8, sz);
-    drawBossAura(ctx, sx, sy, sz, 'rgba(232, 192, 96, 0.3)', t);
+    drawBossAura(ctx, sx, sy, sz, 'rgba(232, 192, 96, 0.32)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Long ceremonial robe — deep red base
+    ctx.fillStyle = '#8a2820';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Gold trim hem + center seam
+    ctx.fillStyle = '#ffd848';
+    ctx.fillRect(sx - sz*0.55, sy + sz*0.50, sz*1.10, sz*0.05);
+    ctx.fillRect(sx - 1.5, sy - sz*0.05, 3, sz*0.55);
+    // Gold sash crossing torso
+    ctx.fillStyle = '#ffd848';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.32, sy);
+    ctx.lineTo(sx + sz*0.32, sy + sz*0.06);
+    ctx.lineTo(sx + sz*0.32, sy + sz*0.14);
+    ctx.lineTo(sx - sz*0.32, sy + sz*0.08);
+    ctx.closePath(); ctx.fill();
+    // Sleeves — wide gold-trimmed
+    ctx.fillStyle = '#8a2820';
+    ctx.fillRect(sx - sz*0.42, sy - sz*0.05, sz*0.18, sz*0.30);
+    ctx.fillRect(sx + sz*0.24, sy - sz*0.05, sz*0.18, sz*0.30);
+    ctx.fillStyle = '#ffd848';
+    ctx.fillRect(sx - sz*0.42, sy + sz*0.22, sz*0.18, sz*0.05);
+    ctx.fillRect(sx + sz*0.24, sy + sz*0.22, sz*0.18, sz*0.05);
+    // Bald golden-mask head
+    ctx.fillStyle = '#f0c860';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.30, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // Forehead jewel — red dot
+    ctx.fillStyle = '#c81818';
+    ctx.beginPath(); ctx.arc(sx, sy - sz*0.40, 2, 0, Math.PI*2); ctx.fill();
+    // Slit eyes — narrow dark lines
+    ctx.fillStyle = '#1a0808';
+    ctx.fillRect(sx - sz*0.10, sy - sz*0.30, sz*0.07, 1.5);
+    ctx.fillRect(sx + sz*0.03, sy - sz*0.30, sz*0.07, 1.5);
+    // Golden cap (bishop-style with finial)
+    ctx.fillStyle = '#ffd848';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.18, sy - sz*0.42);
+    ctx.lineTo(sx + sz*0.18, sy - sz*0.42);
+    ctx.lineTo(sx + sz*0.10, sy - sz*0.58);
+    ctx.lineTo(sx - sz*0.10, sy - sz*0.58);
+    ctx.closePath(); ctx.fill();
+    ctx.fillRect(sx - 1.5, sy - sz*0.66, 3, sz*0.10);
+    // Pillar staff — held to the right side, vertical with stylized capital
+    ctx.fillStyle = '#c8a040';
+    ctx.fillRect(sx + sz*0.50, sy - sz*0.58, sz*0.08, sz*1.10);
+    // Capital block at top of staff
+    ctx.fillStyle = '#ffd848';
+    ctx.fillRect(sx + sz*0.46, sy - sz*0.62, sz*0.16, sz*0.06);
+    // Base of staff
+    ctx.fillRect(sx + sz*0.46, sy + sz*0.46, sz*0.16, sz*0.06);
+    _bossFlash(ctx, sx, sy, sz, fx);
   }
+
+  // Cave Mother — dark earth-tone hooded figure, MANY-eyes inside the hood.
   function drawBoss_cave_mother(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
-    ctx.fillStyle = b._typeData.color;
-    ctx.beginPath(); ctx.arc(sx, sy, sz*0.5, 0, Math.PI*2); ctx.fill();
-    drawBossAura(ctx, sx, sy, sz, 'rgba(40, 20, 30, 0.4)', t);
+    drawBossAura(ctx, sx, sy, sz, 'rgba(40, 20, 30, 0.42)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Massive earth-tone cloak — wider than other bosses (motherly bulk)
+    ctx.fillStyle = '#2a1a14';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.40, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.40, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.62, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.62, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Cloak shadow side
+    ctx.fillStyle = '#1a0e0a';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.40, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.62, sy + sz*0.55);
+    ctx.lineTo(sx, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Tattered hem — irregular triangle cuts
+    ctx.fillStyle = '#0a0604';
+    for (let i = -3; i <= 3; i++) {
+      const ex = sx + i * sz*0.16;
+      ctx.beginPath();
+      ctx.moveTo(ex - sz*0.06, sy + sz*0.50);
+      ctx.lineTo(ex + sz*0.06, sy + sz*0.50);
+      ctx.lineTo(ex,           sy + sz*0.62);
+      ctx.closePath(); ctx.fill();
+    }
+    // Hood — deep cowl casting shadow
+    ctx.fillStyle = '#1a0e0a';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.20, sy - sz*0.55);
+    ctx.lineTo(sx - sz*0.20, sy - sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Hood interior — pure black void
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.32, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // MANY EYES inside the hood — 6 yellow-orange glints, subtle pulse offset by index
+    for (let i = 0; i < 6; i++) {
+      const ax = (i - 2.5) * 4 + Math.sin(t * 1.5 + i) * 0.5;
+      const ay = ((i % 2) ? -2 : 2) + Math.cos(t * 1.2 + i) * 0.5;
+      const flick = 0.6 + Math.sin(t * 2.5 + i * 1.7) * 0.4;
+      ctx.fillStyle = `rgba(248, 200, 64, ${flick})`;
+      ctx.beginPath(); ctx.arc(sx + ax, sy - sz*0.32 + ay, 1.5, 0, Math.PI*2); ctx.fill();
+    }
+    _bossFlash(ctx, sx, sy, sz, fx);
   }
+
+  // Wraith Father — purple aura + crown of thorns, void cloak.
   function drawBoss_wraith_father(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Layered purple aura BEHIND the figure (existing concentric pulse logic).
     for (let i = 3; i > 0; i--) {
-      ctx.fillStyle = `rgba(60, 24, 100, ${0.15 + Math.sin(t*1.5 + i)*0.05})`;
+      ctx.fillStyle = `rgba(60, 24, 100, ${0.18 + Math.sin(t*1.5 + i)*0.05})`;
       ctx.beginPath(); ctx.arc(sx, sy, sz*0.5 + i*4, 0, Math.PI*2); ctx.fill();
     }
-    ctx.fillStyle = b._typeData.color;
-    ctx.beginPath(); ctx.arc(sx, sy, sz*0.45, 0, Math.PI*2); ctx.fill();
     drawBossAura(ctx, sx, sy, sz, 'rgba(160, 96, 255, 0.35)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Void cloak — black with deep purple inner shadow
+    ctx.fillStyle = '#180828';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.34, sy - sz*0.18);
+    ctx.lineTo(sx + sz*0.34, sy - sz*0.18);
+    ctx.lineTo(sx + sz*0.58, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.58, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Inner robe — deep purple
+    ctx.fillStyle = '#3a1860';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.22, sy - sz*0.12);
+    ctx.lineTo(sx + sz*0.22, sy - sz*0.12);
+    ctx.lineTo(sx + sz*0.36, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.36, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Bone clasps down chest — pale dots
+    ctx.fillStyle = '#d0c8b0';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.arc(sx, sy + i * sz*0.10, 1.6, 0, Math.PI*2); ctx.fill();
+    }
+    // Shrouded arms hanging straight down
+    ctx.fillStyle = '#180828';
+    ctx.fillRect(sx - sz*0.46, sy - sz*0.08, sz*0.16, sz*0.40);
+    ctx.fillRect(sx + sz*0.30, sy - sz*0.08, sz*0.16, sz*0.40);
+    // Skeletal hands at ends
+    ctx.fillStyle = '#d0c8b0';
+    ctx.beginPath(); ctx.arc(sx - sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
+    // Pale gaunt face inside hood
+    ctx.fillStyle = '#c0a8c8';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.32, sz*0.16, sz*0.22, 0, 0, Math.PI*2); ctx.fill();
+    // Black void eyes
+    ctx.fillStyle = '#000';
+    ctx.fillRect(sx - sz*0.10, sy - sz*0.34, sz*0.07, sz*0.06);
+    ctx.fillRect(sx + sz*0.03, sy - sz*0.34, sz*0.07, sz*0.06);
+    // Glowing purple pupils
+    ctx.fillStyle = `rgba(200, 128, 255, ${0.7 + Math.sin(t * 2.2) * 0.3})`;
+    ctx.beginPath(); ctx.arc(sx - sz*0.07, sy - sz*0.31, 1.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.07, sy - sz*0.31, 1.2, 0, Math.PI*2); ctx.fill();
+    // Crown of thorns — jagged spikes radiating from skull
+    ctx.strokeStyle = '#1a0828'; ctx.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) {
+      const ax = sx + i * sz*0.12;
+      ctx.beginPath();
+      ctx.moveTo(ax,         sy - sz*0.48);
+      ctx.lineTo(ax + i * 2, sy - sz*0.62 - Math.abs(i));
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#1a0828';
+    ctx.fillRect(sx - sz*0.30, sy - sz*0.50, sz*0.60, 3);
+    // Crown gem — purple glowing
+    ctx.fillStyle = `rgba(168, 96, 255, ${0.7 + Math.sin(t * 1.8) * 0.3})`;
+    ctx.beginPath(); ctx.arc(sx, sy - sz*0.56, 2.2, 0, Math.PI*2); ctx.fill();
+    _bossFlash(ctx, sx, sy, sz, fx);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Shared hit reaction for every enemy type.
+  //   - 80ms additive white flash (DOPAMINE_DESIGN §9 sprite techniques)
+  //   - 200ms damped sine wobble on x — small but readable at thumbnail glance
+  // Caller applies the wobble to sx BEFORE drawing, then calls _creatureFlash
+  // AFTER drawing the body to add the white tint.
+  // ─────────────────────────────────────────────────────────────────────────────
+  function _creatureHitFx(c) {
+    const sinceDmg = performance.now() - (c._lastDamageAt || 0);
+    let wobble = 0;
+    if (sinceDmg < 200) {
+      const decay = 1 - sinceDmg / 200;
+      wobble = decay * decay * Math.sin(sinceDmg / 14) * 1.6;
+    }
+    const flash = sinceDmg < 80 ? (1 - sinceDmg / 80) * 0.6 : 0;
+    return { wobble, flash, sinceDmg };
+  }
+  function _creatureFlash(ctx, sx, sy, sz, flash) {
+    if (flash <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = flash;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - sz * 0.15, sz * 0.5, sz * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Cloaked-zombie enemy sprite. Hooded silhouette, no visible legs, faint pale face.
+  // Used for both legacy types (lurker/walker/sprite/brute_small/caller) AND the
+  // new red_zombie id — drawZombie is the day-baseline form.
   // ─────────────────────────────────────────────────────────────────────────────
   function drawZombie(ctx, sx, sy, c) {
+    const fx = _creatureHitFx(c); sx += fx.wobble;
     const baseColor = c._typeData.color || '#a82828';
     const hoodColor = shade(baseColor, -28);
     const sz = c.size;
@@ -744,19 +1303,7 @@
     ctx.fillStyle = '#1a0410';
     ctx.fillRect(sx - 3, sy - sz*0.32, 2, 2);
     ctx.fillRect(sx + 1, sy - sz*0.32, 2, 2);
-    // Hit-flash overlay (DOPAMINE_DESIGN §9 sprite techniques) — 80ms additive white tint.
-    const sinceDmg = performance.now() - (c._lastDamageAt || 0);
-    if (sinceDmg < 80) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = (1 - sinceDmg/80) * 0.6;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - sz*0.1, sz*0.42, sz*0.55, 0, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-    // HP bar above
+    _creatureFlash(ctx, sx, sy, sz, fx.flash);
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(20, sz+4), c.hp, c.maxHp);
   }
 
@@ -764,6 +1311,7 @@
   // Large orange jack-o-lantern head, dark stick body; glowing face pulses per-creature
   // so a group doesn't flash in unison.
   function drawPumpkin(ctx, sx, sy, c) {
+    const fx = _creatureHitFx(c); sx += fx.wobble;
     const sz = c.size;
     // Glow alpha 0.6–1.0; c.x as phase offset avoids group sync.
     const glow = 0.8 + 0.2 * Math.sin(performance.now() / 280 + c.x * 0.01);
@@ -850,28 +1398,239 @@
     ctx.fillStyle = '#3a3a1a';
     ctx.fillRect(sx - 2, headCy - headR - 5, 4, 6);
 
-    // Hit-flash overlay (DOPAMINE_DESIGN §9) — 80ms additive white tint.
-    const sinceDmg = performance.now() - (c._lastDamageAt || 0);
-    if (sinceDmg < 80) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = (1 - sinceDmg/80) * 0.6;
-      ctx.fillStyle = '#ffffff';
+    _creatureFlash(ctx, sx, sy, sz, fx.flash);
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 0.85, Math.max(20, sz + 4), c.hp, c.maxHp);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Jiangshi — Chinese hopping vampire. Conical straw hat with paper amulet
+  // (the classic mid-yellow ofuda strip with red brush mark), arms stiffly
+  // outstretched, green-tinged dark robe. Matches the SPEC night-folk-horror
+  // register. Actual hop AI is V2 — body is statically posed for V0.
+  // ─────────────────────────────────────────────────────────────────────────────
+  function drawJiangshi(ctx, sx, sy, c) {
+    const fx = _creatureHitFx(c); sx += fx.wobble;
+    const sz = c.size;
+    const robeColor = c._typeData.color || '#3a2018';
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.55, sz*0.45, sz*0.16, 0, 0, Math.PI*2); ctx.fill();
+
+    // Robe — taller trapezoid, green-tinged dark color
+    ctx.fillStyle = robeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.24, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.24, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.42, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.42, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Robe shadow side (warmer green-black)
+    ctx.fillStyle = shade(robeColor, -22);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.24, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.42, sy + sz*0.55);
+    ctx.lineTo(sx, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Pale yellow waist sash (Qing-dynasty register)
+    ctx.fillStyle = '#c8a040';
+    ctx.fillRect(sx - sz*0.26, sy + sz*0.10, sz*0.52, sz*0.06);
+
+    // Arms — stiffly outstretched horizontal sleeves (signature jiangshi pose)
+    ctx.fillStyle = robeColor;
+    ctx.fillRect(sx - sz*0.62, sy - sz*0.10, sz*0.40, sz*0.14);  // left sleeve
+    ctx.fillRect(sx + sz*0.22, sy - sz*0.10, sz*0.40, sz*0.14);  // right sleeve
+    // Pale hands at ends
+    ctx.fillStyle = '#a8b890';  // pale green-tinged
+    ctx.beginPath(); ctx.arc(sx - sz*0.66, sy - sz*0.03, sz*0.07, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.66, sy - sz*0.03, sz*0.07, 0, Math.PI*2); ctx.fill();
+
+    // Pale face — green-tinged pallor under the hat brim
+    ctx.fillStyle = '#a8b890';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.30, sz*0.18, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // Red dot eyes (jiangshi tradition)
+    ctx.fillStyle = '#c81818';
+    ctx.beginPath(); ctx.arc(sx - sz*0.07, sy - sz*0.32, 1.6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.07, sy - sz*0.32, 1.6, 0, Math.PI*2); ctx.fill();
+    // Mouth — small dark line
+    ctx.fillStyle = '#1a0a08';
+    ctx.fillRect(sx - sz*0.05, sy - sz*0.22, sz*0.10, 1.2);
+
+    // Conical straw hat — wide triangular brim, c._typeData.accent for color
+    const hatColor = c._typeData.accent || '#f8e8c8';
+    ctx.fillStyle = hatColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.45, sy - sz*0.42);
+    ctx.lineTo(sx + sz*0.45, sy - sz*0.42);
+    ctx.lineTo(sx,           sy - sz*0.78);
+    ctx.closePath(); ctx.fill();
+    // Hat shadow underside line
+    ctx.strokeStyle = shade(hatColor, -30); ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.45, sy - sz*0.42);
+    ctx.lineTo(sx + sz*0.45, sy - sz*0.42);
+    ctx.stroke();
+    // Brush-stroke ribs on hat (3 short angled lines for woven straw read)
+    for (let i = -1; i <= 1; i++) {
       ctx.beginPath();
-      ctx.ellipse(sx, sy - sz*0.15, sz*0.5, sz*0.6, 0, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
+      ctx.moveTo(sx + i * sz*0.16, sy - sz*0.42);
+      ctx.lineTo(sx + i * sz*0.08, sy - sz*0.64);
+      ctx.stroke();
     }
 
-    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 0.85, Math.max(20, sz + 4), c.hp, c.maxHp);
+    // Paper amulet — vertical white strip hanging in front of face from hat brim
+    ctx.fillStyle = '#f4ecd0';
+    ctx.fillRect(sx - sz*0.04, sy - sz*0.42, sz*0.08, sz*0.30);
+    ctx.strokeStyle = '#a01818'; ctx.lineWidth = 1;
+    // Red brush mark down the amulet
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz*0.40);
+    ctx.lineTo(sx, sy - sz*0.14);
+    ctx.stroke();
+    // Cross-stroke (talisman ideogram hint)
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.025, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.025, sy - sz*0.30);
+    ctx.stroke();
+
+    _creatureFlash(ctx, sx, sy, sz, fx.flash);
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.85, Math.max(22, sz + 4), c.hp, c.maxHp);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Samurai grunt — armored humanoid with horned kabuto helmet, red robe over
+  // dark armor plates, katana sheathed at the hip. Slightly larger silhouette
+  // than walker/sprite to read as a heavier threat.
+  // ─────────────────────────────────────────────────────────────────────────────
+  function drawSamurai(ctx, sx, sy, c) {
+    const fx = _creatureHitFx(c); sx += fx.wobble;
+    const sz = c.size;
+    const robeColor = c._typeData.color || '#a82828';
+    const goldColor = c._typeData.accent || '#ffc850';
+
+    // Drop shadow — wider, samurai is bigger
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.58, sz*0.52, sz*0.18, 0, 0, Math.PI*2); ctx.fill();
+
+    // Lower robe — wide trapezoid skirting (haidate)
+    ctx.fillStyle = robeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.28, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.28, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.50, sy + sz*0.58);
+    ctx.lineTo(sx - sz*0.50, sy + sz*0.58);
+    ctx.closePath(); ctx.fill();
+    // Shadow side
+    ctx.fillStyle = shade(robeColor, -22);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.28, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.50, sy + sz*0.58);
+    ctx.lineTo(sx, sy + sz*0.58);
+    ctx.closePath(); ctx.fill();
+    // Gold trim along bottom hem
+    ctx.fillStyle = goldColor;
+    ctx.fillRect(sx - sz*0.50, sy + sz*0.50, sz*1.0, sz*0.05);
+    // Vertical gold seam down center (front of robe)
+    ctx.fillRect(sx - 1, sy - sz*0.05, 2, sz*0.55);
+
+    // Chest armor cuirass — darker rect with gold rivets
+    ctx.fillStyle = shade(robeColor, -38);
+    ctx.fillRect(sx - sz*0.26, sy - sz*0.30, sz*0.52, sz*0.24);
+    ctx.fillStyle = goldColor;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.arc(sx + i * sz*0.18, sy - sz*0.20, 1.5, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Shoulder pads (sode) — angled gold-trimmed plates
+    ctx.fillStyle = shade(robeColor, -12);
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.42, sy - sz*0.28);
+    ctx.lineTo(sx - sz*0.22, sy - sz*0.30);
+    ctx.lineTo(sx - sz*0.20, sy - sz*0.10);
+    ctx.lineTo(sx - sz*0.46, sy - sz*0.06);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.42, sy - sz*0.28);
+    ctx.lineTo(sx + sz*0.22, sy - sz*0.30);
+    ctx.lineTo(sx + sz*0.20, sy - sz*0.10);
+    ctx.lineTo(sx + sz*0.46, sy - sz*0.06);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = goldColor; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.46, sy - sz*0.06); ctx.lineTo(sx - sz*0.42, sy - sz*0.28); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + sz*0.46, sy - sz*0.06); ctx.lineTo(sx + sz*0.42, sy - sz*0.28); ctx.stroke();
+
+    // Mempo (face mask) — dark grimace under helmet brim
+    ctx.fillStyle = '#1a0808';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.40, sz*0.16, sz*0.13, 0, 0, Math.PI*2); ctx.fill();
+    // Red glaring eyes
+    ctx.fillStyle = '#ff4040';
+    ctx.fillRect(sx - sz*0.10, sy - sz*0.42, sz*0.06, 1.6);
+    ctx.fillRect(sx + sz*0.04, sy - sz*0.42, sz*0.06, 1.6);
+
+    // Kabuto helmet — wide gold brim + dome
+    ctx.fillStyle = goldColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.34, sy - sz*0.46);
+    ctx.lineTo(sx + sz*0.34, sy - sz*0.46);
+    ctx.lineTo(sx + sz*0.30, sy - sz*0.38);
+    ctx.lineTo(sx - sz*0.30, sy - sz*0.38);
+    ctx.closePath(); ctx.fill();
+    // Helmet dome — darker red metal
+    ctx.fillStyle = shade(robeColor, -32);
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.28, sy - sz*0.46);
+    ctx.lineTo(sx + sz*0.28, sy - sz*0.46);
+    ctx.lineTo(sx + sz*0.18, sy - sz*0.66);
+    ctx.lineTo(sx - sz*0.18, sy - sz*0.66);
+    ctx.closePath(); ctx.fill();
+    // Two short horns (kuwagata) — gold crescents on the brim
+    ctx.fillStyle = goldColor;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.30, sy - sz*0.46);
+    ctx.lineTo(sx - sz*0.40, sy - sz*0.66);
+    ctx.lineTo(sx - sz*0.22, sy - sz*0.50);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.30, sy - sz*0.46);
+    ctx.lineTo(sx + sz*0.40, sy - sz*0.66);
+    ctx.lineTo(sx + sz*0.22, sy - sz*0.50);
+    ctx.closePath(); ctx.fill();
+    // Helmet front gold crest
+    ctx.fillStyle = goldColor;
+    ctx.fillRect(sx - 1.5, sy - sz*0.62, 3, sz*0.16);
+
+    // Katana — angled gray line at hip with gold guard
+    ctx.strokeStyle = '#c8c8c8'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.20, sy + sz*0.18);
+    ctx.lineTo(sx + sz*0.55, sy + sz*0.42);
+    ctx.stroke();
+    // Tsuba (guard)
+    ctx.fillStyle = goldColor;
+    ctx.beginPath(); ctx.arc(sx + sz*0.22, sy + sz*0.18, 2, 0, Math.PI*2); ctx.fill();
+    // Hilt (dark wrap)
+    ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(sx + sz*0.14, sy + sz*0.13);
+    ctx.lineTo(sx + sz*0.22, sy + sz*0.18);
+    ctx.stroke();
+
+    _creatureFlash(ctx, sx, sy, sz, fx.flash);
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.78, Math.max(24, sz + 6), c.hp, c.maxHp);
   }
 
   function drawCreatures(ctx) {
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
       const s = w2s(c.x, c.y);
-      if (c.type === 'pumpkin_lantern') drawPumpkin(ctx, s.x, s.y, c);
-      else drawZombie(ctx, s.x, s.y, c);
+      switch (c.type) {
+        case 'pumpkin_lantern': drawPumpkin(ctx, s.x, s.y, c);   break;
+        case 'jiangshi':        drawJiangshi(ctx, s.x, s.y, c);  break;
+        case 'samurai_grunt':   drawSamurai(ctx, s.x, s.y, c);   break;
+        default:                drawZombie(ctx, s.x, s.y, c);  // red_zombie + classic five
+      }
     }
     if (runtime.boss && runtime.boss.hp > 0) {
       const b = runtime.boss;
@@ -901,8 +1660,41 @@
     }
   }
 
+  // Projectile draw — supports an optional `_trail` array on the projectile
+  // (push current position each render frame, trim to TRAIL_LEN, render fading
+  // streak behind the head). Used by turret projectiles for "moving fast" read.
+  const _PROJ_TRAIL_LEN = 8;
   function drawProjectiles(ctx) {
     for (const p of runtime.projectiles) {
+      // Trail bookkeeping (presentation-only mutation, no game state).
+      if (p._trail) {
+        p._trail.push({ x: p.x, y: p.y });
+        if (p._trail.length > _PROJ_TRAIL_LEN) p._trail.shift();
+        // Render trail under the head so the head reads as the bright tip.
+        for (let i = 0; i < p._trail.length - 1; i++) {
+          const a = (i + 1) / p._trail.length;       // 0 (oldest) → 1 (newest)
+          const t1 = p._trail[i], t2 = p._trail[i + 1];
+          const s1 = w2s(t1.x, t1.y), s2 = w2s(t2.x, t2.y);
+          ctx.strokeStyle = p.color || '#ffd870';
+          ctx.globalAlpha = a * 0.7;
+          ctx.lineWidth = 1 + a * 2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(s1.x, s1.y);
+          ctx.lineTo(s2.x, s2.y);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+        // Glow halo behind head.
+        const sh = w2s(p.x, p.y);
+        const grad = ctx.createRadialGradient(sh.x, sh.y, 0, sh.x, sh.y, 8);
+        grad.addColorStop(0,   p.color || '#ffd870');
+        grad.addColorStop(0.4, 'rgba(255, 220, 120, 0.35)');
+        grad.addColorStop(1,   'rgba(255, 220, 120, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(sh.x, sh.y, 8, 0, Math.PI*2); ctx.fill();
+      }
       const s = w2s(p.x, p.y);
       ctx.fillStyle = p.color || '#ffd870';
       ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI*2); ctx.fill();
@@ -1072,9 +1864,12 @@
 
     // Wave indicators — HEXAGONAL dots (HD source §L.3 confirms hex shape, not circle).
     // Pointy-top hexagons, purple/dark base with red glow on active wave.
+    // Total-wave count now varies (5 / 10 / 15 by stage tier) so hex size
+    // scales down for higher counts to stay inside the screen width.
     const currentWave = (runtime.wave && runtime.wave.index) || 1;
-    const totalWaves = (runtime.wave && runtime.wave.total) || 5;
-    const hexR = 12, hexGap = 10;
+    const totalWaves = (runtime.wave && runtime.wave.total) || (runtime.stage && runtime.stage.waveCount) || 5;
+    const hexR  = totalWaves <= 5 ? 12 : totalWaves <= 10 ? 8 : 6;
+    const hexGap = totalWaves <= 5 ? 10 : totalWaves <= 10 ? 6 : 4;
     const totalW = totalWaves * (hexR*2) + (totalWaves-1) * hexGap;
     const startX = w/2 - totalW/2 + hexR;
     function hexPath(cx, cy, r) {
@@ -1101,9 +1896,9 @@
       hexPath(dx, dy, hexR); ctx.stroke();
       // Number text
       ctx.fillStyle = active ? '#ffe0d0' : (cleared ? '#e8c8e0' : '#7a6878');
-      ctx.font = 'bold 12px system-ui';
+      ctx.font = 'bold ' + (hexR >= 10 ? 12 : hexR >= 8 ? 10 : 8) + 'px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(String(i), dx, dy + 4);
+      ctx.fillText(String(i), dx, dy + (hexR >= 10 ? 4 : hexR >= 8 ? 3 : 2));
       ctx.textAlign = 'left';
     }
 
@@ -1165,7 +1960,7 @@
         high = currentWave - 1;
         try { localStorage.setItem(key, String(high)); } catch(e) {}
       }
-      banner.textContent = `Highest Wave Reached: ${high}/${totalWaves} Waves`;
+      banner.textContent = `Highest Wave Reached: ${high} / ${totalWaves} Waves`;
     }
 
     // Skill button (DOM): label "Hidden Relic" + cooldown overlay
@@ -1300,6 +2095,7 @@
     drawTiles(ctx, biome);
     drawPineForest(ctx);
     drawCampfireLight(ctx, props);
+    drawCampfireRegenRings(ctx, props);
     drawConstructionSites(ctx, props);
     drawBuiltStructures(ctx, props);
     drawStumps(ctx, props);
@@ -1317,6 +2113,10 @@
     ctx.restore(); // pair with outer trauma transform save
 
     // Screen-space overlays — HUD, fog, modals (drawn at native scale)
+    // SPEC §0 — Night-mode darkness with carved torch/campfire holes. Drawn before
+    // biome.lightFog so cave-fog sits *on top* of carved torch holes (consistent
+    // with "fog is always there, torch only cuts the dark").
+    drawNightOverlay(ctx);
     if (biome.lightFog > 0) {
       ctx.fillStyle = `rgba(0,0,0,${biome.lightFog})`;
       ctx.fillRect(0, 0, D().width, D().height);

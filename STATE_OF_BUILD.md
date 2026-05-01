@@ -1,6 +1,6 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-01 by W-Audio-Sourcing
+**Last updated:** 2026-05-01 by W-DayNight-And-Torch
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
@@ -34,10 +34,10 @@
 - `hunt-weapons.js` — 14 weapons (1 starter + 9 in-stage pickups + 2 ranged-slot + 3 pet-slot). Each: range, cooldown, damage, power.
 - `hunt-enemies.js` — 5 enemy types (lurker, walker, sprite, brute_small, caller) with target-priority AI, contact damage, ranged caller projectiles.
 - `hunt-bosses.js` — 6 bosses with distinct attack patterns (summon, shards, area, charge, contact). Names: pale_bride / frozen_crone / autumn_lord / temple_warden / cave_mother / wraith_father.
-- `hunt-waves.js` — wave manager: spawn-rate ramp curve + boss spawn at 100%.
-- `hunt-player.js` — auto-attack on cooldown ring, ranged + pet companion, level-up XP, in-stage skill, pickup magnet, level-up boon draft. cd/dmg/speed boons apply via `cooldownMul`, `bonusDmg`, `speedBonus`.
+- `hunt-waves.js` — wave manager: spawn-rate ramp curve + boss spawn at 100%. **Night Mode multipliers** (W-DayNight-And-Torch 2026-05-01): `runtime.mode === 'night'` → spawn rate × `NIGHT_SPAWN_MUL` (1.6) and enemy + boss hp/maxHp/damage × `NIGHT_STAT_MUL` (1.4) at spawn-time. Day Mode is the existing baseline (mul=1).
+- `hunt-player.js` — auto-attack on cooldown ring, ranged + pet companion, level-up XP, in-stage skill, pickup magnet, level-up boon draft. cd/dmg/speed boons apply via `cooldownMul`, `bonusDmg`, `speedBonus`. **Torch system** (W-DayNight-And-Torch 2026-05-01): `player.torchAmount` (init 1.0) and `player.torchDecay` (0.012/s). `tickTorch(dt)` runs only when `runtime.mode === 'night'`; instant 1.0 reset inside any built campfire's `TORCH_RELIGHT_R` (100-unit) radius, otherwise linear decay. Stump-chop has `TORCH_DROP_CHANCE` (20%) replacement of second coin with a `'torch'` field drop in Night Mode; pickup sets torch to 1.0 + emits `pickup:torch`.
 - `hunt-results.js` — end-of-stage modal with NEXT/RETRY/+2× ad button.
-- `hunt-render.js` — top-down camera follow, tile draw, sprites, level-up draft modal, HUD, particle hooks. **basic tile decoration only** — no biome-specific decoration sprites yet. HUD counter pulse on wood/gold/XP increments (DOPAMINE_DESIGN §1+§2).
+- `hunt-render.js` — top-down camera follow, tile draw, sprites, level-up draft modal, HUD, particle hooks. **basic tile decoration only** — no biome-specific decoration sprites yet. HUD counter pulse on wood/gold/XP increments (DOPAMINE_DESIGN §1+§2). **Night Mode overlay** (W-DayNight-And-Torch 2026-05-01): `drawNightOverlay()` paints a screen-space indigo gradient with corner vignette modulated by `1 - torchAmount` (cubic in/out ease, not stair-step), then carves player + every-built-campfire light holes via `destination-out` radial gradients. Constants: `NIGHT_OVERLAY_TOP/_MID`, `NIGHT_MAX_ALPHA` (0.93), `NIGHT_PLAYER_LIGHT_R` (80), `NIGHT_CAMPFIRE_LIGHT_R` (140), two-frequency flicker on both. `drawDrops` `'torch'` case renders a flickering orange flame on a stick with warm-glow ring (per-drop `_flickerSeed`).
 - `hunt-fxnumbers.js` — floating-number FX layer (DOPAMINE_DESIGN §1, P0). World-anchored spawns wired to stump:hit/chopped, enemy:killed, boss:damaged, player:level, pickup:coin, relic:fragment-pickup. Easing: opacity easeOutQuad + scale 1→1.15→0.95.
 
 ### Ascend (`js/ascend/` — 5 modules)
@@ -113,6 +113,8 @@
 - Forge tab: Power readout, Daily Chest claim, 8-slot building grid, crafting station with Craft x10 + Odds button
 - Relics tab: 5 rarity filter tabs, Rare grid (all undiscovered), Forge CTA
 - Duel tab: Bronze rank, 0/5 daily duels, FIND OPPONENT button, full ranked ladder
+- **`runtime.mode`** (W-DayNight-And-Torch 2026-05-01): `'day'` or `'night'`, set in `wg-game.js#buildHuntRuntime()` from the lobby Battle-tab card tap, fixed for the duration of the stage. Day = existing baseline. Night = `NIGHT_SPAWN_MUL` (1.6) × spawn rate, `NIGHT_STAT_MUL` (1.4) × hp/dmg, plus the night overlay + torch system below.
+- **Torch (Night Mode only)** (W-DayNight-And-Torch 2026-05-01): `player.torchAmount` initialized 1.0; `tickTorch(dt)` decays linearly at 0.012/s (~83s full burn) when player is outside any built campfire's 100-unit relight radius. Inside the radius → instant reset to 1.0. Field-dropped Torch items (20% replacement of second coin per chopped tree in Night Mode) reset on pickup. Visual: cubic-eased dark indigo overlay with carved player (80-unit) and campfire (140-unit) light holes, two-frequency flicker on both. Verified live in browser: bright @ torch=1.0, dark with glowing player + campfire holes @ torch=0.0, mode-guard intact (Day Mode @ torch=0 still bright).
 
 ---
 

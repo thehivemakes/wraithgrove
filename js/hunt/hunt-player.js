@@ -5,6 +5,15 @@
   // Skill cooldown
   const SKILL_BASE_CD = 22;
 
+  // SPEC §0 — Night Mode torch system. torchAmount decays only when mode==='night'
+  // AND player is outside any built campfire's TORCH_RELIGHT_R radius. Decay is
+  // linear-continuous (smooth, not stair-step) — the perceived non-linear darkening
+  // comes from the cubic ease in hunt-render.drawNightOverlay's alpha mapping.
+  const TORCH_INITIAL       = 1.0;
+  const TORCH_DECAY_PER_S   = 0.012;   // 1 / 0.012 ≈ 83s full burn from 1.0 → 0.0
+  const TORCH_RELIGHT_R     = 100;     // SPEC §0: campfire 100-unit relight radius
+  const TORCH_DROP_CHANCE   = 0.20;    // 20% per chopped tree in Night Mode
+
   let runtime = null;
 
   function place(x, y, rt) {
@@ -31,6 +40,9 @@
       heldPickupId: null,        // id of in-stage temp weapon (overrides melee)
       // pet companion
       petCooldown: 0,
+      // SPEC §0 — Night Mode torch (always initialized; tickTorch is mode-gated).
+      torchAmount: TORCH_INITIAL,
+      torchDecay:  TORCH_DECAY_PER_S,
     };
   }
 
@@ -189,16 +201,44 @@
               });
               const cAng2 = cAng + Math.PI + (Math.random() - 0.5);
               const cSp2  = 80 + Math.random() * 40;
-              runtime.drops.push({
-                x: s.x + 6, y: s.y + 4, type: 'coin',
-                vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
-              });
+              // SPEC §0 — Night Mode: TORCH_DROP_CHANCE replaces this second
+              // coin with a Torch item. Tree still gives wood + first coin.
+              if (runtime.mode === 'night' && Math.random() < TORCH_DROP_CHANCE) {
+                runtime.drops.push({
+                  x: s.x + 6, y: s.y + 4, type: 'torch',
+                  vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
+                  _flickerSeed: Math.random() * Math.PI * 2,
+                });
+              } else {
+                runtime.drops.push({
+                  x: s.x + 6, y: s.y + 4, type: 'coin',
+                  vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
+                });
+              }
               const wAng = Math.random() * Math.PI * 2;
               const wSp  = 160 + Math.random() * 60;
               runtime.drops.push({
                 x: s.x, y: s.y, type: 'wood',
                 vx: Math.cos(wAng) * wSp, vy: Math.sin(wAng) * wSp,
               });
+              // SPEC W-Hard-Tuning-And-Monetization §B — wood_x2 buff drops a
+              // second wood + a second coin per chopped tree. Both extras get
+              // their own arc so the magnet pulls them in independently.
+              const woodX2 = (window.WG && WG.Buffs && WG.Buffs.has && WG.Buffs.has('wood_x2'));
+              if (woodX2) {
+                const wAng2 = wAng + Math.PI + (Math.random() - 0.5) * 0.6;
+                const wSp2  = 160 + Math.random() * 60;
+                runtime.drops.push({
+                  x: s.x, y: s.y, type: 'wood',
+                  vx: Math.cos(wAng2) * wSp2, vy: Math.sin(wAng2) * wSp2,
+                });
+                const cAngB = Math.random() * Math.PI * 2;
+                const cSpB  = 80 + Math.random() * 40;
+                runtime.drops.push({
+                  x: s.x, y: s.y, type: 'coin',
+                  vx: Math.cos(cAngB) * cSpB, vy: Math.sin(cAngB) * cSpB,
+                });
+              }
               // Architect tuning preserved: 1 XP per chop, harder curve.
               p.xp += 1;
               if (p.xp >= p.xpToNext) levelUp();
@@ -254,7 +294,12 @@
   function baseDamage(w) {
     const ps = WG.State.get().player.stats;
     const p = runtime.player;
-    return Math.max(1, w.damage + (p && p.bonusDmg || 0) + Math.floor(ps.attack * 0.6));
+    let d = Math.max(1, w.damage + (p && p.bonusDmg || 0) + Math.floor(ps.attack * 0.6));
+    // SPEC W-Hard-Tuning-And-Monetization §B — damage_x2 buff doubles outgoing
+    // melee + turret damage. Read at hit-time so buff expiry is reflected
+    // immediately mid-stage without a refresh cycle.
+    if (window.WG && WG.Buffs && WG.Buffs.has && WG.Buffs.has('damage_x2')) d *= 2;
+    return d;
   }
 
   function fireProjectile(x, y, tx, ty, w, sourceType) {
@@ -281,6 +326,14 @@
     p.hp = Math.max(0, p.hp - reduced);
     WG.Engine.emit('player:damaged', { amount: reduced, hp: p.hp, source });
     if (p.hp <= 0) {
+      // SPEC W-Hard-Tuning-And-Monetization §B — pre-armed revive buff
+      // intercepts death once. Restores to full HP, fires player:revived,
+      // does NOT emit player:died (so the death modal doesn't appear).
+      if (window.WG && WG.Buffs && WG.Buffs.consume && WG.Buffs.consume('revive')) {
+        p.hp = p.maxHp;
+        WG.Engine.emit('player:revived', { source: 'buff' });
+        return;
+      }
       WG.Engine.emit('player:died', { source });
     }
   }
@@ -375,6 +428,10 @@
             WG.State.get().forge.craftFragments++;
             WG.Engine.emit('relic:fragment-pickup', { x: d.x, y: d.y, amount: 1 });
             WG.Engine.emit('pickup:fragment',       { x: d.x, y: d.y, amount: 1 });
+          } else if (d.type === 'torch') {
+            // SPEC §0 — Field-dropped Torch: full relight + event for FX.
+            p.torchAmount = TORCH_INITIAL;
+            WG.Engine.emit('pickup:torch', { x: d.x, y: d.y });
           }
           runtime.drops.splice(i, 1);
         }
@@ -410,6 +467,58 @@
     }
   }
 
+  // SPEC §0 — Torch tick. Linear decay outside any built campfire's relight
+  // radius; instant 1.0 reset inside (per spec: "campfire instantly relights
+  // torch in Night Mode"). HP is NOT damaged by torch-out — visibility cost
+  // (the night overlay) is the punishment.
+  //
+  // Edge cases:
+  //   - mode!=='night' → noop, torch stays at last value (preserved if mode flips).
+  //   - props.fires unavailable (stage not loaded) → noop, no decay (defensive).
+  //   - Player exactly on relight boundary (dist² == r²) → treated as inside
+  //     (<= comparison) — generous, avoids "you were in the campfire but missed".
+  //   - Multiple campfires overlap → first in-range fire relights; loop short-circuits.
+  //   - Mode switch mid-tick → guard at top; a future toggle goes silent without state mismatch.
+  function tickTorch(dt) {
+    if (!runtime || runtime.mode !== 'night') return;
+    const p = runtime.player;
+    if (!p) return;
+    if (typeof p.torchAmount !== 'number') p.torchAmount = TORCH_INITIAL;
+    if (typeof p.torchDecay  !== 'number') p.torchDecay  = TORCH_DECAY_PER_S;
+
+    if (window.WG.HuntRender && WG.HuntRender.getStageProps && runtime.stage) {
+      const props = WG.HuntRender.getStageProps(runtime.stage);
+      // Built-campfire fire entities live in props.fires (constructionTick pushes
+      // them on built). props.fires also holds any procedurally-placed campfires
+      // from getStageProps for non-night stages — that's harmless: tickTorch only
+      // runs in 'night' mode and the procedural fires represent the same lit
+      // campfire concept.
+      if (props.fires) {
+        for (const f of props.fires) {
+          const dx = p.x - f.x, dy = p.y - f.y;
+          if (dx*dx + dy*dy <= TORCH_RELIGHT_R * TORCH_RELIGHT_R) {
+            p.torchAmount = TORCH_INITIAL;
+            return;
+          }
+        }
+      }
+      // Defensive fallback: if an in-progress build hasn't pushed to props.fires
+      // yet, also check constructions for built campfires directly.
+      if (props.constructions) {
+        for (const c of props.constructions) {
+          if (!c.built || c.type !== 'campfire') continue;
+          const dx = p.x - c.x, dy = p.y - c.y;
+          if (dx*dx + dy*dy <= TORCH_RELIGHT_R * TORCH_RELIGHT_R) {
+            p.torchAmount = TORCH_INITIAL;
+            return;
+          }
+        }
+      }
+    }
+
+    p.torchAmount = Math.max(0, p.torchAmount - p.torchDecay * dt);
+  }
+
   // Construction tick — when player stands inside a dashed-circle slot AND
   // has wood, drain wood and accumulate progress. When have >= need, mark
   // built and (for campfire) push to props.fires for the existing campfire
@@ -427,6 +536,18 @@
       const dx = p.x - c.x, dy = p.y - c.y;
       if (dx*dx + dy*dy > CONSTRUCT_RADIUS * CONSTRUCT_RADIUS) {
         c.drainTimer = 0;  // reset when player leaves
+        continue;
+      }
+      // SPEC W-Hard-Tuning-And-Monetization §B — instant_turret buff:
+      // standing on a turret slot consumes the buff and force-builds it
+      // even with zero wood. One-shot, self-consuming. Other slot types
+      // (campfire, etc.) ignore the buff so it stays primed for a turret.
+      if (c.type === 'turret' && window.WG && WG.Buffs && WG.Buffs.has && WG.Buffs.has('instant_turret')) {
+        WG.Buffs.consume('instant_turret');
+        c.have = c.need;
+        c.built = true;
+        c.drainTimer = 0;
+        WG.Engine.emit('construct:built', { site: c, source: 'buff' });
         continue;
       }
       // Player on circle. Drain wood if available.
@@ -456,7 +577,12 @@
     autoAttack(dt);
     pickupTick(dt);
     constructionTick(dt);
+    // Turret auto-fire + campfire HP regen — owned by W-Turret-And-Campfire-Combat
+    // worker. Runs after constructionTick so a turret completed this tick begins
+    // ticking next frame, not the same one (prevents fire-during-build edge cases).
+    if (window.WG.HuntTurret && WG.HuntTurret.tick) WG.HuntTurret.tick(dt);
     tickSkill(dt);
+    tickTorch(dt);
   }
 
   function init() {}
