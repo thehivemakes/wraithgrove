@@ -1,7 +1,7 @@
 # Wraithgrove SPEC — Wood Siege clone, current truth
 
-**Last updated:** 2026-04-29
-**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.9.0-tree-barriers-spinning-scythe`)
+**Last updated:** 2026-05-01
+**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.11.0-fx-p0`)
 **Mirror:** https://thehivemakes.github.io/wraithgrove/
 **Source target:** Wood Siege (`com.dream.sfgame`, SF Group / Shifeng Shenzhen, English-localized)
 
