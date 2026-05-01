@@ -410,10 +410,52 @@
     }
   }
 
+  // Construction tick — when player stands inside a dashed-circle slot AND
+  // has wood, drain wood and accumulate progress. When have >= need, mark
+  // built and (for campfire) push to props.fires for the existing campfire
+  // render to pick up. Emits construction:built for FX hooks.
+  const CONSTRUCT_RADIUS = 28;       // matches drawConstructionSites r
+  const CONSTRUCT_TICK_S = 0.22;     // time per wood consumed (faster = more responsive)
+  function constructionTick(dt) {
+    if (runtime.pendingLevelUp) return;
+    if (!window.WG.HuntRender || !WG.HuntRender.getStageProps || !runtime.stage) return;
+    const props = WG.HuntRender.getStageProps(runtime.stage);
+    if (!props.constructions) return;
+    const p = runtime.player;
+    for (const c of props.constructions) {
+      if (c.built) continue;
+      const dx = p.x - c.x, dy = p.y - c.y;
+      if (dx*dx + dy*dy > CONSTRUCT_RADIUS * CONSTRUCT_RADIUS) {
+        c.drainTimer = 0;  // reset when player leaves
+        continue;
+      }
+      // Player on circle. Drain wood if available.
+      if ((runtime.runWood || 0) <= 0) continue;
+      c.drainTimer = (c.drainTimer || 0) + dt;
+      if (c.drainTimer >= CONSTRUCT_TICK_S) {
+        c.drainTimer -= CONSTRUCT_TICK_S;
+        runtime.runWood = Math.max(0, runtime.runWood - 1);
+        c.have += 1;
+        WG.Engine.emit('construct:tick', { site: c });
+        if (c.have >= c.need) {
+          c.built = true;
+          c.drainTimer = 0;
+          // Campfire built → push fire entity for existing flame render
+          if (c.type === 'campfire') {
+            if (!props.fires) props.fires = [];
+            props.fires.push({ x: c.x, y: c.y, flicker: Math.random() * Math.PI * 2 });
+          }
+          WG.Engine.emit('construct:built', { site: c });
+        }
+      }
+    }
+  }
+
   function tick(dt) {
     if (!runtime || !runtime.player || runtime.player.hp <= 0) return;
     autoAttack(dt);
     pickupTick(dt);
+    constructionTick(dt);
     tickSkill(dt);
   }
 

@@ -149,11 +149,11 @@
     // Construction sites — fixed positions arrayed around the base (Wood Siege has
     // 4-6 fixed turret slots around the player's spawn, not random placement)
     const constructions = [
-      { x: cxBase - 110, y: cyBase - 10,  name: 'Turret', have: 0, need: 4  },
-      { x: cxBase + 110, y: cyBase - 10,  name: 'Turret', have: 0, need: 4  },
-      { x: cxBase - 110, y: cyBase + 90,  name: 'Turret', have: 0, need: 4  },
-      { x: cxBase + 110, y: cyBase + 90,  name: 'Turret', have: 0, need: 4  },
-      { x: cxBase + 70,  y: cyBase + 30,  name: 'Campfire', have: 0, need: 30 },
+      { x: cxBase - 110, y: cyBase - 10,  type: 'turret',   name: 'Turret',   have: 0, need: 4,  built: false, drainTimer: 0 },
+      { x: cxBase + 110, y: cyBase - 10,  type: 'turret',   name: 'Turret',   have: 0, need: 4,  built: false, drainTimer: 0 },
+      { x: cxBase - 110, y: cyBase + 90,  type: 'turret',   name: 'Turret',   have: 0, need: 4,  built: false, drainTimer: 0 },
+      { x: cxBase + 110, y: cyBase + 90,  type: 'turret',   name: 'Turret',   have: 0, need: 4,  built: false, drainTimer: 0 },
+      { x: cxBase + 70,  y: cyBase + 30,  type: 'campfire', name: 'Campfire', have: 0, need: 30, built: false, drainTimer: 0 },
     ];
 
     // DENSE forest covering the ENTIRE map on a jittered grid (Wood Siege register —
@@ -442,21 +442,37 @@
   function drawConstructionSites(ctx, props) {
     if (!props.constructions) return;
     const t = performance.now() / 1000;
+    const playerX = runtime.player ? runtime.player.x : -9999;
+    const playerY = runtime.player ? runtime.player.y : -9999;
     for (const c of props.constructions) {
+      if (c.built) continue;  // built sites are drawn by drawBuiltStructures
       const s = w2s(c.x, c.y);
       if (s.x < -60 || s.x > D().width + 60 || s.y < -60 || s.y > D().height + 60) continue;
       const r = 28;
+      // Player-on-circle highlight: brighter ring + warmer fill when within radius
+      const dx = playerX - c.x, dy = playerY - c.y;
+      const onCircle = (dx*dx + dy*dy) < r * r;
       // Dashed circle outline
       ctx.save();
       ctx.setLineDash([6, 4]);
       ctx.lineDashOffset = -t * 8;
-      ctx.strokeStyle = 'rgba(232, 224, 200, 0.85)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = onCircle ? 'rgba(255, 224, 120, 1.0)' : 'rgba(232, 224, 200, 0.85)';
+      ctx.lineWidth = onCircle ? 2.5 : 1.5;
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
       // Subtle tint inside
-      ctx.fillStyle = 'rgba(232, 224, 200, 0.06)';
+      ctx.fillStyle = onCircle ? 'rgba(255, 224, 120, 0.18)' : 'rgba(232, 224, 200, 0.06)';
       ctx.beginPath(); ctx.arc(s.x, s.y, r - 1, 0, Math.PI * 2); ctx.fill();
+      // Progress fill — pie slice based on have/need
+      if (c.have > 0) {
+        const frac = Math.min(1, c.have / c.need);
+        ctx.fillStyle = 'rgba(120, 220, 120, 0.30)';
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.arc(s.x, s.y, r - 2, -Math.PI/2, -Math.PI/2 + frac * Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
       // Padlock icon (small) above center
       ctx.fillStyle = '#d8d0b0';
       ctx.fillRect(s.x - 3, s.y - 4, 6, 5);
@@ -481,6 +497,58 @@
       ctx.textAlign = 'left';
       ctx.fillText(`${c.have}/${c.need}`, s.x - 7, s.y + 12);
       ctx.textAlign = 'left';
+    }
+  }
+
+  // Built structures — draw turrets / campfires that have been completed.
+  // Construction tick (in hunt-player) consumes wood while player stands on a
+  // dashed-circle slot; once have >= need, sets c.built = true and emits
+  // construction:built. Built turrets render here with a small wagon+cannon
+  // sprite. Built campfire sites adopt the existing campfire flame + light.
+  function drawBuiltStructures(ctx, props) {
+    if (!props.constructions) return;
+    const t = performance.now() / 1000;
+    for (const c of props.constructions) {
+      if (!c.built) continue;
+      const s = w2s(c.x, c.y);
+      if (s.x < -60 || s.x > D().width + 60 || s.y < -60 || s.y > D().height + 60) continue;
+      if (c.type === 'turret') {
+        // Drop shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.beginPath(); ctx.ellipse(s.x, s.y + 12, 18, 5, 0, 0, Math.PI*2); ctx.fill();
+        // Wagon base (brown wood plank platform)
+        ctx.fillStyle = '#6a3818';
+        ctx.fillRect(s.x - 14, s.y - 2, 28, 12);
+        ctx.strokeStyle = '#3a1c08'; ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(s.x - 14, s.y - 2 + i*4 + 2);
+          ctx.lineTo(s.x + 14, s.y - 2 + i*4 + 2);
+          ctx.stroke();
+        }
+        // Wheels
+        ctx.fillStyle = '#1a0a02';
+        ctx.beginPath(); ctx.arc(s.x - 11, s.y + 11, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(s.x + 11, s.y + 11, 3, 0, Math.PI*2); ctx.fill();
+        // Cannon barrel — angled upward, slowly rotating to track an imagined enemy
+        const aim = Math.sin(t * 0.6 + c.x * 0.01) * 0.4 - 0.5;  // -0.9 to -0.1 rad
+        ctx.save();
+        ctx.translate(s.x, s.y - 2);
+        ctx.rotate(aim);
+        ctx.fillStyle = '#4a4438';
+        ctx.fillRect(-2, -14, 4, 14);
+        ctx.fillStyle = '#7a7468';
+        ctx.fillRect(-2, -16, 4, 2);  // muzzle
+        ctx.restore();
+        // Faint muzzle glow
+        ctx.fillStyle = `rgba(255, 200, 80, ${0.3 + Math.sin(t * 4) * 0.15})`;
+        ctx.beginPath();
+        ctx.arc(s.x + Math.sin(aim) * 14, s.y - 2 - Math.cos(aim) * 14, 3, 0, Math.PI*2);
+        ctx.fill();
+      }
+      // Campfire built sites: handled by drawCampfireLight + drawCampfireFlame
+      // which iterate props.fires; the construction tick should push the fire
+      // when c.built becomes true. Render-side no-op here.
     }
   }
 
@@ -1233,6 +1301,7 @@
     drawPineForest(ctx);
     drawCampfireLight(ctx, props);
     drawConstructionSites(ctx, props);
+    drawBuiltStructures(ctx, props);
     drawStumps(ctx, props);
     drawCaves(ctx, props);
     drawCampfireFlame(ctx, props);
@@ -1347,6 +1416,31 @@
     // Sprite-juice state — track damage timestamps for hit-flash + swing for squash.
     WG.Engine.on('enemy:damaged', ({ creature }) => { if (creature) creature._lastDamageAt = performance.now(); });
     WG.Engine.on('player:swing',  () => { _lastSwingAt = performance.now(); });
+
+    // Construction: each wood-tick consumed → small particle puff. Built → big burst + trauma.
+    WG.Engine.on('construct:tick', ({ site }) => {
+      for (let i = 0; i < 3; i++) {
+        const a = Math.random() * Math.PI * 2;
+        WG.Render.spawnParticles({
+          x: site.x + Math.cos(a) * 16, y: site.y + Math.sin(a) * 12,
+          angle: a, speed: 50 + Math.random() * 40,
+          life: 0.35, color: '#a8d878', size: 2,
+        });
+      }
+    });
+    WG.Engine.on('construct:built', ({ site }) => {
+      addTrauma(0.30);
+      WG.Engine.hitPause(80);
+      // Big burst at the site
+      for (let i = 0; i < 24; i++) {
+        const a = Math.PI * 2 * (i / 24);
+        WG.Render.spawnParticles({
+          x: site.x, y: site.y,
+          angle: a, speed: 120 + Math.random() * 60,
+          life: 0.8, color: i % 2 === 0 ? '#ffe888' : '#a8d878', size: 3,
+        });
+      }
+    });
   }
 
   // Expose getStageProps so hunt-player can damage stumps on swing.
