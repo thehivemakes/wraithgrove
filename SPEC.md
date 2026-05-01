@@ -1,7 +1,55 @@
 # Wraithgrove SPEC — Wood Siege clone, current truth
 
-**Last updated:** 2026-05-01
-**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.11.0-fx-p0`)
+**Last updated:** 2026-05-01 (Architect locked Q&A)
+**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.12.0-construction-build`)
+
+## §0 — ARCHITECT-LOCKED ARCHITECTURE TRUTHS (2026-05-01)
+
+These supersede any conflicting earlier section. Architect-confirmed; no further verification needed.
+
+### Navigation model
+- **Tabs are ONLY visible on the lobby/menu screen.** Once the player enters a Battle stage, all tabs disappear — the stage takes the full screen.
+- **Level selection lives INSIDE the Battle/Hunt tab on the menu**, not as a separate boot screen. Player taps Battle tab → sees level cards split by **Day Mode** and **Night Mode** categories → taps a card → enters that stage in that mode → tabs hidden.
+- Returning to lobby (death/clear/menu button) → tabs reappear.
+
+### Day Mode vs Night Mode (stage-level choice, NOT wave cycle)
+- Each stage exists as **two playable variants**: Day Mode and Night Mode. Player picks one from the lobby level select.
+- **Day Mode = easier.** Standard gather + build + defend. Existing combat baseline.
+- **Night Mode = harder.** More enemy density, hidden boss enemies that **emerge from trees** when approached, and the **torch mechanic** (below).
+
+### Torch mechanic (Night Mode only)
+- Player has a personal **torch radius** that lights the area around them.
+- When player is **away from a built Campfire**, the torch dims over time → screen darkens progressively → eventually nearly black.
+- Player relights the torch by either: (1) returning to a built Campfire, or (2) picking up a **Torch item** drop in the field.
+- Implication: Night Mode forces players to chain campfire-to-campfire or rush to torch drops, creating tension + ad-buy opportunity.
+
+### Built turret behavior
+- Auto-shoots at nearby enemies (NOT fixed direction).
+- Deals offensive damage AND takes damage from enemy attacks (has HP).
+- Can be destroyed by enemy waves; player rebuilds with wood.
+- Fire rate + damage are tuning parameters; baseline starts low so monetization upgrades feel impactful.
+
+### Built campfire behavior
+- Player **HP regen** when standing inside radius (b).
+- **Set dressing** + light radius (d).
+- **Relights torch** in Night Mode when player passes through.
+
+### Difficulty mandate
+- Game is intentionally HARD. Players get stuck.
+- Monetization, ad-rewarded videos, IAP buffs, and ad-revives are the relief valve.
+- **Don't soften balance to "feel fair."** The grind IS the design — the ad/IAP layer makes it feel surmountable.
+- Specifically:
+  - Watch ad → temporary 2× damage / 2× wood / etc.
+  - Watch ad → instant build a turret without wood cost
+  - Death → watch ad to revive (limited per stage)
+  - IAP for permanent stat upgrades, premium relics, character unlocks
+
+### Multi-enemy catalog (confirmed multiple types)
+- Day enemies: red cloaked figures (existing baseline)
+- Night enemies: pumpkin-heads + jiangshi (Chinese hopping vampire) + samurai grunts + larger boss variants hidden in trees
+- Bosses: existing 6 (pale_bride / frozen_crone / autumn_lord / temple_warden / cave_mother / wraith_father) need cloaked-humanoid sprites instead of geometric
+
+---
 **Mirror:** https://thehivemakes.github.io/wraithgrove/
 **Source target:** Wood Siege (`com.dream.sfgame`, SF Group / Shifeng Shenzhen, English-localized)
 
