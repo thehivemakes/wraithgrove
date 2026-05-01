@@ -13,6 +13,54 @@
   let runtime = null;
   let _edgePulse = null;
   let _stagePropsCache = {}; // stageId → { stumps:[], cabins:[], fires:[] }
+  // Trauma-based screen shake (DOPAMINE_DESIGN §9 / Eiserloh GDC 2016).
+  // shake = trauma², decays ~1.4/sec, max 18px offset + 0.04 rad rotation.
+  let _trauma = 0;
+  let _shakeLastMs = performance.now();
+  // Player swing squash timestamp (DOPAMINE_DESIGN §9 sprite techniques).
+  let _lastSwingAt = 0;
+
+  function addTrauma(amt) { _trauma = Math.min(1, _trauma + amt); }
+  let _lastFrameMs = 0;
+
+  // HUD counter pulse — DOPAMINE_DESIGN §1+§2: counter scale-bounce + tint on increment.
+  const HUD_PULSE_DUR_MS    = 280;
+  const HUD_PULSE_SCALE_AMP = 0.35;
+  const HUD_PULSE_TINT      = '#ffe888';
+  const _hudPulse = {
+    wood: { val: 0, ts: 0 },
+    gold: { val: 0, ts: 0 },
+    xp:   { val: 0, ts: 0 },
+  };
+  function _hudMixHex(a, b, t) {
+    const ar=parseInt(a.slice(1,3),16), ag=parseInt(a.slice(3,5),16), ab=parseInt(a.slice(5,7),16);
+    const br=parseInt(b.slice(1,3),16), bg=parseInt(b.slice(3,5),16), bb=parseInt(b.slice(5,7),16);
+    const r=Math.round(ar+(br-ar)*t), g=Math.round(ag+(bg-ag)*t), bl=Math.round(ab+(bb-ab)*t);
+    return 'rgb('+r+','+g+','+bl+')';
+  }
+  function _hudPulseStyle(key, baseColor) {
+    const entry = _hudPulse[key];
+    if (!entry || !entry.ts) return { scale: 1, color: baseColor };
+    const k = (performance.now() - entry.ts) / HUD_PULSE_DUR_MS;
+    if (k >= 1 || k < 0) return { scale: 1, color: baseColor };
+    const scale = 1 + HUD_PULSE_SCALE_AMP * Math.sin(k * Math.PI);
+    return { scale, color: _hudMixHex(baseColor, HUD_PULSE_TINT, 1 - k) };
+  }
+  function _hudDrawScaled(ctx, cx, cy, scale, drawFn) {
+    if (scale === 1) { drawFn(); return; }
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(scale, scale); ctx.translate(-cx, -cy);
+    drawFn();
+    ctx.restore();
+  }
+  function _hudBumpCache(woodNow, goldNow, xpNow) {
+    const tNow = performance.now();
+    if (woodNow > _hudPulse.wood.val) { _hudPulse.wood.ts = tNow; }
+    if (woodNow !== _hudPulse.wood.val) _hudPulse.wood.val = woodNow;
+    if (goldNow > _hudPulse.gold.val) { _hudPulse.gold.ts = tNow; }
+    if (goldNow !== _hudPulse.gold.val) _hudPulse.gold.val = goldNow;
+    if (xpNow > _hudPulse.xp.val)     { _hudPulse.xp.ts = tNow; }
+    if (xpNow !== _hudPulse.xp.val) _hudPulse.xp.val = xpNow; // resets on level-up
+  }
 
   function pulseEdges(color, opacity, durationMs) {
     _edgePulse = { color, opacity, start: performance.now(), end: performance.now() + durationMs };
@@ -34,7 +82,12 @@
     ctx.globalAlpha = 1;
   }
 
-  function setRuntime(rt) { runtime = rt; _stagePropsCache = {}; }
+  function setRuntime(rt) {
+    runtime = rt; _stagePropsCache = {};
+    _hudPulse.wood.val = 0; _hudPulse.wood.ts = 0;
+    _hudPulse.gold.val = 0; _hudPulse.gold.ts = 0;
+    _hudPulse.xp.val   = 0; _hudPulse.xp.ts   = 0;
+  }
 
   function updateCamera() {
     if (!runtime || !runtime.player) return;
@@ -272,7 +325,8 @@
     ctx.fillRect(sx - 2, sy - 7, 4, 7);
     // Foliage — 3 stacked triangles, sized by hash, brighter on hit.
     // Architect: 'darker' — pulled green channels down ~12 across the board.
-    const flashBoost = flash * 30;
+    // DOPAMINE_DESIGN §9 — bumped flash factor from 30→48 for cleaner pop.
+    const flashBoost = flash * 48;
     ctx.fillStyle = `rgb(${10 + flashBoost},${32 + flashBoost*1.5},${14 + flashBoost})`;
     ctx.beginPath(); ctx.moveTo(sx, sy - 33); ctx.lineTo(sx - 9, sy - 19); ctx.lineTo(sx + 9, sy - 19); ctx.closePath(); ctx.fill();
     ctx.fillStyle = `rgb(${14 + flashBoost},${40 + flashBoost*1.5},${16 + flashBoost})`;
@@ -492,6 +546,9 @@
         ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI*2); ctx.fill();
       } else if (d.type === 'coin') {
         ctx.fillStyle = '#ffd870'; ctx.fillRect(s.x-3, s.y-3, 6, 6);
+      } else if (d.type === 'wood') {
+        ctx.fillStyle = '#a06028'; ctx.fillRect(s.x-3, s.y-2, 6, 4);
+        ctx.fillStyle = '#5a3010'; ctx.fillRect(s.x-3, s.y-2, 6, 1);
       } else if (d.type === 'fragment') {
         ctx.fillStyle = '#e0a8ff';
         ctx.beginPath(); ctx.moveTo(s.x, s.y-4); ctx.lineTo(s.x+4, s.y); ctx.lineTo(s.x, s.y+4); ctx.lineTo(s.x-4, s.y); ctx.closePath(); ctx.fill();
@@ -619,6 +676,18 @@
     ctx.fillStyle = '#1a0410';
     ctx.fillRect(sx - 3, sy - sz*0.32, 2, 2);
     ctx.fillRect(sx + 1, sy - sz*0.32, 2, 2);
+    // Hit-flash overlay (DOPAMINE_DESIGN §9 sprite techniques) — 80ms additive white tint.
+    const sinceDmg = performance.now() - (c._lastDamageAt || 0);
+    if (sinceDmg < 80) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (1 - sinceDmg/80) * 0.6;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy - sz*0.1, sz*0.42, sz*0.55, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
     // HP bar above
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(20, sz+4), c.hp, c.maxHp);
   }
@@ -712,6 +781,19 @@
     // Stem — small green-brown nub on top of head
     ctx.fillStyle = '#3a3a1a';
     ctx.fillRect(sx - 2, headCy - headR - 5, 4, 6);
+
+    // Hit-flash overlay (DOPAMINE_DESIGN §9) — 80ms additive white tint.
+    const sinceDmg = performance.now() - (c._lastDamageAt || 0);
+    if (sinceDmg < 80) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (1 - sinceDmg/80) * 0.6;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy - sz*0.15, sz*0.5, sz*0.6, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 0.85, Math.max(20, sz + 4), c.hp, c.maxHp);
   }
@@ -888,7 +970,22 @@
       if (wep && wep.range) weaponRange = wep.range;
     }
     const visualRadius = Math.min(weaponRange, 16);
-    drawAnimeGirl(ctx, s.x, s.y, visualRadius);
+    // Player swing squash-and-stretch (DOPAMINE_DESIGN §9 sprite techniques) —
+    // 60ms ease-back from 1.08x / 0.92y to 1.0. Sells weapon weight.
+    const sinceSwing = performance.now() - _lastSwingAt;
+    if (sinceSwing < 60) {
+      const k = sinceSwing / 60;
+      const sxK = 1 + (1 - k) * 0.08;
+      const syK = 1 - (1 - k) * 0.08;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.scale(sxK, syK);
+      ctx.translate(-s.x, -s.y);
+      drawAnimeGirl(ctx, s.x, s.y, visualRadius);
+      ctx.restore();
+    } else {
+      drawAnimeGirl(ctx, s.x, s.y, visualRadius);
+    }
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
 
@@ -945,6 +1042,7 @@
     // Top-left: in-stage resource counters (coin + wood)
     const coins = (runtime.runCoins || 0);
     const wood  = (runtime.runWood  || 0);
+    _hudBumpCache(wood, coins, p.xp); // DOPAMINE_DESIGN §1+§2 — pulse on increment
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(8, 76, 78, 50);
     // Coin
@@ -952,23 +1050,32 @@
     ctx.beginPath(); ctx.arc(20, 90, 6, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#a8801c'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(20, 90, 6, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = '#f0e8c8';
+    const goldP = _hudPulseStyle('gold', '#f0e8c8');
     ctx.font = 'bold 12px system-ui';
-    ctx.fillText(String(coins), 32, 94);
+    _hudDrawScaled(ctx, 32, 94, goldP.scale, () => {
+      ctx.fillStyle = goldP.color;
+      ctx.fillText(String(coins), 32, 94);
+    });
     // Wood
     ctx.fillStyle = '#8a5828';
     ctx.fillRect(15, 110, 10, 6);
     ctx.fillStyle = '#5a3010';
     ctx.fillRect(15, 110, 10, 2);
-    ctx.fillStyle = '#f0e8c8';
-    ctx.fillText(String(wood), 32, 117);
+    const woodP = _hudPulseStyle('wood', '#f0e8c8');
+    _hudDrawScaled(ctx, 32, 117, woodP.scale, () => {
+      ctx.fillStyle = woodP.color;
+      ctx.fillText(String(wood), 32, 117);
+    });
 
     // Mid: level bar (smaller, below wave dots)
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(94, 76, w - 200, 22);
-    ctx.fillStyle = '#f0d890';
+    const xpP = _hudPulseStyle('xp', '#f0d890');
     ctx.font = 'bold 11px system-ui';
-    ctx.fillText('Lv.' + p.level, 100, 91);
+    _hudDrawScaled(ctx, 100, 91, xpP.scale, () => {
+      ctx.fillStyle = xpP.color;
+      ctx.fillText('Lv.' + p.level, 100, 91);
+    });
     ctx.fillStyle = '#3a3022';
     ctx.fillRect(126, 86, w - 240, 6);
     ctx.fillStyle = '#a8d878';
@@ -1069,8 +1176,32 @@
     const biome = WG.HuntStage.getBiome(runtime.stage.biome);
     updateCamera();
     const props = getStageProps(runtime.stage);
+    // Derive dt for fx-only systems (game-logic dt handled by wg-game).
+    const nowMs = performance.now();
+    const fxDt = _lastFrameMs ? Math.min(0.1, (nowMs - _lastFrameMs) / 1000) : 0;
+    _lastFrameMs = nowMs;
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.tick(fxDt);
+    if (window.WG.HuntFX) WG.HuntFX.tick(fxDt);
 
     WG.Render.clear(ctx, biome.ground);
+
+    // Trauma-based screen shake (DOPAMINE_DESIGN §9). Decays ~1.4/sec, displacement
+    // = trauma² × maxOffset (Eiserloh GDC 2016). Wraps world rendering only — HUD
+    // and edge-pulse are drawn at native screen-space below and stay anchored.
+    const _now = performance.now();
+    _trauma = Math.max(0, _trauma - 1.4 * (_now - _shakeLastMs) / 1000);
+    _shakeLastMs = _now;
+    ctx.save();
+    if (_trauma > 0) {
+      const shake = _trauma * _trauma;
+      const offX = (Math.random() * 2 - 1) * shake * 18;
+      const offY = (Math.random() * 2 - 1) * shake * 18;
+      const rot  = (Math.random() * 2 - 1) * shake * 0.04;
+      const W = D().width, H = D().height;
+      ctx.translate(offX + W/2, offY + H/2);
+      ctx.rotate(rot);
+      ctx.translate(-W/2, -H/2);
+    }
 
     // World rendering — zoomed by ZOOM factor (closer to player, like Wood Siege HD)
     ctx.save();
@@ -1088,7 +1219,10 @@
     drawProjectiles(ctx);
     drawPlayer(ctx);
     WG.Render.drawParticles(ctx, w2s);
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.draw(ctx, w2s);
+    if (window.WG.HuntFX) WG.HuntFX.draw(ctx, w2s);
     ctx.restore();
+    ctx.restore(); // pair with outer trauma transform save
 
     // Screen-space overlays — HUD, fog, modals (drawn at native scale)
     if (biome.lightFog > 0) {
@@ -1101,6 +1235,12 @@
   }
 
   function init() {
+    if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.init) WG.HuntFXNumbers.init();
+    if (window.WG.HuntFX && WG.HuntFX.init) WG.HuntFX.init();
+    // Manual HUD pulse trigger — DOPAMINE_DESIGN §2: any module can ping a counter.
+    WG.Engine.on('hud:pulse', ({ key }) => {
+      if (_hudPulse[key]) _hudPulse[key].ts = performance.now();
+    });
     const skillBtn = document.getElementById('hunt-skill-btn');
     if (skillBtn) skillBtn.addEventListener('click', () => WG.Input.triggerSkill());
     D().canvas.addEventListener('pointerdown', (e) => {
@@ -1164,8 +1304,28 @@
     WG.Engine.on('boss:defeated', () => {
       if (WG.Haptics) WG.Haptics.impact('heavy');
     });
+
+    // Trauma triggers (DOPAMINE_DESIGN §9 table). stump:hit excluded — would
+    // shake constantly with the spinning scythe at 5 chops/sec.
+    WG.Engine.on('enemy:killed',  () => addTrauma(0.18));
+    WG.Engine.on('boss:damaged',  () => addTrauma(0.10));
+    WG.Engine.on('boss:defeated', () => addTrauma(0.65));
+    WG.Engine.on('player:damaged', ({ amount }) => addTrauma(0.30 + (amount || 0) / 200));
+    WG.Engine.on('player:skill',  () => addTrauma(0.45));
+    WG.Engine.on('stump:chopped', () => addTrauma(0.05));
+
+    // Hit-pause triggers (DOPAMINE_DESIGN §9). NOT wired on stump:hit / stump:chopped
+    // — would kill chop-flow at 5/sec (explicit DOPAMINE_DESIGN constraint).
+    WG.Engine.on('enemy:killed',   () => WG.Engine.hitPause(30));
+    WG.Engine.on('boss:damaged',   () => WG.Engine.hitPause(40));
+    WG.Engine.on('boss:defeated',  () => WG.Engine.hitPause(220));
+    WG.Engine.on('player:damaged', ({ amount }) => { if ((amount || 0) > 20) WG.Engine.hitPause(60); });
+
+    // Sprite-juice state — track damage timestamps for hit-flash + swing for squash.
+    WG.Engine.on('enemy:damaged', ({ creature }) => { if (creature) creature._lastDamageAt = performance.now(); });
+    WG.Engine.on('player:swing',  () => { _lastSwingAt = performance.now(); });
   }
 
   // Expose getStageProps so hunt-player can damage stumps on swing.
-  window.WG.HuntRender = { init, drawFrame, setRuntime, w2s, getStageProps };
+  window.WG.HuntRender = { init, drawFrame, setRuntime, w2s, getStageProps, addTrauma };
 })();

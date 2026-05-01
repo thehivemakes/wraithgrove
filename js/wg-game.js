@@ -70,9 +70,11 @@
     // Run engine tick (drives ticked modules)
     WG.Engine.tick(dt);
 
-    // Hunt-specific runtime update only when on Hunt tab AND in a stage
+    // Hunt-specific runtime update only when on Hunt tab AND in a stage.
+    // Hit-pause (DOPAMINE_DESIGN §9) freezes world sim but lets render continue
+    // — runtime.elapsed must NOT advance during the pause window.
     if (WG.State.get().activeTab === 'hunt' && huntRuntime && huntRuntime.player && huntRuntime.player.hp > 0 && !huntRuntime.pendingLevelUp) {
-      if (!huntRuntime._tutorialPaused) {
+      if (!huntRuntime._tutorialPaused && !WG.Engine.isHitPaused()) {
       huntRuntime.elapsed += dt;
       // Player movement from input
       const inp = WG.Input.poll();
@@ -159,7 +161,7 @@
         running = false;
         finishHunt(true);
       }
-      } // end !_tutorialPaused guard
+      } // end !_tutorialPaused && !isHitPaused guard
     }
 
     // Always render appropriate canvas content

@@ -176,14 +176,32 @@
             WG.Engine.emit('stump:hit', { stump: s });
             if (s.hp <= 0) {
               s.dropped = true;
-              // Drop wood, coin, and grant XP
-              runtime.drops.push({ x: s.x, y: s.y, type: 'coin', vx:0, vy:0 });
-              runtime.drops.push({ x: s.x + 6, y: s.y + 4, type: 'coin', vx:0, vy:0 });
-              // Architect tuning: HARDER curve. 1 XP per chop (was 2), so leveling
-              // takes more sustained chopping. Combined with higher base xpToNext.
+              // DOPAMINE_DESIGN §2 — drops pop outward, magnet inward. Coins:
+              // ~20px arc with fast magnet (lerp 0.22). Wood chunk: 30-40px arc
+              // over 200ms, 100ms linger, then magnet at lerp 0.18. The wood
+              // counter increments at pickup time, not at chop — "nothing on the
+              // counter without traveling through screen space first."
+              const cAng = Math.random() * Math.PI * 2;
+              const cSp  = 80 + Math.random() * 40;
+              runtime.drops.push({
+                x: s.x, y: s.y, type: 'coin',
+                vx: Math.cos(cAng) * cSp, vy: Math.sin(cAng) * cSp,
+              });
+              const cAng2 = cAng + Math.PI + (Math.random() - 0.5);
+              const cSp2  = 80 + Math.random() * 40;
+              runtime.drops.push({
+                x: s.x + 6, y: s.y + 4, type: 'coin',
+                vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
+              });
+              const wAng = Math.random() * Math.PI * 2;
+              const wSp  = 160 + Math.random() * 60;
+              runtime.drops.push({
+                x: s.x, y: s.y, type: 'wood',
+                vx: Math.cos(wAng) * wSp, vy: Math.sin(wAng) * wSp,
+              });
+              // Architect tuning preserved: 1 XP per chop, harder curve.
               p.xp += 1;
               if (p.xp >= p.xpToNext) levelUp();
-              runtime.runWood = (runtime.runWood || 0) + 1;
               WG.Engine.emit('stump:chopped', { stump: s });
             }
           }
@@ -312,21 +330,52 @@
     runtime.pendingLevelUp = false;
   }
 
-  function pickupTick() {
+  function pickupTick(dt) {
     const p = runtime.player;
     const r = p.pickupRadius;
     for (let i = runtime.drops.length - 1; i >= 0; i--) {
       const d = runtime.drops[i];
+
+      // DOPAMINE_DESIGN §2 — initial pop physics. Each drop carries vx/vy at
+      // spawn; exponential decay settles it within the type's pop window.
+      d._lifetime = (d._lifetime || 0) + dt;
+      if (d.vx || d.vy) {
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        const decayPerSec = (d.type === 'coin') ? 12 : 8;
+        const k = Math.exp(-decayPerSec * dt);
+        d.vx *= k;
+        d.vy *= k;
+        if (Math.abs(d.vx) < 0.5 && Math.abs(d.vy) < 0.5) { d.vx = 0; d.vy = 0; }
+      }
+
+      // §2 magnet table — wood lingers 300ms (200ms pop + 100ms hold) before
+      // magnet engages; coin gets aggressive 0.22 lerp; orb/fragment 0.18.
+      const linger = (d.type === 'wood') ? 0.30 : 0;
+      if (d._lifetime < linger) continue;
+      const lerp = (d.type === 'coin') ? 0.22 : 0.18;
+
       const dx = d.x - p.x, dy = d.y - p.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
       if (dist < r) {
-        // magnetize
-        d.x += (p.x - d.x) * 0.18;
-        d.y += (p.y - d.y) * 0.18;
+        d.x += (p.x - d.x) * lerp;
+        d.y += (p.y - d.y) * lerp;
         if (dist < 14) {
-          if (d.type === 'orb') { p.xp += 1; if (p.xp >= p.xpToNext) levelUp(); }
-          else if (d.type === 'coin') WG.State.grant('coins', 1);
-          else if (d.type === 'fragment') { WG.State.get().forge.craftFragments++; WG.Engine.emit('relic:fragment-pickup',{}); }
+          if (d.type === 'orb') {
+            p.xp += 1;
+            if (p.xp >= p.xpToNext) levelUp();
+            WG.Engine.emit('pickup:orb', { x: d.x, y: d.y, amount: 1 });
+          } else if (d.type === 'coin') {
+            WG.State.grant('coins', 1);
+            WG.Engine.emit('pickup:coin', { x: d.x, y: d.y, amount: 1 });
+          } else if (d.type === 'wood') {
+            runtime.runWood = (runtime.runWood || 0) + 1;
+            WG.Engine.emit('pickup:wood', { x: d.x, y: d.y, amount: 1 });
+          } else if (d.type === 'fragment') {
+            WG.State.get().forge.craftFragments++;
+            WG.Engine.emit('relic:fragment-pickup', { x: d.x, y: d.y, amount: 1 });
+            WG.Engine.emit('pickup:fragment',       { x: d.x, y: d.y, amount: 1 });
+          }
           runtime.drops.splice(i, 1);
         }
       }
@@ -364,7 +413,7 @@
   function tick(dt) {
     if (!runtime || !runtime.player || runtime.player.hp <= 0) return;
     autoAttack(dt);
-    pickupTick();
+    pickupTick(dt);
     tickSkill(dt);
   }
 
