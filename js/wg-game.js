@@ -6,14 +6,17 @@
 
   // Hunt runtime — populated when entering Hunt mode
   let huntRuntime = null;
+  // SPEC §0 — Day/Night mode chosen on lobby level select; persists across panel rerenders
+  let currentLevelMode = 'day';
 
-  function buildHuntRuntime(stageId) {
+  function buildHuntRuntime(stageId, mode) {
     const stage = WG.HuntStage.get(stageId);
     if (!stage) return null;
     const mapW = 720;
     const mapH = 1100;
     const rt = {
       stage,
+      mode: (mode === 'night' ? 'night' : 'day'), // SPEC §0 — read by hunt-stage/waves/render in later workers
       mapW, mapH,
       elapsed: 0,
       spawnAccum: 0,
@@ -35,14 +38,16 @@
     return rt;
   }
 
-  function startHunt(stageId) {
-    buildHuntRuntime(stageId);
+  function startHunt(stageId, mode) {
+    buildHuntRuntime(stageId, mode);
     WG.State.get().huntProgress.currentStage = stageId;
     // Remove the stage select overlay if present
     const sel = document.getElementById('hunt-stage-select');
     if (sel && sel.parentNode) sel.parentNode.removeChild(sel);
     switchTab('hunt');
-    WG.Engine.emit('hunt:stage-start', { stageId });
+    // SPEC §0 — tabs hidden once a stage starts
+    document.body.classList.add('in-stage');
+    WG.Engine.emit('hunt:stage-start', { stageId, mode: huntRuntime ? huntRuntime.mode : 'day' });
     WG.HuntTutorial.maybeStart(stageId);
   }
 
@@ -51,6 +56,8 @@
   function exitHunt() {
     huntRuntime = null;
     WG.HuntRender.setRuntime(null);
+    // SPEC §0 — tabs+top-strip restored on lobby return
+    document.body.classList.remove('in-stage');
     WG.State.setActiveTab('hunt');
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-hunt').classList.add('active');
@@ -226,43 +233,74 @@
     if (tab === 'hunt') showHuntStageList();
   }
 
+  // SPEC §0 — Level select lives INSIDE the Hunt tab; mode tabs split Day/Night;
+  // all 18 stages unlocked for now (worker spec). Card tap → startHunt(id, mode).
   function showHuntStageList() {
-    // If a stage is currently running, do nothing.
     if (huntRuntime && huntRuntime.player && huntRuntime.player.hp > 0) return;
     const root = document.getElementById('tab-hunt');
-    // Always recreate the panel to ensure correct DOM position after nav transitions.
     const existing = document.getElementById('hunt-stage-select');
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
     const select = document.createElement('div');
     select.id = 'hunt-stage-select';
-    select.style.cssText = 'position:absolute;inset:36px 0 0 0;overflow-y:auto;padding:12px;background:#0c0a08;z-index:10;';
+    select.style.cssText = 'position:absolute;inset:36px 0 0 0;overflow-y:auto;padding:10px 12px 16px 12px;background:#0c0a08;z-index:10;';
     root.appendChild(select);
-    const h2 = document.createElement('h2');
-    h2.textContent = 'Hunt — Stage Select';
-    h2.style.cssText = 'font-size:14px;color:#f0d890;letter-spacing:2px;text-transform:uppercase;text-align:center;margin:8px 0 12px 0;';
-    select.appendChild(h2);
+
+    // Mode chooser strip
+    const modeBar = document.createElement('div');
+    modeBar.style.cssText = 'display:flex;gap:6px;margin:4px 0 12px 0;';
+    const dayTab = document.createElement('div');
+    const nightTab = document.createElement('div');
+    function styleModeTab(el, active, isNight) {
+      const accent = isNight ? '#7aa0e0' : '#a8d878';
+      const bg = active
+        ? (isNight ? 'linear-gradient(to bottom, rgba(60,90,160,0.45), rgba(20,40,90,0.55))'
+                   : 'linear-gradient(to bottom, rgba(80,140,60,0.4), rgba(30,70,20,0.5))')
+        : '#1a1208';
+      el.style.cssText = `flex:1;padding:11px;text-align:center;font-size:11px;letter-spacing:2px;font-weight:700;cursor:pointer;border-radius:6px;border:1px solid ${active?accent:'#3a2818'};background:${bg};color:${active?accent:'#a89878'};`;
+    }
+    dayTab.textContent = '☀ DAY MODE';
+    nightTab.textContent = '☾ NIGHT MODE';
+    function rerender() {
+      styleModeTab(dayTab, currentLevelMode === 'day', false);
+      styleModeTab(nightTab, currentLevelMode === 'night', true);
+      drawGrid();
+    }
+    dayTab.addEventListener('click', () => { currentLevelMode = 'day'; rerender(); });
+    nightTab.addEventListener('click', () => { currentLevelMode = 'night'; rerender(); });
+    modeBar.appendChild(dayTab); modeBar.appendChild(nightTab);
+    select.appendChild(modeBar);
+
     const grid = document.createElement('div');
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:8px;';
-    const highest = WG.State.get().huntProgress.highestUnlocked;
-    for (const stage of WG.HuntStage.list()) {
-      const locked = stage.id > highest;
-      const tile = document.createElement('div');
-      const biome = WG.HuntStage.getBiome(stage.biome);
-      tile.style.cssText = `background:${biome.ground};border:1px solid #604020;border-radius:6px;padding:10px;cursor:${locked?'default':'pointer'};opacity:${locked?0.5:1};text-align:center;`;
-      tile.innerHTML = `<div style="font-size:9px;color:#a89878;letter-spacing:1px;">STAGE ${stage.id}</div>
-        <div style="font-size:13px;color:#f0d890;margin:4px 0;">${stage.name}</div>
-        <div style="font-size:10px;color:#c8a868;">${stage.bossId ? '⚔ Boss' : '· wave ·'} · ${(stage.durationSec/60).toFixed(1)}m</div>`;
-      if (!locked) {
+    select.appendChild(grid);
+
+    function drawGrid() {
+      grid.innerHTML = '';
+      const isNight = currentLevelMode === 'night';
+      const tint = isNight
+        ? 'linear-gradient(to bottom, #1a2a4c, #0a1430)'  // SPEC §0 — Night cards: deep blue
+        : 'linear-gradient(to bottom, #1c3a1c, #0a2010)'; // SPEC §0 — Day cards: warm green
+      const accent = isNight ? '#7aa0e0' : '#a8d878';
+      const bestWaves = WG.State.get().huntProgress.bestWaves || {};
+      for (const stage of WG.HuntStage.list()) {
+        const tile = document.createElement('div');
+        const best = bestWaves[stage.id] ? `${(+bestWaves[stage.id]).toFixed(1)}m` : '—';
+        const moonOrSun = isNight ? '☾' : '☀';
+        tile.style.cssText = `background:${tint};border:1px solid ${accent};border-radius:6px;padding:10px;cursor:pointer;text-align:center;`;
+        tile.innerHTML = `
+          <div style="font-size:9px;letter-spacing:1px;color:${accent};opacity:0.85;">STAGE ${stage.id} · ${moonOrSun}</div>
+          <div style="font-size:13px;color:#f0d890;margin:4px 0;">${stage.name}</div>
+          <div style="font-size:10px;color:${accent};opacity:0.85;">${stage.bossId ? '⚔ Boss' : '· wave ·'} · ${(stage.durationSec/60).toFixed(1)}m</div>
+          <div style="font-size:9px;color:#a89878;margin-top:4px;">Best: ${best}</div>
+        `;
         tile.addEventListener('click', () => {
           if (select.parentNode) select.parentNode.removeChild(select);
-          startHunt(stage.id);
+          startHunt(stage.id, currentLevelMode);
         });
-      } else {
-        tile.innerHTML += '<div style="font-size:18px;margin-top:6px;">🔒</div>';
+        grid.appendChild(tile);
       }
-      grid.appendChild(tile);
     }
-    select.appendChild(grid);
+    rerender();
   }
 
   function syncTopStrip() {
@@ -282,6 +320,11 @@
   function setupNav() {
     document.querySelectorAll('.nav-tab').forEach(n => {
       n.addEventListener('click', () => switchTab(n.dataset.tab));
+    });
+    // SPEC §0 — in-stage back-to-lobby button (counts as exit, no rewards)
+    const backBtn = document.getElementById('hunt-back-btn');
+    if (backBtn) backBtn.addEventListener('click', () => {
+      if (huntRuntime) exitHunt();
     });
   }
 

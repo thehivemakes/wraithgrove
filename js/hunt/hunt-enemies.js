@@ -6,6 +6,8 @@
     sprite:      { hp:6,  speed:60, damage:3,  cooldown:0.6, size:10, color:'#5a2878', accent:'#2a1438', xp:2  },
     brute_small: { hp:55, speed:18, damage:18, cooldown:2.0, size:24, color:'#9a2018', accent:'#4a1008', xp:8  },
     caller:      { hp:14, speed:22, damage:8,  cooldown:1.6, size:16, color:'#3a2858', accent:'#1a1228', xp:5, ranged:true, projectileSpeed:140, projectileRange:260 },
+    // Night-mode folk-horror. matches screenshot_4 pumpkin-head creature register.
+    pumpkin_lantern: { name: 'Pumpkin Lantern', hp: 28, damage: 5, speed: 78, cooldown: 1.2, size: 18, color: '#e07820', accent: '#ffc848', xp: 4, ai: 'walker' },
   };
 
   let nextId = 1;

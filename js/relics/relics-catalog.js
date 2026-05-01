@@ -18,33 +18,35 @@
   //  gatherRate | .015 – .030 | .045 – .065 | .10 – .14   | .25 – .35   |  .60 – .80
 
   const RELICS = [
-    // Common (12)
-    { id:'r_hempcord',   name:'Hempcord',         tier:'common', icon:'🧵', stat:'attack',     value: 2 },
-    { id:'r_birchstrip', name:'Birch Strip',      tier:'common', icon:'📜', stat:'hpMax',      value: 12 },
-    { id:'r_chippedbowl',name:'Chipped Bowl',     tier:'common', icon:'🥣', stat:'defense',    value: 1 },
-    { id:'r_riverstone', name:'River Stone',      tier:'common', icon:'🪨', stat:'attack',     value: 3 },
-    { id:'r_brokenpipe', name:'Broken Pipe',      tier:'common', icon:'🪈', stat:'gatherRate', value: 0.02 },
-    { id:'r_stalkknife', name:'Stalk Knife',      tier:'common', icon:'🔪', stat:'attack',     value: 2 },
-    { id:'r_sootash',    name:'Soot & Ash',       tier:'common', icon:'⚱', stat:'critRate',   value: 0.01 },
-    { id:'r_clayrod',    name:'Clay Rod',          tier:'common', icon:'🥖', stat:'defense',    value: 2 },
-    { id:'r_oilrag',     name:'Oil Rag',           tier:'common', icon:'🧻', stat:'gatherRate', value: 0.03 },
-    { id:'r_dryroot',    name:'Dry Root',          tier:'common', icon:'🌱', stat:'hpMax',      value: 10 },
-    { id:'r_mothleaf',   name:'Moth Leaf',         tier:'common', icon:'🍃', stat:'gatherRate', value: 0.025 },
-    { id:'r_chippedaxe', name:'Chipped Axehead',   tier:'common', icon:'🪓', stat:'attack',     value: 3 },
+    // Common (12) — eclectic mix per Wood Siege register — see SPEC §10 + HD_SOURCE §F. All names original to Wraithgrove.
+    // Mix: 4 tools/weapons + 3 mundane + 3 folk-horror ceremonial + 2 wildcards (mundane-absurd, the Potato/Roller-skates slot).
+    { id:'r_twinelash',     name:'Twine Lash',      tier:'common', icon:'🧵', stat:'attack',     value: 2 },
+    { id:'r_burntpetition', name:'Burnt Petition',  tier:'common', icon:'📜', stat:'hpMax',      value: 12 },
+    { id:'r_tinbowl',       name:'Tin Bowl',        tier:'common', icon:'🥣', stat:'defense',    value: 1 },
+    { id:'r_rivercobble',   name:'River Cobble',    tier:'common', icon:'🪨', stat:'attack',     value: 3 },
+    { id:'r_reedpipe',      name:'Reed Pipe',       tier:'common', icon:'🪈', stat:'gatherRate', value: 0.02 },
+    { id:'r_whettedsliver', name:'Whetted Sliver',  tier:'common', icon:'🔪', stat:'attack',     value: 2 },
+    { id:'r_funeralurn',    name:'Funeral Urn',     tier:'common', icon:'⚱', stat:'critRate',   value: 0.01 },
+    { id:'r_pickledradish', name:'Pickled Radish',  tier:'common', icon:'🥖', stat:'defense',    value: 2 },
+    { id:'r_boiledrag',     name:'Boiled Rag',      tier:'common', icon:'🧻', stat:'gatherRate', value: 0.03 },
+    { id:'r_garlicstalk',   name:'Garlic Stalk',    tier:'common', icon:'🌱', stat:'hpMax',      value: 10 },
+    { id:'r_jossleaf',      name:'Joss Leaf',       tier:'common', icon:'🍃', stat:'gatherRate', value: 0.025 },
+    { id:'r_rustedhatchet', name:'Rusted Hatchet',  tier:'common', icon:'🪓', stat:'attack',     value: 3 },
 
-    // Rare (12)
-    { id:'r_ironbloom',  name:'Iron Bloom',       tier:'rare',   icon:'⚙', stat:'attack',     value: 8 },
-    { id:'r_whitemoth',  name:'White Moth',       tier:'rare',   icon:'🦋', stat:'critRate',   value: 0.02 },
-    { id:'r_lampshade',  name:'Lamp Shade',       tier:'rare',   icon:'🪔', stat:'hpMax',      value: 28 },
-    { id:'r_silktape',   name:'Silk Tape',        tier:'rare',   icon:'🎗', stat:'defense',    value: 5 },
-    { id:'r_quailbone',  name:'Quail Bone',       tier:'rare',   icon:'🦴', stat:'attack',     value: 7 },
-    { id:'r_pinescent',  name:'Pine Scent',       tier:'rare',   icon:'🌲', stat:'gatherRate', value: 0.06 },
-    { id:'r_pearlash',   name:'Pearl Ash',        tier:'rare',   icon:'🤍', stat:'defense',    value: 6 },
-    { id:'r_stonehammer',name:'Stone Hammer',     tier:'rare',   icon:'🔨', stat:'attack',     value: 9 },
-    { id:'r_bramblerope',name:'Bramble Rope',     tier:'rare',   icon:'🪢', stat:'critRate',   value: 0.023 },
-    { id:'r_ricepouch',  name:'Rice Pouch',       tier:'rare',   icon:'🌾', stat:'hpMax',      value: 32 },
-    { id:'r_inkbrush',   name:'Ink Brush',        tier:'rare',   icon:'🖌', stat:'gatherRate', value: 0.05 },
-    { id:'r_owlfeather', name:'Owl Feather',      tier:'rare',   icon:'🪶', stat:'critRate',   value: 0.025 },
+    // Rare (12) — eclectic mix per Wood Siege register — see SPEC §10 + HD_SOURCE §J.3. All names original to Wraithgrove.
+    // Lean: practical Western tools + Eastern baroque ceremonial (cinnabar/lantern/silk/joss-paper register) + folk-horror anchors. More elaborate than Common.
+    { id:'r_ironcog',         name:'Iron Cog',         tier:'rare',   icon:'⚙', stat:'attack',     value: 8 },
+    { id:'r_papermoth',       name:'Paper Moth',       tier:'rare',   icon:'🦋', stat:'critRate',   value: 0.02 },
+    { id:'r_brasslantern',    name:'Brass Lantern',    tier:'rare',   icon:'🪔', stat:'hpMax',      value: 28 },
+    { id:'r_embroideredsash', name:'Embroidered Sash', tier:'rare',   icon:'🎗', stat:'defense',    value: 5 },
+    { id:'r_carvedtibia',     name:'Carved Tibia',     tier:'rare',   icon:'🦴', stat:'attack',     value: 7 },
+    { id:'r_cypressresin',    name:'Cypress Resin',    tier:'rare',   icon:'🌲', stat:'gatherRate', value: 0.06 },
+    { id:'r_bonecharm',       name:'Bone Charm',       tier:'rare',   icon:'🤍', stat:'defense',    value: 6 },
+    { id:'r_carpentermaul',   name:'Carpenter Maul',   tier:'rare',   icon:'🔨', stat:'attack',     value: 9 },
+    { id:'r_knottedcord',     name:'Knotted Cord',     tier:'rare',   icon:'🪢', stat:'critRate',   value: 0.023 },
+    { id:'r_saltsack',        name:'Salt Sack',        tier:'rare',   icon:'🌾', stat:'hpMax',      value: 32 },
+    { id:'r_vermilionbrush',  name:'Vermilion Brush',  tier:'rare',   icon:'🖌', stat:'gatherRate', value: 0.05 },
+    { id:'r_crowplume',       name:'Crow Plume',       tier:'rare',   icon:'🪶', stat:'critRate',   value: 0.025 },
 
     // Epic (12)
     { id:'r_stargazer',  name:'Stargazer',        tier:'epic',   icon:'⭐', stat:'attack',     value: 20 },

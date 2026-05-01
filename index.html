@@ -166,6 +166,20 @@
     background: rgba(232,200,120,0.6); top: 30px; left: 30px;
   }
   #hunt-hud .joystick-vis.active { display: block; }
+
+  /* SPEC §0 — Navigation model: tabs+top-strip hidden when in a stage */
+  body.in-stage #nav-bar { display: none; }
+  body.in-stage #top-strip { display: none; }
+  body.in-stage #hunt-hud { inset: 0; }
+  #hunt-hud .back-btn {
+    position: absolute; top: 8px; left: 12px;
+    height: 30px; padding: 0 12px;
+    background: rgba(0,0,0,0.7); border: 1px solid #604020; border-radius: 15px;
+    pointer-events: auto; cursor: pointer;
+    color: #c8a868; font-size: 11px; letter-spacing: 1.5px; font-weight: 600;
+    display: flex; align-items: center;
+  }
+  #hunt-hud .back-btn:active { background: rgba(40,20,8,0.9); }
 </style>
 </head>
 <body>
@@ -188,6 +202,7 @@
       <div class="tab-panel" id="tab-ascend"></div>
       <div class="tab-panel active" id="tab-hunt">
         <div id="hunt-hud">
+          <div class="back-btn" id="hunt-back-btn">← MENU</div>
           <div class="stage-banner" id="hunt-stage-banner">stage —</div>
           <div class="menu-btn" id="hunt-menu-btn">⚙</div>
           <div class="skill-btn" id="hunt-skill-btn">✦</div>
@@ -238,7 +253,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.12.0-construction-build-1777656538', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.13.0-audio-nav-relics-1777661147', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');

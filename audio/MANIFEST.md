@@ -21,7 +21,7 @@ audio/
 
 ---
 
-## SFX needed (16 files)
+## SFX needed (13 files)
 
 | File | Source | Notes |
 |---|---|---|
@@ -50,7 +50,7 @@ audio/
 | `audio/ambient/cave_drips.mp3` | cave | Freesound CC0 — water drips + cave reverb | 60-120s loop. Sparse, claustrophobic. |
 | `audio/ambient/wraith_choir.mp3` | eldritch | Freesound CC0 — choral pad + dissonant hum | 90-120s loop. The Wraith Father biome. Most processed. |
 
-## UI needed (7 files)
+## UI needed (6 files)
 
 | File | Source | Notes |
 |---|---|---|
@@ -116,3 +116,63 @@ Settings persist to `localStorage.wg_audio_v1`. Architect-touch task: add a sett
 - **Voice acting.** None. Eastern folk-horror register stays mostly silent / atmospheric.
 
 If a future Claude wants to expand: add rows to `EVENT_MAP` in `wg-audio.js`, add files here, done. No engine change needed.
+
+---
+
+## Sources used (this download — W-Audio-Sourcing, 2026-05-01)
+
+All 25 files present (13 sfx + 6 ambient + 6 ui). Total disk: **6.6 MB** of 50 MB budget. License: **CC0 / public-domain only.**
+
+### SFX — Kenney CC0 packs (mono 128 kbps mp3)
+
+| File | Source pack | Source file | License |
+|---|---|---|---|
+| `sfx/swing.mp3` | Kenney RPG Audio | `Audio/chop.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
+| `sfx/fire_arrow.mp3` | Kenney RPG Audio | `Audio/knifeSlice2.ogg` (trim 0.3 s) | CC0 — https://kenney.nl/assets/rpg-audio |
+| `sfx/skill_burst.mp3` | Kenney Sci-Fi Sounds | `Audio/lowFrequency_explosion_001.ogg` | CC0 — https://kenney.nl/assets/sci-fi-sounds |
+| `sfx/player_hurt.mp3` | Kenney Voiceover Pack (Fighter) | `Audio/1.ogg` (trim 0.4 s) | CC0 — https://kenney.nl/assets/voiceover-pack-fighter |
+| `sfx/player_die.mp3` | Kenney Voiceover Pack (Fighter) | `Audio/7.ogg` | CC0 — https://kenney.nl/assets/voiceover-pack-fighter |
+| `sfx/level_up.mp3` | Kenney Digital Audio | `Audio/zapThreeToneUp.ogg` | CC0 — https://kenney.nl/assets/digital-audio |
+| `sfx/pet_attack.mp3` | Kenney Impact Sounds | `Audio/impactSoft_medium_002.ogg` | CC0 — https://kenney.nl/assets/impact-sounds |
+| `sfx/boss_hit.mp3` | Kenney Impact Sounds | `Audio/impactPunch_heavy_002.ogg` (trim 0.3 s) | CC0 — https://kenney.nl/assets/impact-sounds |
+| `sfx/boss_die.mp3` | Kenney Sci-Fi Sounds | `Audio/explosionCrunch_002.ogg` | CC0 — https://kenney.nl/assets/sci-fi-sounds |
+| `sfx/orb.mp3` | Kenney Interface Sounds | `Audio/pluck_001.ogg` | CC0 — https://kenney.nl/assets/interface-sounds |
+| `sfx/coin.mp3` | Kenney RPG Audio | `Audio/handleCoins2.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
+| `sfx/fragment.mp3` | Kenney Interface Sounds | `Audio/glass_001.ogg` | CC0 — https://kenney.nl/assets/interface-sounds |
+| `sfx/craft.mp3` | Kenney RPG Audio | `Audio/metalPot2.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
+
+### UI — Kenney CC0 packs (mono 128 kbps mp3)
+
+| File | Source pack | Source file | License |
+|---|---|---|---|
+| `ui/ui_tab.mp3` | Kenney Interface Sounds | `Audio/switch_002.ogg` (trim 0.15 s) | CC0 — https://kenney.nl/assets/interface-sounds |
+| `ui/ui_button.mp3` | Kenney Interface Sounds | `Audio/click_002.ogg` | CC0 — https://kenney.nl/assets/interface-sounds |
+| `ui/ui_modal.mp3` | Kenney Interface Sounds | `Audio/glass_004.ogg` (trim 0.25 s) | CC0 — https://kenney.nl/assets/interface-sounds |
+| `ui/cha_ching.mp3` | Kenney RPG Audio | `Audio/handleCoins.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
+| `ui/duel_win.mp3` | Kenney Digital Audio | `Audio/threeTone2.ogg` | CC0 — https://kenney.nl/assets/digital-audio |
+| `ui/duel_lose.mp3` | Kenney Digital Audio | `Audio/zapThreeToneDown.ogg` | CC0 — https://kenney.nl/assets/digital-audio |
+
+### Ambient — synthesized via ffmpeg (stereo 128 kbps mp3, original generation, public-domain clean)
+
+No third-party audio used. Each file generated from pure noise/sine primitives via `ffmpeg -f lavfi`. Loop-friendly (no abrupt fades).
+
+| File | Generator | Length |
+|---|---|---|
+| `ambient/forest_day.mp3` | brown noise, bandpass 80–1800 Hz | 60 s |
+| `ambient/forest_dusk.mp3` | brown noise, bandpass 120–900 Hz, slow tremolo | 60 s |
+| `ambient/wind_stone.mp3` | white noise, bandpass 300–2200 Hz, slow tremolo | 60 s |
+| `ambient/temple_drone.mp3` | sine 82.4 Hz + 123.5 Hz (root + perfect-5th), tremolo | 90 s |
+| `ambient/cave_drips.mp3` | quiet brown bed + 600 Hz drip pings every 5 s, lowpass 4 kHz | 60 s |
+| `ambient/wraith_choir.mp3` | sine 87.3 + 92.5 + 174.6 Hz (minor-2nd cluster), tremolo | 90 s |
+
+**Quality note (be honest):** ambients are placeholder-grade synthesized beds, not field recordings. Drones (temple/wraith/cave) sit cleanly in the Eastern folk-horror register. Forest/wind beds suggest texture without nature detail. Replace with Sonniss/Freesound CC0 field recordings when network access to those services is available.
+
+### Tools used
+
+- `curl` — fetch Kenney pack zips from `https://kenney.nl/media/pages/assets/...`.
+- `unzip` — extract to `/tmp/wraith-audio/`.
+- `ffmpeg` — convert ogg→mp3, trim, and synthesize ambient beds via `lavfi`.
+
+### Replacement workflow (future Claude)
+
+To swap any file, drop a new mp3 at the same path. Engine fail-silent means you can do this live with the server running. To replace an ambient with a field recording, prefer 60–120 s loop-friendly cuts at -23 LUFS, stereo, 128–192 kbps mp3.
