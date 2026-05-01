@@ -1114,58 +1114,81 @@
     }
   }
 
-  function drawLevelUpModal(ctx) {
-    if (!runtime.pendingLevelUp) return;
-    const w = D().width, h = D().height;
-    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#f0d890';
-    ctx.font = 'bold 16px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('LEVEL UP — Choose a Boon', w/2, h*0.32);
-    ctx.textAlign = 'left';
-    if (!runtime._luOptions) {
-      const all = ['dmg', 'cd', 'maxhp', 'pickup', 'speed'];
-      runtime._luOptions = [...all].sort(() => Math.random() - 0.5).slice(0, 3);
+  // DOM-based level-up modal — replaces canvas-drawn version for reliable taps.
+  // Canvas hit-detection was fighting trauma shake + ctx.scale(ZOOM) + DPR layering.
+  // DOM is z-index 100 above canvas with native button event handling.
+  let _luEl = null;
+  const LU_LABELS = {
+    dmg:    ['+ Damage',   'Stronger swings'],
+    cd:     ['+ Speed',    'Attack faster'],
+    maxhp:  ['+ Vigor',    'More HP'],
+    pickup: ['+ Reach',    'Wider pickup'],
+    speed:  ['+ Pace',     'Move faster'],
+  };
+  function _luBuild() {
+    if (_luEl) return _luEl;
+    const overlay = document.createElement('div');
+    overlay.id = 'levelup-modal';
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.78);z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;pointer-events:auto';
+    const title = document.createElement('div');
+    title.style.cssText = 'font:bold 18px system-ui;color:#f0d890;letter-spacing:2px;margin-bottom:18px;text-shadow:0 0 12px rgba(240,216,144,0.5)';
+    title.textContent = 'LEVEL UP — Choose a Boon';
+    overlay.appendChild(title);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;width:100%;max-width:520px;justify-content:center';
+    overlay.appendChild(row);
+    overlay._row = row;
+    document.getElementById('app').appendChild(overlay);
+    _luEl = overlay;
+    return overlay;
+  }
+  function _luShow(options) {
+    const el = _luBuild();
+    const row = el._row;
+    row.innerHTML = '';
+    for (const id of options) {
+      const card = document.createElement('button');
+      card.style.cssText = 'flex:1;background:linear-gradient(to bottom,#2a1c10,#1a1006);border:2px solid #806040;border-radius:10px;padding:18px 12px;color:#f0d890;font:inherit;cursor:pointer;min-height:120px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;-webkit-tap-highlight-color:rgba(255,255,255,0.15);transition:transform 80ms,border-color 80ms';
+      const t = document.createElement('div');
+      t.style.cssText = 'font:bold 14px system-ui;color:#f0d890;letter-spacing:1px';
+      t.textContent = LU_LABELS[id][0];
+      const s = document.createElement('div');
+      s.style.cssText = 'font:11px system-ui;color:#c8a868';
+      s.textContent = LU_LABELS[id][1];
+      card.appendChild(t); card.appendChild(s);
+      const onPick = (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        if (!runtime || !runtime.pendingLevelUp) return;
+        WG.HuntPlayer.applyLevelChoice(id);
+        runtime._luOptions = null;
+        _luHide();
+      };
+      card.addEventListener('click', onPick);
+      card.addEventListener('touchend', onPick);
+      row.appendChild(card);
     }
-    const labels = {
-      dmg: ['+ Damage',   'Stronger swings'],
-      cd: ['+ Speed',     'Attack faster'],
-      maxhp: ['+ Vigor',  'More HP'],
-      pickup: ['+ Reach', 'Wider pickup'],
-      speed: ['+ Pace',   'Move faster'],
-    };
-    const cardW = (w - 40) / 3, cardH = 100, top = h * 0.4;
-    runtime._luBounds = [];
-    for (let i = 0; i < runtime._luOptions.length; i++) {
-      const id = runtime._luOptions[i];
-      const x = 16 + i * (cardW + 4);
-      ctx.fillStyle = '#2a1c10';
-      ctx.fillRect(x, top, cardW, cardH);
-      ctx.strokeStyle = '#806040'; ctx.strokeRect(x+0.5, top+0.5, cardW-1, cardH-1);
-      ctx.fillStyle = '#f0d890';
-      ctx.font = 'bold 12px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText(labels[id][0], x + cardW/2, top + 44);
-      ctx.font = '10px system-ui';
-      ctx.fillStyle = '#c8a868';
-      ctx.fillText(labels[id][1], x + cardW/2, top + 66);
-      ctx.textAlign = 'left';
-      runtime._luBounds.push({ id, x, y: top, w: cardW, h: cardH });
+    el.style.display = 'flex';
+  }
+  function _luHide() {
+    if (_luEl) _luEl.style.display = 'none';
+  }
+  function drawLevelUpModal(ctx) {
+    // No canvas drawing — DOM overlay handles it. Just sync visibility.
+    if (runtime.pendingLevelUp) {
+      if (!runtime._luOptions) {
+        const all = ['dmg', 'cd', 'maxhp', 'pickup', 'speed'];
+        runtime._luOptions = [...all].sort(() => Math.random() - 0.5).slice(0, 3);
+      }
+      if (!_luEl || _luEl.style.display !== 'flex') {
+        _luShow(runtime._luOptions);
+      }
+    } else {
+      if (_luEl && _luEl.style.display !== 'none') _luHide();
     }
   }
 
-  function handleHuntTap(clientX, clientY) {
-    if (!runtime.pendingLevelUp || !runtime._luBounds) return false;
-    for (const b of runtime._luBounds) {
-      if (clientX >= b.x && clientX <= b.x + b.w && clientY >= b.y && clientY <= b.y + b.h) {
-        WG.HuntPlayer.applyLevelChoice(b.id);
-        runtime._luOptions = null;
-        runtime._luBounds = null;
-        return true;
-      }
-    }
-    return false;
-  }
+  // No-op kept for backwards compat — old canvas-tap code path retired.
+  function handleHuntTap() { return false; }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Frame composition.
