@@ -26,6 +26,11 @@
 
     // Armored samurai grunt — both modes (boss-tier henchman across day/night).
     samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:10, mode:'both', ai:'walker' },
+    // Architect 2026-05-02: shrieking scary banshee — large Night-only rare frenzied
+    banshee:         { name: 'Banshee',        hp:220,speed:130,damage:22, cooldown:1.0, size:36, color:'#e8e0f0', accent:'#a060ff', xp:30, mode:'night', ai:'banshee_charge', rare:true, shriekCooldown:4.0 },
+    // Spawn-Tuning additions
+    wraith_fast:     { name: 'Wraith Stalker', hp:18, speed:140,damage:7,  cooldown:1.2, size:14, color:'#404858', accent:'#a8c0e8', xp:4,  mode:'night', ai:'walker' },
+    skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:1.1, size:12, color:'#e8e0d0', accent:'#3a2010', xp:2,  mode:'both',  ai:'walker', swarmSize:4 },
   };
 
   let nextId = 1;
@@ -109,6 +114,37 @@
       } else if (dist > c.size + 30) {
         c.x += (dx/dist) * c.speed * dt;
         c.y += (dy/dist) * c.speed * dt;
+      }
+    } else if (c._typeData.ai === 'banshee_charge') {
+      // Frenzied AI — erratic sin-wave lateral motion + periodic shriek-charge.
+      c._shriekTimer = (c._shriekTimer == null) ? c._typeData.shriekCooldown : c._shriekTimer - dt;
+      const charging = c._chargeTimer > 0;
+      if (c._shriekTimer <= 0 && !charging) {
+        c._chargeTimer = 0.8;  // 0.8s of locked-on charge
+        c._shriekTimer = c._typeData.shriekCooldown;
+        WG.Engine.emit('enemy:shriek', { creature: c });
+        if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.3);
+        if (window.WG.HuntFX && WG.HuntFX.burst) WG.HuntFX.burst(c.x, c.y, 'pickupFragment', { count: 16, life: 0.7 });
+      }
+      if (c._chargeTimer > 0) {
+        c._chargeTimer -= dt;
+        // Hard charge — straight at player, 1.8× speed
+        c.x += (dx/dist) * c.speed * 1.8 * dt;
+        c.y += (dy/dist) * c.speed * 1.8 * dt;
+      } else {
+        // Erratic — sin-wave lateral perpendicular to forward direction
+        const lateralA = Math.sin(performance.now() / 280 + c.x * 0.01);
+        const px = -dy/dist, py = dx/dist; // perpendicular unit
+        c.x += (dx/dist) * c.speed * dt + px * lateralA * c.speed * 0.4 * dt;
+        c.y += (dy/dist) * c.speed * dt + py * lateralA * c.speed * 0.4 * dt;
+      }
+      if (dist <= contactDist) {
+        c.attackTimer -= dt;
+        if (c.attackTimer <= 0) {
+          if (c.target === runtime.player) WG.HuntPlayer.takeDamage(c.damage, { type:'banshee', id:c.id });
+          WG.Engine.emit('enemy:hit', { creature: c });
+          c.attackTimer = c.attackCooldown;
+        }
       }
     } else {
       if (dist > contactDist) {

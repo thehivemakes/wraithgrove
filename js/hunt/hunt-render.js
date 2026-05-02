@@ -1628,6 +1628,120 @@
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.78, Math.max(24, sz + 6), c.hp, c.maxHp);
   }
 
+  // Architect 2026-05-02: Banshee — large ghostly shrieking spirit, Night-only rare.
+  // Body trapezoid white-violet trailing robe, hollow purple eye glow, flowing dark
+  // hair, pulsing aura. During shriek-charge (c._chargeTimer > 0): expanding ring.
+  function drawBanshee(ctx, sx, sy, c) {
+    const t = performance.now() / 1000;
+    const sz = c.size;
+    const wind = Math.sin(t * 4 + c.x * 0.01) * 4;
+    const charging = (c._chargeTimer || 0) > 0;
+    // 3-layer aura
+    for (let i = 3; i > 0; i--) {
+      ctx.fillStyle = `rgba(160, 96, 255, ${0.10 + Math.sin(t * 2 + i) * 0.04})`;
+      ctx.beginPath(); ctx.arc(sx + wind, sy, sz * 0.7 + i * 6, 0, Math.PI*2); ctx.fill();
+    }
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.55, sz*0.5, sz*0.2, 0, 0, Math.PI*2); ctx.fill();
+    // Robe — trapezoid widening to ground, wind-shifted
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.18 + wind, sy - sz*0.4);
+    ctx.lineTo(sx + sz*0.18 + wind, sy - sz*0.4);
+    ctx.lineTo(sx + sz*0.5, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.5, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Robe shadow side
+    ctx.fillStyle = 'rgba(120, 100, 150, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(sx + wind, sy - sz*0.4);
+    ctx.lineTo(sx + sz*0.18 + wind, sy - sz*0.4);
+    ctx.lineTo(sx + sz*0.5, sy + sz*0.55);
+    ctx.lineTo(sx, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Flowing hair — 5 vertical strands
+    ctx.strokeStyle = '#1a0a1a'; ctx.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) {
+      const baseX = sx + i * 4 + wind * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(baseX, sy - sz*0.5);
+      ctx.quadraticCurveTo(baseX + Math.sin(t*3 + i) * 5, sy + sz*0.1, baseX + Math.sin(t*2 + i) * 8, sy + sz*0.4);
+      ctx.stroke();
+    }
+    // Head — pale violet
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath(); ctx.ellipse(sx + wind, sy - sz*0.5, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+    // Hollow glowing eyes — additive
+    const eyeGlow = 0.7 + Math.sin(t * 3) * 0.3;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(160, 96, 255, ${eyeGlow})`;
+    ctx.beginPath(); ctx.arc(sx + wind - 4, sy - sz*0.52, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + wind + 4, sy - sz*0.52, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    // Mouth — gaping (wider during shriek)
+    const mouthW = charging ? 6 : 3;
+    const mouthH = charging ? 5 : 2;
+    ctx.fillStyle = '#1a0410';
+    ctx.fillRect(sx + wind - mouthW/2, sy - sz*0.45, mouthW, mouthH);
+    // Shriek charge — expanding ring + outward purple flare
+    if (charging) {
+      const ringR = (1 - c._chargeTimer / 0.8) * 50;
+      ctx.strokeStyle = `rgba(160, 96, 255, ${1 - ringR/50})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(sx + wind, sy, ringR, 0, Math.PI*2); ctx.stroke();
+    }
+    // HP bar above
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(28, sz+8), c.hp, c.maxHp);
+  }
+
+  // Architect 2026-05-02: Wraith Stalker — fast small Night-mode ghost wisp.
+  // Pale-blue trailing wisp, hollow eyes, no legs.
+  function drawWraithFast(ctx, sx, sy, c) {
+    const t = performance.now() / 1000;
+    const sz = c.size;
+    const drift = Math.sin(t * 3 + c.x * 0.02) * 2;
+    // Fading tail
+    for (let i = 4; i >= 1; i--) {
+      ctx.fillStyle = `rgba(168, 192, 232, ${0.10 + i * 0.06})`;
+      ctx.beginPath(); ctx.ellipse(sx + drift, sy + i * 3, sz * 0.4 - i * 0.06, sz * 0.45 - i * 0.06, 0, 0, Math.PI*2); ctx.fill();
+    }
+    // Body
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath(); ctx.ellipse(sx + drift, sy, sz*0.45, sz*0.55, 0, 0, Math.PI*2); ctx.fill();
+    // Hollow eyes
+    ctx.fillStyle = '#0a0a18';
+    ctx.fillRect(sx + drift - 3, sy - 2, 2, 2);
+    ctx.fillRect(sx + drift + 1, sy - 2, 2, 2);
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(20, sz+4), c.hp, c.maxHp);
+  }
+
+  // Architect 2026-05-02: Skull Imp — small skeletal swarmer, exposed bone-white skull.
+  function drawSkullImp(ctx, sx, sy, c) {
+    const sz = c.size;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.55, sz*0.4, sz*0.15, 0, 0, Math.PI*2); ctx.fill();
+    // Stick body (dark)
+    ctx.fillStyle = '#3a2010';
+    ctx.fillRect(sx - 2, sy - 2, 4, sz*0.5);  // torso
+    ctx.fillRect(sx - 4, sy + sz*0.3, 2, sz*0.3);  // left leg
+    ctx.fillRect(sx + 2, sy + sz*0.3, 2, sz*0.3);  // right leg
+    ctx.fillRect(sx - 5, sy, 3, 2);  // left arm
+    ctx.fillRect(sx + 2, sy, 3, 2);  // right arm
+    // Skull (bone-white, oversized)
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.3, sz*0.35, sz*0.32, 0, 0, Math.PI*2); ctx.fill();
+    // Eye sockets + jagged teeth
+    ctx.fillStyle = '#1a0810';
+    ctx.fillRect(sx - 3, sy - sz*0.35, 2, 2);
+    ctx.fillRect(sx + 1, sy - sz*0.35, 2, 2);
+    // Teeth — small triangle row at jaw
+    ctx.fillRect(sx - 3, sy - sz*0.22, 6, 1);
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(18, sz+4), c.hp, c.maxHp);
+  }
+
   function drawCreatures(ctx) {
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
@@ -1636,6 +1750,9 @@
         case 'pumpkin_lantern': drawPumpkin(ctx, s.x, s.y, c);   break;
         case 'jiangshi':        drawJiangshi(ctx, s.x, s.y, c);  break;
         case 'samurai_grunt':   drawSamurai(ctx, s.x, s.y, c);   break;
+        case 'banshee':         drawBanshee(ctx, s.x, s.y, c);   break;
+        case 'wraith_fast':     drawWraithFast(ctx, s.x, s.y, c); break;
+        case 'skull_swarmer':   drawSkullImp(ctx, s.x, s.y, c);  break;
         default:                drawZombie(ctx, s.x, s.y, c);  // red_zombie + classic five
       }
     }
