@@ -28,7 +28,7 @@
     { event: 'player:swing',          id: 'swing',         bus: 'sfx', throttleMs: 60,  vol: 0.6 },
     { event: 'player:fire',           id: 'fire_arrow',    bus: 'sfx', throttleMs: 80,  vol: 0.7 },
     { event: 'player:skill',          id: 'skill_burst',   bus: 'sfx', throttleMs: 0,   vol: 1.0 },
-    { event: 'player:damaged',        id: 'player_hurt',   bus: 'sfx', throttleMs: 200, vol: 0.8 },
+    { event: 'player:damaged',        id: 'player_hurt',   bus: 'sfx', throttleMs: 450, vol: 0.32 },  // Architect: less annoying — softer + slower retrigger
     { event: 'player:died',           id: 'player_die',    bus: 'sfx', throttleMs: 0,   vol: 1.0 },
     { event: 'player:level',          id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 0.9 },
     { event: 'pet:attack',            id: 'pet_attack',    bus: 'sfx', throttleMs: 100, vol: 0.5 },

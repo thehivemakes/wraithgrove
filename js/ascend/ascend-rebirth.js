@@ -207,7 +207,7 @@
 
     const cultivateBtn = document.createElement('button');
     cultivateBtn.className = 'btn primary';
-    cultivateBtn.textContent = `CULTIVATE (${cost} 🪙)`;
+    cultivateBtn.innerHTML = `CULTIVATE (${cost} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`;
     const playerCoins = WG.State.get().currencies.coins;
     if (playerCoins < cost) cultivateBtn.disabled = true;
 

@@ -47,11 +47,11 @@
     // Skin button
     const skinBtnRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
     skinBtnRow.appendChild(el('button', { class:'btn', onclick: () => showSkinPicker() }, 'SKIN'));
-    skinBtnRow.appendChild(el('button', { class:'btn primary', onclick: () => { const r = WG.AscendCharacter.tryLevelUp(); refresh(); if (!r.ok) toast('Need ' + (r.cost||0) + ' coins'); } }, `LEVEL UP (${WG.AscendCharacter.levelUpCost(ps.level)} 🪙)`));
+    skinBtnRow.appendChild(el('button', { class:'btn primary', onclick: () => { const r = WG.AscendCharacter.tryLevelUp(); refresh(); if (!r.ok) toast('Need ' + (r.cost||0) + ' coins'); } }, `LEVEL UP (${WG.AscendCharacter.levelUpCost(ps.level)} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`));
     heroBox.appendChild(skinBtnRow);
 
     const ascRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
-    ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryAscend(); refresh(); if(!r.ok) toast('Need lvl 30 + ' + WG.AscendCharacter.ascendCost(ps.ascendTier) + ' 🪙'); } }, `ASCEND (${WG.AscendCharacter.ascendCost(ps.ascendTier)} 🪙)`));
+    ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryAscend(); refresh(); if(!r.ok) toast('Need lvl 30 + ' + WG.AscendCharacter.ascendCost(ps.ascendTier) + ' <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'); } }, `ASCEND (${WG.AscendCharacter.ascendCost(ps.ascendTier)} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`));
     ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryCultivate(); refresh(); if(!r.ok) toast('Need 5 💎'); } }, 'CULTIVATE (5 💎)'));
     heroBox.appendChild(ascRow);
 
@@ -68,7 +68,7 @@
       tile.appendChild(el('div', { class:'level' }, w ? w.name : 'LOCKED'));
       if (!equipped && slot !== 'melee') {
         const cost = WG.AscendEquipment.SLOT_UNLOCK_COSTS[slot];
-        const costStr = Object.entries(cost).map(([k,v])=>`${v}${k==='coins'?'🪙':k==='diamonds'?'💎':'🎴'}`).join(' ');
+        const costStr = Object.entries(cost).map(([k,v])=>`${v}${k==='coins'?'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>':k==='diamonds'?'💎':'🎴'}`).join(' ');
         const btn = el('button', { class:'btn', style:'margin-top:4px;font-size:9px;padding:4px 6px;', onclick: (e) => { e.stopPropagation(); const r = WG.AscendEquipment.tryUnlockSlot(slot); refresh(); if(!r.ok) toast('Insufficient'); } }, 'UNLOCK ' + costStr);
         tile.appendChild(btn);
       } else {
@@ -96,7 +96,7 @@
       const row = el('div', { style:'display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 4px;border-bottom:1px solid rgba(96,64,32,0.3);' });
       row.appendChild(el('span', { style:'color:#c8a868;' }, ln.label));
       row.appendChild(el('span', { style:'color:#f0d890;font-weight:600;' }, '' + ln.value));
-      row.appendChild(el('button', { class:'btn', style:'font-size:9px;padding:4px 8px;', onclick: () => { const r = WG.AscendStats.tryUpgrade(ln.upgrade); refresh(); if(!r.ok) toast('Insufficient'); } }, '+ ' + cost + '🪙'));
+      row.appendChild(el('button', { class:'btn', style:'font-size:9px;padding:4px 8px;', onclick: () => { const r = WG.AscendStats.tryUpgrade(ln.upgrade); refresh(); if(!r.ok) toast('Insufficient'); } }, '+ ' + cost + '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'));
       statsBox.appendChild(row);
     }
     scroll.appendChild(statsBox);
@@ -120,7 +120,7 @@
       const cost = (WG.AscendChars.rebirthCost && WG.AscendChars.rebirthCost(charId)) || 2880;
       const ready = highest >= need;
       const note = ready
-        ? `↑ Tier ${next.tier} ready · Cultivate ${cost}🪙`
+        ? `↑ Tier ${next.tier} ready · Cultivate ${cost}<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>`
         : `↑ Tier ${next.tier} locked · clear stage ${need}`;
       pwrBox.appendChild(el('div', {
         style: `font-size:10px;color:${ready ? '#ffd870' : '#806040'};margin-top:4px;letter-spacing:1px;`
@@ -237,7 +237,7 @@
           }, 220);
         });
       } else {
-        const costStr = Object.entries(ch.cost || {}).map(([k,v]) => `${v}${k==='coins'?'🪙':k==='diamonds'?'💎':'🎴'}`).join(' ') || 'LOCKED';
+        const costStr = Object.entries(ch.cost || {}).map(([k,v]) => `${v}${k==='coins'?'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>':k==='diamonds'?'💎':'🎴'}`).join(' ') || 'LOCKED';
         const btn = el('button', { class:'btn roster-cost-btn',
           onclick: (e) => {
             e.stopPropagation();
