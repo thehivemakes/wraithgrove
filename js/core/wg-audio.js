@@ -55,6 +55,8 @@
     { event: 'player:revived',        id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
     { event: 'buff:expired',          id: 'ui_modal',      bus: 'ui',  throttleMs: 0,   vol: 0.5 },
     { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
+    // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
+    { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
   ];
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.

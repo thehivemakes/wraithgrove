@@ -595,6 +595,51 @@
           ctx.fillRect(barX, barY, barW * frac, barH);
         }
       }
+      // W-Building-Repair — hover-progress ring while player approaches a
+      // damaged turret, then active-repair wrench glyph + bobble while wood
+      // drains. Hover repair logic lives in WG.HuntPlayer.repairTick; this
+      // block is render-only. Sparkles are spawned by hunt-fx on repair:tick.
+      if (c.type === 'turret' && typeof c.hp === 'number' && c.hp < (c.maxHp || c.hp)
+          && window.WG.HuntPlayer && WG.HuntPlayer.REPAIR_TUNABLES) {
+        const RT = WG.HuntPlayer.REPAIR_TUNABLES;
+        const hover = c.repairHover || 0;
+        if (hover > 0) {
+          const t01 = Math.min(1, hover / RT.REPAIR_HOVER_DELAY);
+          if (t01 < 1) {
+            // Polish mandate: ease-out cubic — fast initial growth, settles near 1.
+            const eased = 1 - Math.pow(1 - t01, 3);
+            ctx.save();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = `rgba(168, 240, 160, ${0.55 + 0.35 * eased})`;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 22, -Math.PI / 2, -Math.PI / 2 + eased * Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          } else {
+            // Active repair — wrench glyph above turret, gentle bobble.
+            const bob = Math.sin(t * 5.5) * 1.6;
+            const wx = s.x;
+            const wy = s.y - 26 + bob;
+            ctx.save();
+            ctx.translate(wx, wy);
+            ctx.rotate(-Math.PI / 5);
+            ctx.shadowColor = 'rgba(168, 240, 160, 0.75)';
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = '#a8f0a0';
+            ctx.beginPath();
+            ctx.arc(0, -4, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(20, 60, 30, 0.9)';
+            ctx.beginPath();
+            ctx.arc(0, -5.6, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#c8ffc8';
+            ctx.fillRect(-1.2, -2, 2.4, 7);
+            ctx.restore();
+          }
+        }
+      }
       // Campfire built sites: handled by drawCampfireLight + drawCampfireFlame
       // which iterate props.fires; the construction tick should push the fire
       // when c.built becomes true. Render-side no-op here.

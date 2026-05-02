@@ -53,6 +53,15 @@
     // most dramatic moment in the run. Larger speed + ring shape.
     playerRevive:   { count: 32, life: 0.90, sMin: 200, sMax: 200, gravity: -20, size: 3,
                       colors: ['#80f0ff', '#fff0c0', '#ffd070'], shape: 'square', ring: true },
+    // W-Building-Repair — per-tick green sparkle drifting up from a damaged
+    // turret while wood is being consumed. 2 particles per emit; cumulative
+    // density across ticks gives the "active repair" read.
+    repairSparkle:  { count: 2,  life: 0.55, sMin:  30, sMax:  60, gravity: -40, size: 2,
+                      colors: ['#a8f0a0', '#80e088', '#c8ffc8'], shape: 'sparkle' },
+    // W-Building-Repair — repair:complete radial burst. 12 particles, ring,
+    // green tones — louder than enemyHit, smaller than levelUp.
+    repairBurst:    { count: 12, life: 0.70, sMin: 100, sMax: 180, gravity:  40, size: 2,
+                      colors: ['#a8f0a0', '#80e088', '#fff0c0'], shape: 'square', ring: true },
   };
 
   function _alloc() {
@@ -191,6 +200,20 @@
       if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
         WG.HuntFXNumbers.spawn(px, py - 22, 'REVIVED', { color: '#80f0ff', size: 22, duration: 1400 });
       }
+    });
+    // W-Building-Repair — per-wood green sparkle while a turret is being
+    // hover-repaired. Continuous density confirms the wood drain is active.
+    WG.Engine.on('repair:tick', ({ x, y }) => {
+      if (x != null && y != null) burst(x, y, 'repairSparkle');
+    });
+    // W-Building-Repair — completion punctuation: ring burst, mild trauma,
+    // and an audio:repair_complete event routed to the existing craft sample
+    // via wg-audio EVENT_MAP.
+    WG.Engine.on('repair:complete', ({ x, y }) => {
+      if (x == null || y == null) return;
+      burst(x, y, 'repairBurst');
+      if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.15);
+      WG.Engine.emit('audio:repair_complete', { x, y });
     });
     // W-FX-Polish-Pass — gap 2 (consume side): instant_turret/revive consumed.
     // Gold confirm-burst at the player + small "USED" float-text. HUD pill

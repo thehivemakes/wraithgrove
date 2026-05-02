@@ -26,11 +26,10 @@
 
     // Armored samurai grunt — both modes (boss-tier henchman across day/night).
     samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:10, mode:'both', ai:'walker' },
-    // Architect 2026-05-02: shrieking scary banshee — large Night-only rare frenzied
+    // W-Banshee-Enemy — Architect 2026-05-02: large Night-only rare frenzied scare.
+    // SPEC §0 register. AI 'banshee_charge': erratic sin-wave pursuit + 0.8s charge
+    // every shriekCooldown sec. `rare` flag → wave-spawner 5% pre-roll, max 1 alive.
     banshee:         { name: 'Banshee',        hp:220,speed:130,damage:22, cooldown:1.0, size:36, color:'#e8e0f0', accent:'#a060ff', xp:30, mode:'night', ai:'banshee_charge', rare:true, shriekCooldown:4.0 },
-    // Spawn-Tuning additions
-    wraith_fast:     { name: 'Wraith Stalker', hp:18, speed:140,damage:7,  cooldown:1.2, size:14, color:'#404858', accent:'#a8c0e8', xp:4,  mode:'night', ai:'walker' },
-    skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:1.1, size:12, color:'#e8e0d0', accent:'#3a2010', xp:2,  mode:'both',  ai:'walker', swarmSize:4 },
   };
 
   let nextId = 1;
@@ -123,8 +122,10 @@
         c._chargeTimer = 0.8;  // 0.8s of locked-on charge
         c._shriekTimer = c._typeData.shriekCooldown;
         WG.Engine.emit('enemy:shriek', { creature: c });
+        // Polish mandate — shriek is the dopamine peak.
         if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.3);
         if (window.WG.HuntFX && WG.HuntFX.burst) WG.HuntFX.burst(c.x, c.y, 'pickupFragment', { count: 16, life: 0.7 });
+        if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#a060ff', 0.3, 200);
       }
       if (c._chargeTimer > 0) {
         c._chargeTimer -= dt;
