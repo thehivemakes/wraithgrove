@@ -1,0 +1,19 @@
+W-Spawn-Tuning — DONE 2026-05-02 (inline)
+
+Architect 2026-05-02: "more enemies + different types"
+
+## Catalog (js/hunt/hunt-enemies.js TYPES)
+- wraith_fast: hp 18, speed 140, size 14, Night, ai 'walker'
+- skull_swarmer: hp 9, speed 95, size 12, both modes, swarmSize 4
+- (banshee landed in W-Banshee-Enemy)
+
+## Stage mix (js/hunt/hunt-stage.js)
+- All 18 stages now include wraith_fast + skull_swarmer in their enemyMix arrays
+
+## Spawn rate (js/hunt/hunt-waves.js)
+- WAVE_BASE_RATE_MIN: 0.5 → 0.7 (+40%)
+- WAVE_BASE_RATE_MAX: 1.5 → 2.1 (+40%)
+
+Sprites in hunt-render.js: drawWraithFast (wisp + hollow eyes), drawSkullImp (exposed skull, jagged teeth).
+
+Marker minted by orchestrator after worker scheduled-task stalled (4+ attempts). Code is on disk and live since v0.17.0-banshee-spawn.
