@@ -45,12 +45,12 @@
     // these continuously so cumulative density gives the "healing aura" read.
     campfireSparkle:{ count: 1,  life: 0.85, sMin:  20, sMax:  40, gravity: -30, size: 2,
                       colors: ['#a8f0a0', '#80e088', '#c8ffc8'], shape: 'sparkle' },
-    // W-FX-Polish-Pass — closes audit §C.2 gap 3: pickup:torch was silent.
-    // Warm orange-yellow sparkle, slight upward bias (negative gravity).
+    // W-FX-Polish-Pass — gap 3: pickup:torch was silent. Warm orange-yellow
+    // sparkle, slight upward bias (negative gravity) — Night-Mode tension resolution.
     pickupTorch:    { count: 8,  life: 0.55, sMin:  60, sMax: 120, gravity: -20, size: 2,
                       colors: ['#f8b850', '#ffe888', '#ffc848'], shape: 'sparkle' },
     // W-FX-Polish-Pass — gap 1: player:revived was silent. Cyan + gold ring,
-    // the most dramatic moment in the run. Larger speed + ring shape.
+    // most dramatic moment in the run. Larger speed + ring shape.
     playerRevive:   { count: 32, life: 0.90, sMin: 200, sMax: 200, gravity: -20, size: 3,
                       colors: ['#80f0ff', '#fff0c0', '#ffd070'], shape: 'square', ring: true },
   };
@@ -168,42 +168,40 @@
     WG.Engine.on('turret:fire', ({ x, y }) => {
       if (x != null && y != null) burst(x, y, 'muzzleFlash');
     });
-    // W-FX-Polish-Pass — gap 3: pickup:torch was silent (Night-Mode tension resolution).
+    WG.Engine.on('turret:destroyed', ({ turret }) => {
+      if (turret) burst(turret.x, turret.y, 'turretExplode');
+    });
+    // W-FX-Polish-Pass — gap 3: pickup:torch (Night-Mode torch refill).
     WG.Engine.on('pickup:torch', ({ x, y }) => {
-      if (x != null && y != null) {
-        burst(x, y, 'pickupTorch');
-        if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
-          WG.HuntFXNumbers.spawn(x, y, '+TORCH', { color: '#ffc848', size: 1.2, duration: 900 });
-        }
+      if (x == null || y == null) return;
+      burst(x, y, 'pickupTorch');
+      if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
+        WG.HuntFXNumbers.spawn(x, y - 6, '+TORCH', { color: '#ffc848', size: 14, duration: 900 });
       }
     });
-    // W-FX-Polish-Pass — gap 1: player:revived was silent. Cyan/gold ring + screen flash.
+    // W-FX-Polish-Pass — gap 1: player:revived (most dramatic moment in run).
+    // Cyan/gold ring + camera kick + screen flash + REVIVED float-text.
     WG.Engine.on('player:revived', ({ x, y }) => {
-      const px = (x != null) ? x : (window.WG.HuntPlayer && WG.HuntPlayer.runtime && WG.HuntPlayer.runtime.player) ? WG.HuntPlayer.runtime.player.x : 400;
-      const py = (y != null) ? y : (window.WG.HuntPlayer && WG.HuntPlayer.runtime && WG.HuntPlayer.runtime.player) ? WG.HuntPlayer.runtime.player.y : 300;
+      const player = _runtimePlayer();
+      const px = (x != null) ? x : (player ? player.x : 0);
+      const py = (y != null) ? y : (player ? player.y : 0);
       burst(px, py, 'playerRevive');
       if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.5);
       if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#80f0ff', 0.5, 400);
       if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
-        WG.HuntFXNumbers.spawn(px, py, 'REVIVED', { color: '#80f0ff', size: 1.6, duration: 1400 });
+        WG.HuntFXNumbers.spawn(px, py - 22, 'REVIVED', { color: '#80f0ff', size: 22, duration: 1400 });
       }
     });
-    // W-FX-Polish-Pass — gap 2: buff:expired/consumed silent.
-    WG.Engine.on('buff:expired', ({ buffId }) => {
-      // HUD pill desaturation handled by wg-game.js HUD updater listening to same event.
-      // FX side: brief small puff at pill location not feasible without HUD coords;
-      // signaled via audio (wg-audio EVENT_MAP picks up buff:expired automatically).
-    });
-    WG.Engine.on('buff:consumed', ({ buffId, x, y }) => {
-      const px = (x != null) ? x : (window.WG.HuntPlayer && WG.HuntPlayer.runtime && WG.HuntPlayer.runtime.player) ? WG.HuntPlayer.runtime.player.x : 400;
-      const py = (y != null) ? y : (window.WG.HuntPlayer && WG.HuntPlayer.runtime && WG.HuntPlayer.runtime.player) ? WG.HuntPlayer.runtime.player.y : 300;
-      burst(px, py, 'pickupCoin', { count: 8, colors: ['#ffe888', '#fff0c0'] });
+    // W-FX-Polish-Pass — gap 2 (consume side): instant_turret/revive consumed.
+    // Gold confirm-burst at the player + small "USED" float-text. HUD pill
+    // desaturation for both consumed AND expired is handled in hunt-render.js.
+    WG.Engine.on('buff:consumed', () => {
+      const player = _runtimePlayer();
+      if (!player) return;
+      burst(player.x, player.y, 'pickupCoin', { count: 10 });
       if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
-        WG.HuntFXNumbers.spawn(px, py, 'USED', { color: '#fff0c0', size: 1.0, duration: 800 });
+        WG.HuntFXNumbers.spawn(player.x, player.y - 18, 'USED', { color: '#fff0c0', size: 13, duration: 800 });
       }
-    });
-    WG.Engine.on('turret:destroyed', ({ turret }) => {
-      if (turret) burst(turret.x, turret.y, 'turretExplode');
     });
   }
 

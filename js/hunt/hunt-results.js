@@ -73,19 +73,26 @@
     let revIv = null, revRem = REVIVE_COUNTDOWN_SEC;
     if (reviveAvailable) {
       const cd = wrap.querySelector('#hr-revive-cd');
-      // W-FX-Polish-Pass — gap 7: countdown number now pulses + color-shifts as
-      // tension peaks. White → yellow → orange → red as it approaches 0.
+      // W-FX-Polish-Pass — gap 7: countdown number pulses + color-shifts as
+      // tension rises. Heartbeat lives on the button; the *number* now leads
+      // the panic. White → yellow → orange → red as it approaches 0.
+      if (cd) {
+        cd.style.display = 'inline-block';
+        cd.style.transition = 'transform 200ms cubic-bezier(0.34,1.56,0.64,1), color 150ms ease, opacity 250ms ease';
+      }
       revIv = setInterval(() => {
         revRem--;
         if (cd) {
-          cd.textContent = String(revRem);
-          // Color shift by remaining seconds
-          const color = revRem <= 1 ? '#ff4040' : revRem <= 2 ? '#ff9040' : revRem <= 3 ? '#ffd870' : '#ffe080';
+          cd.textContent = String(Math.max(0, revRem));
+          const color = revRem <= 1 ? '#ff4040'
+                      : revRem <= 2 ? '#ff9040'
+                      : revRem <= 3 ? '#ffd870'
+                                    : '#ffe080';
           cd.style.color = color;
-          // Scale punch on each tick (CSS transition handles the ease back)
-          cd.style.transition = 'transform 200ms cubic-bezier(0.34,1.56,0.64,1), color 150ms ease';
-          cd.style.transform = 'scale(1.4)';
-          setTimeout(() => { if (cd) cd.style.transform = 'scale(1.0)'; }, 200);
+          if (revRem <= 0) cd.style.opacity = '0';
+          // Scale punch on each tick, ease-back via transition
+          cd.style.transform = 'scale(1.55)';
+          setTimeout(() => { if (cd) cd.style.transform = 'scale(1.0)'; }, 180);
         }
         if (revRem <= 0) {
           clearInterval(revIv); revIv = null;

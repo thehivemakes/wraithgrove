@@ -161,7 +161,8 @@
       t.built = false;
       t.have = 0;        // dashed-circle slot reappears, can be rebuilt
       WG.Engine.emit('turret:destroyed', { turret: t });
-      // W-FX-Polish-Pass — gap 5: turret destruction was soft. Add screen kick.
+      // W-FX-Polish-Pass — gap 5: turret loss is a meaningful tactical event.
+      // 0.4 trauma kick (between enemy:killed 0.18 and player:damaged 0.30+).
       if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.4);
       return true;
     }

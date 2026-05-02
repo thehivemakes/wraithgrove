@@ -47,6 +47,14 @@
     { event: 'forge:craft',           id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.8 },
     { event: 'duel:victory',          id: 'duel_win',      bus: 'ui',  throttleMs: 0,   vol: 1.0 },
     { event: 'duel:defeat',           id: 'duel_lose',     bus: 'ui',  throttleMs: 0,   vol: 0.8 },
+    // W-FX-Polish-Pass — gaps 1, 2, 3: closing the audio side of silent events.
+    // pickup:torch reuses orb sample (no torch sample shipped); player:revived
+    // reuses level_up (triumphal); buff:expired reuses ui_modal close; consumed
+    // reuses cha_ching for the small confirm payoff.
+    { event: 'pickup:torch',          id: 'orb',           bus: 'sfx', throttleMs: 60,  vol: 0.6 },
+    { event: 'player:revived',        id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
+    { event: 'buff:expired',          id: 'ui_modal',      bus: 'ui',  throttleMs: 0,   vol: 0.5 },
+    { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
   ];
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.

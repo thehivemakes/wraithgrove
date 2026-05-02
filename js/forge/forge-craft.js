@@ -1,16 +1,19 @@
 // WG.ForgeCraft — relic crafting with RNG-based outcomes
 (function(){'use strict';
-  // Drop tables for Craft x10 — depends on Forge level
-  // Higher Forge level = better odds for higher rarities
+  // Drop tables for Craft x10 — Forge-level scales the odds.
+  // Baseline (Forge Lv.1) per spec §9 / scr_02 monetization tuning:
+  //   Common 70%  / Rare 22% / Epic 6% / Legendary 1.8% / Mythic 0.2%
+  // Each Forge level above 1 shifts ~2.5% from Common into the higher tiers.
   function getDropTable() {
     const fb = WG.State.get().forge.buildings.find(b => b.id === 'forge');
     const lvl = fb ? fb.level : 1;
+    const lup = lvl - 1; // levels above baseline
     return {
-      common:    Math.max(0.2, 0.65 - lvl * 0.025),
-      rare:      0.25 + lvl * 0.012,
-      epic:      0.08 + lvl * 0.008,
-      legendary: 0.02 + lvl * 0.005,
-      mythic:    0.0 + Math.max(0, (lvl - 5) * 0.002),
+      common:    Math.max(0.20, 0.700 - lup * 0.025),
+      rare:      0.220 + lup * 0.012,
+      epic:      0.060 + lup * 0.008,
+      legendary: 0.018 + lup * 0.005,
+      mythic:    0.002 + Math.max(0, (lvl - 5) * 0.002),
     };
   }
 

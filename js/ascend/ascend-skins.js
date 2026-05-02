@@ -148,21 +148,36 @@
     return { ok: true };
   }
 
+  // Cultivate cost ladder per next-tier index. Anchors SPEC §8's "~2880 coins"
+  // to the tier-3 advance (Lantern Bride), with geometric growth above that.
+  // Tier 2 advances are intentionally cheap to teach the Rebirth UX early.
+  // Beyond tier 4 falls back to power × 12 to support future-tier additions.
+  const CULTIVATE_LADDER = { 2: 800, 3: 2880, 4: 14400 };
+  function rebirthCost(id) {
+    const c = get(id);
+    if (!c) return 0;
+    const ps = WG.State.get().player;
+    const currentTierIdx = (ps.characterTiers && ps.characterTiers[id]) || c.defaultTier || 1;
+    const next = c.tiers.find(t => t.tier === currentTierIdx + 1);
+    if (!next) return 0;
+    return CULTIVATE_LADDER[next.tier] || Math.max(800, next.power * 12);
+  }
+
   // Rebirth — advance the active character to next tier if eligible.
   // Eligibility: stage cleared with id ≥ tier.requiresStageClear AND coins >= rebirthCost.
   function tryRebirth(id, opts) {
     const c = get(id);
     if (!c) return { ok: false, reason: 'unknown' };
     const ps = WG.State.get().player;
-    const currentTierIdx = (ps.characterTiers && ps.characterTiers[id]) || c.defaultTier;
+    const currentTierIdx = (ps.characterTiers && ps.characterTiers[id]) || c.defaultTier || 1;
     const next = c.tiers.find(t => t.tier === currentTierIdx + 1);
     if (!next) return { ok: false, reason: 'max-tier' };
     const requireStage = next.requiresStageClear || 0;
     const highest = (ps.highestStageCleared || 0);
     if (highest < requireStage) return { ok: false, reason: 'stage-locked', need: requireStage };
-    const rebirthCost = (opts && opts.cost) || (next.power * 12); // ~12 coins per power point
-    if (WG.State.get().currencies.coins < rebirthCost) return { ok: false, reason: 'insufficient-coins', need: rebirthCost };
-    WG.State.spend('coins', rebirthCost);
+    const cost = (opts && opts.cost != null) ? opts.cost : rebirthCost(id);
+    if (WG.State.get().currencies.coins < cost) return { ok: false, reason: 'insufficient-coins', need: cost };
+    WG.State.spend('coins', cost);
     ps.characterTiers = ps.characterTiers || {};
     ps.characterTiers[id] = next.tier;
     WG.Engine.emit('character:rebirth', { character: c, fromTier: currentTierIdx, toTier: next.tier, rewards: { skin: 1, diamonds: 100, hammer: 10 } });
@@ -196,11 +211,10 @@
   }
 
   // Backwards-compat aliases for any code still calling skin-named functions.
-  // Will be cleaned up by W-Roster-And-Rebirth Concern B (UI rebuild).
   window.WG.AscendSkins = {
     init, get, list, tryUnlock, trySetActive: setActive, SKINS: CHARACTERS,
     // Roster API:
-    setActive, currentTier, tryRebirth, activeBonus, activePower,
+    setActive, currentTier, tryRebirth, rebirthCost, activeBonus, activePower,
     CHARACTERS,
   };
   // Also alias as AscendChars for clarity.

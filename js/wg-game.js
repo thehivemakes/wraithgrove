@@ -205,14 +205,23 @@
       const cur = s.huntProgress.bestWaves[stageId] || 0;
       if (mins > cur) s.huntProgress.bestWaves[stageId] = +mins.toFixed(2);
       s.huntProgress.highestUnlocked = Math.max(s.huntProgress.highestUnlocked, stageId + 1);
+      // Bump highestStageCleared — gates Rebirth tier eligibility (SPEC §0).
+      s.player.highestStageCleared = Math.max(s.player.highestStageCleared || 0, stageId);
       WG.Engine.emit('hunt:stage-cleared', { stageId, mins, kills: huntRuntime.kills });
     } else {
       WG.Engine.emit('hunt:stage-failed', { stageId, mins, kills: huntRuntime.kills });
     }
-    WG.HuntResults.show({ stageId, cleared, mins, kills: huntRuntime.kills, rewards });
-    // Restart loop to keep top-strip / autosave running
+    const showResults = () => WG.HuntResults.show({ stageId, cleared, mins, kills: huntRuntime.kills, rewards });
+    if (cleared && WG.AscendRebirth && WG.AscendRebirth.maybeShow) {
+      huntRuntime.rebirthPending = !!WG.AscendRebirth.isEligible();
+      WG.AscendRebirth.maybeShow({ stageId, onContinue: showResults });
+    } else {
+      showResults();
+    }
+    // Restart loop to keep top-strip / autosave running. We keep huntRuntime.player
+    // intact so the §B revive flow can restore HP from the existing entity —
+    // exitHunt() clears the runtime when the user backs out for real.
     running = true;
-    huntRuntime.player = null;
     rafId = requestAnimationFrame(frame);
   }
 
@@ -439,6 +448,7 @@
     WG.AscendSkins.init();
     WG.AscendEquipment.init();
     WG.AscendStats.init();
+    WG.AscendRebirth.init();
     WG.AscendRender.init();
     WG.ForgeBuildings.init();
     WG.ForgeCraft.init();
@@ -471,5 +481,5 @@
     rafId = 0;
   }
 
-  window.WG.Game = { init, start, stop, switchTab, startHunt, exitHunt, syncTopStrip, getHuntRuntime };
+  window.WG.Game = { init, start, stop, switchTab, startHunt, exitHunt, syncTopStrip, getHuntRuntime, flashScreen };
 })();

@@ -24,23 +24,25 @@
     root.appendChild(scroll);
 
     const ps = WG.State.get().player;
-    const skin = WG.AscendSkins.get(ps.activeSkin);
+    const charId = ps.activeCharacter || 'lantern_acolyte';
+    const character = WG.AscendChars.get(charId);
+    const tier = WG.AscendChars.currentTier(charId) || (character && character.tiers[0]);
 
     // Character display
     const heroBox = el('div', { class: 'scene-row' });
     heroBox.appendChild(el('h2', null, 'Ascend'));
 
-    // Hero portrait
+    // Hero portrait — current Rebirth-tier appearance
     const portrait = el('div', { style:'position:relative;width:80px;height:96px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));border:1px solid #604020;border-radius:6px;margin:6px 0;display:flex;align-items:flex-end;justify-content:center;' });
-    const fig = el('div', { style:`width:30px;height:48px;background:${skin.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;` });
-    const head = el('div', { style:`position:absolute;top:-12px;left:6px;width:18px;height:18px;background:${skin.accent};border-radius:50%;border:1px solid #2a1c10;` });
+    const fig = el('div', { style:`width:30px;height:48px;background:${tier.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;` });
+    const head = el('div', { style:`position:absolute;top:-12px;left:6px;width:18px;height:18px;background:${tier.accent};border-radius:50%;border:1px solid #2a1c10;` });
     fig.appendChild(head);
     portrait.appendChild(fig);
     heroBox.appendChild(portrait);
 
     // Name / tier / level
-    heroBox.appendChild(el('div', { style:'font-size:14px;color:#f0d890;letter-spacing:1px;' }, skin.name));
-    heroBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;' }, `${WG.AscendCharacter.tierName(ps.ascendTier)} · Lv ${ps.level}`));
+    heroBox.appendChild(el('div', { style:'font-size:14px;color:#f0d890;letter-spacing:1px;' }, character.name));
+    heroBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;' }, `${tier.name} · Tier ${tier.tier} · Lv ${ps.level}`));
 
     // Skin button
     const skinBtnRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
@@ -99,40 +101,158 @@
     }
     scroll.appendChild(statsBox);
 
-    // Power summary
+    // Power summary — annotated with the active character's tier contribution
+    // and the next-tier marker so the player can see what's coming.
     const power = WG.State.recomputePower();
+    const charPower = (WG.AscendChars.activePower && WG.AscendChars.activePower()) || 0;
     const pwrBox = el('div', { class:'scene-row', style:'background:linear-gradient(to bottom,#3a2818,#1a1006);' });
     pwrBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'TOTAL POWER'));
     pwrBox.appendChild(el('div', { style:'font-size:28px;color:#ffd870;font-weight:700;' }, '' + power));
+    pwrBox.appendChild(el('div', { style:'font-size:10px;color:#a89878;margin-top:2px;' },
+      `${character.name} · Tier ${tier.tier} (+${charPower} pwr)`));
+
+    // Rebirth marker — tease the next tier's appearance + cost when it's
+    // possible to advance. Uses the Cultivate ladder from AscendChars.
+    const next = character.tiers.find(t => t.tier === tier.tier + 1);
+    if (next) {
+      const need = next.requiresStageClear || 0;
+      const highest = ps.highestStageCleared || 0;
+      const cost = (WG.AscendChars.rebirthCost && WG.AscendChars.rebirthCost(charId)) || 2880;
+      const ready = highest >= need;
+      const note = ready
+        ? `↑ Tier ${next.tier} ready · Cultivate ${cost}🪙`
+        : `↑ Tier ${next.tier} locked · clear stage ${need}`;
+      pwrBox.appendChild(el('div', {
+        style: `font-size:10px;color:${ready ? '#ffd870' : '#806040'};margin-top:4px;letter-spacing:1px;`
+      }, note));
+    }
     scroll.appendChild(pwrBox);
 
     syncTopStrip();
   }
 
+  // Inject roster-picker CSS once: tap scale-bounce, active checkmark badge,
+  // and the small 3-col tile portrait.
+  function injectRosterCSS() {
+    if (document.getElementById('roster-picker-css')) return;
+    const st = document.createElement('style');
+    st.id = 'roster-picker-css';
+    st.textContent = `
+      @keyframes roster-tap-bounce {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(0.92); }
+        70%  { transform: scale(1.06); }
+        100% { transform: scale(1); }
+      }
+      .roster-tile {
+        position: relative; cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease;
+      }
+      .roster-tile.tap { animation: roster-tap-bounce 320ms ease-out; }
+      .roster-tile:active { transform: scale(0.96); }
+      .roster-tile.active { border-color: #ffd870 !important; box-shadow: 0 0 12px 1px rgba(255,216,112,0.45); }
+      .roster-tile .check {
+        position: absolute; top: 4px; right: 4px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: linear-gradient(135deg, #ffe888, #c89030);
+        color: #2a1c10; font-size: 11px; font-weight: 800;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 6px rgba(255,200,100,0.8);
+      }
+      .roster-portrait {
+        width: 56px; height: 64px; border-radius: 6px;
+        background: linear-gradient(to bottom, rgba(20,16,10,0.9), rgba(8,4,2,0.95));
+        border: 1px solid #3a2818; position: relative; overflow: hidden;
+      }
+      .roster-portrait .body {
+        position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+        width: 22px; height: 32px; border-radius: 5px 5px 2px 2px;
+      }
+      .roster-portrait .head {
+        position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%);
+        width: 14px; height: 14px; border-radius: 50%; border: 1px solid #2a1c10;
+      }
+      .roster-tag {
+        font-size: 8px; letter-spacing: 1.5px; color: #c8a868; margin-top: 2px;
+      }
+      .roster-tag.cta { color: #ffd870; font-weight: 700; text-shadow: 0 0 4px rgba(255,200,100,0.4); }
+      .roster-bonus { font-size: 8px; color: #80c8a0; margin-top: 1px; line-height: 1.2; }
+      .roster-cost-btn {
+        margin-top: 4px; font-size: 9px; padding: 3px 6px;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
   function showSkinPicker() {
+    injectRosterCSS();
     const root = document.getElementById('modal-root');
     const wrap = el('div', { class:'modal-overlay show' });
-    const card = el('div', { class:'modal-card', style:'width:90%;max-width:380px;' });
-    card.appendChild(el('div', { class:'modal-title' }, 'Skins — boost power'));
-    const grid = el('div', { style:'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;' });
+    const card = el('div', { class:'modal-card', style:'width:92%;max-width:380px;' });
+    card.appendChild(el('div', { class:'modal-title' }, 'ROSTER — TAP TO PLAY'));
+
+    const grid = el('div', { style:'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;' });
     const ps = WG.State.get().player;
-    for (const skin of WG.AscendSkins.list()) {
-      const owned = ps.ownedSkins.includes(skin.id);
-      const tile = el('div', { class:'card-tile' + (!owned ? ' locked' : ''), style:'cursor:pointer;' });
-      tile.appendChild(el('div', { class:'icon-box', style:`background:${skin.color};color:${skin.accent};` }, '👤'));
-      tile.appendChild(el('div', { class:'name' }, skin.name));
-      tile.appendChild(el('div', { class:'level' }, '+' + skin.power + ' PWR'));
+    const ownedSet = new Set(ps.ownedCharacters || ['lantern_acolyte']);
+    const activeId = ps.activeCharacter || 'lantern_acolyte';
+
+    for (const ch of WG.AscendChars.list()) {
+      const owned = ownedSet.has(ch.id);
+      // Show the player's CURRENT tier appearance for owned chars; tier-1 for locked.
+      const tier = owned ? (WG.AscendChars.currentTier(ch.id) || ch.tiers[0]) : ch.tiers[0];
+      const isActive = owned && (ch.id === activeId);
+      const tile = el('div', { class:'card-tile roster-tile' + (!owned ? ' locked' : '') + (isActive ? ' active' : '') });
+
+      // Active checkmark badge — only visible when this character is currently active.
+      if (isActive) {
+        const check = el('div', { class:'check' }, '✓');
+        tile.appendChild(check);
+      }
+
+      // Portrait: simulated body+head matching tier color/accent.
+      const portrait = el('div', { class:'roster-portrait' });
+      const body = el('div', { class:'body', style:`background:${tier.color};` });
+      const head = el('div', { class:'head', style:`background:${tier.accent};` });
+      portrait.appendChild(body);
+      portrait.appendChild(head);
+      tile.appendChild(portrait);
+
+      tile.appendChild(el('div', { class:'name' }, ch.name));
+      tile.appendChild(el('div', { class:'roster-tag' + (owned && !isActive ? ' cta' : '') },
+        isActive ? 'ACTIVE' : (owned ? 'TAP TO PLAY' : `Tier ${tier.tier}`)));
+
+      // Active bonus hint for owned characters (special effect line).
+      if (owned && ch.bonus && ch.bonus.special) {
+        tile.appendChild(el('div', { class:'roster-bonus' }, ch.bonus.special));
+      }
+
       if (owned) {
-        tile.addEventListener('click', () => { WG.AscendSkins.trySetActive(skin.id); wrap.remove(); refresh(); });
+        tile.addEventListener('click', () => {
+          // Scale-bounce + commit + refresh after the tap animation reads.
+          tile.classList.add('tap');
+          setTimeout(() => {
+            WG.AscendChars.setActive(ch.id);
+            wrap.remove();
+            refresh();
+          }, 220);
+        });
       } else {
-        const costStr = Object.entries(skin.cost||{}).map(([k,v])=>`${v}${k==='coins'?'🪙':k==='diamonds'?'💎':'🎴'}`).join(' ');
-        const btn = el('button', { class:'btn', style:'font-size:9px;padding:4px 6px;', onclick: (e) => { e.stopPropagation(); const r = WG.AscendSkins.tryUnlock(skin.id); if (r.ok) { wrap.remove(); refresh(); } else toast('Need ' + costStr); } }, costStr);
+        const costStr = Object.entries(ch.cost || {}).map(([k,v]) => `${v}${k==='coins'?'🪙':k==='diamonds'?'💎':'🎴'}`).join(' ') || 'LOCKED';
+        const btn = el('button', { class:'btn roster-cost-btn',
+          onclick: (e) => {
+            e.stopPropagation();
+            const r = WG.AscendChars.tryUnlock(ch.id);
+            if (r.ok) { wrap.remove(); refresh(); }
+            else toast('Need ' + costStr);
+          }
+        }, costStr);
         tile.appendChild(btn);
       }
       grid.appendChild(tile);
     }
     card.appendChild(grid);
-    const row = el('div', { class:'modal-btn-row', style:'margin-top:12px;' });
+
+    const row = el('div', { class:'modal-btn-row', style:'margin-top:14px;' });
     row.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'CLOSE'));
     card.appendChild(row);
     wrap.appendChild(card);

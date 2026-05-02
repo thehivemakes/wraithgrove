@@ -7,8 +7,13 @@
     player: {
       level: 1, xp: 0,
       ascendTier: 0,    // 0=Mortal, 1=Initiate, 2=Apprentice, 3=Adept, 4=Master, 5=Sage, 6=Immortal
-      activeSkin: 'starter',
-      ownedSkins: ['starter'],
+      // SPEC §0/§12: 9-character roster. Each character has its own Rebirth-tier
+      // ladder (the "skin" IS the current tier). Only the active character grants
+      // its bonus. Default unlocked: lantern_acolyte at tier 1.
+      activeCharacter: 'lantern_acolyte',
+      ownedCharacters: ['lantern_acolyte'],
+      characterTiers: { lantern_acolyte: 1 },
+      highestStageCleared: 0,           // gates Rebirth tier unlocks
       slots: { melee: 'branch_stick', ranged: null, pet: null },
       stats: { attack: 5, hpMax: 100, hp: 100, gatherRate: 0, critRate: 0.05, defense: 0 },
     },
@@ -33,6 +38,9 @@
       craftDailyUsed: 0,
       craftDailyMax: 10,
       lastDailyChestMs: 0,
+      // 7-day streak tracker (Buildings tab Daily Chest)
+      dailyStreakDay: 0,        // 0 means no claim yet; 1..7 cycles
+      streakLastClaimMs: 0,     // ms of last claim — used to detect skip
     },
     relics: {
       owned: {},                // relicId -> { count, level }
@@ -72,10 +80,10 @@
     pwr += p.ascendTier * 120;
     pwr += p.stats.attack * 4;
     pwr += Math.floor(p.stats.hpMax / 4);
-    // Skin contribution
-    if (p.activeSkin && WG.AscendSkins) {
-      const s = WG.AscendSkins.get(p.activeSkin);
-      if (s) pwr += s.power || 0;
+    // Active-character contribution (SPEC §0: only the actively-equipped
+    // character grants bonus; current Rebirth tier supplies the power value).
+    if (WG.AscendChars && typeof WG.AscendChars.activePower === 'function') {
+      pwr += WG.AscendChars.activePower();
     }
     // Equipment
     for (const slot of ['melee','ranged','pet']) {
@@ -84,9 +92,10 @@
       const wep = WG.HuntWeapons && WG.HuntWeapons.byId(id);
       if (wep) pwr += wep.power || 0;
     }
-    // Forge buildings
+    // Forge buildings — each placed building contributes level × 50 to Power
+    // (spec §9 marker: matches scr_02 economy — Power 1347 with mid-tier buildings).
     for (const b of state.forge.buildings) {
-      if (b.unlocked) pwr += b.level * 6;
+      if (b.unlocked) pwr += b.level * 50;
     }
     // Relics
     for (const id in state.relics.owned) {

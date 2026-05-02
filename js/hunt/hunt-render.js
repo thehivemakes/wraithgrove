@@ -38,6 +38,13 @@
   }
 
   function addTrauma(amt) { _trauma = Math.min(1, _trauma + amt); }
+
+  // W-FX-Polish-Pass — gap 2: HUD pill ghost track. When a buff expires or is
+  // consumed, push a ghost entry that desaturates and fades over 280ms instead
+  // of snap-removing. The active list (WG.Buffs.list()) prunes the buff
+  // immediately, so without this the pill just vanished mid-frame.
+  const BUFF_GHOST_DUR_MS = 280;
+  const _buffGhosts = []; // { id, short, expiredAt }
   let _lastFrameMs = 0;
 
   // HUD counter pulse — DOPAMINE_DESIGN §1+§2: counter scale-bounce + tint on increment.
@@ -1963,6 +1970,59 @@
       banner.textContent = `Highest Wave Reached: ${high} / ${totalWaves} Waves`;
     }
 
+    // SPEC W-Hard-Tuning-And-Monetization §B — active buff badges. Stack vertically
+    // top-right just under the wave dots. Gold pill, label + remaining seconds.
+    // W-FX-Polish-Pass — gap 2: appended ghost pills (desaturated 280ms fade) so
+    // expiry/consume reads as a closing breath, not a snap-cut.
+    if (window.WG && WG.Buffs && WG.Buffs.list) {
+      const buffs = WG.Buffs.list();
+      const padX = 8, padY = 4, h = 18, gap = 4;
+      let y = 76;
+      ctx.font = 'bold 11px system-ui';
+      for (const b of buffs) {
+        const remTxt = (b.remainingMs === null) ? '★' : Math.ceil(b.remainingMs / 1000) + 's';
+        const text = `${b.short} ${remTxt}`;
+        const tw = ctx.measureText(text).width + padX * 2;
+        const x = w - tw - 8;
+        // Gold gradient pill
+        ctx.fillStyle = 'rgba(60,38,8,0.85)';
+        ctx.fillRect(x, y, tw, h);
+        ctx.strokeStyle = '#f0c060';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x + 0.5, y + 0.5, tw - 1, h - 1);
+        ctx.fillStyle = '#ffe0a0';
+        ctx.fillText(text, x + padX, y + h - padY - 1);
+        y += h + gap;
+      }
+      // Ghost pills: desaturated, fade out, then prune.
+      if (_buffGhosts.length) {
+        const nowMs = performance.now();
+        for (let i = _buffGhosts.length - 1; i >= 0; i--) {
+          const g = _buffGhosts[i];
+          const age = nowMs - g.expiredAt;
+          if (age >= BUFF_GHOST_DUR_MS) { _buffGhosts.splice(i, 1); continue; }
+        }
+        for (const g of _buffGhosts) {
+          const age = nowMs - g.expiredAt;
+          const k = 1 - (age / BUFF_GHOST_DUR_MS); // 1 → 0
+          const text = `${g.short} —`;
+          const tw = ctx.measureText(text).width + padX * 2;
+          const x = w - tw - 8;
+          const prevA = ctx.globalAlpha;
+          ctx.globalAlpha = prevA * k;
+          ctx.fillStyle = 'rgba(40,40,40,0.85)';
+          ctx.fillRect(x, y, tw, h);
+          ctx.strokeStyle = '#808080';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x + 0.5, y + 0.5, tw - 1, h - 1);
+          ctx.fillStyle = '#b8b8b8';
+          ctx.fillText(text, x + padX, y + h - padY - 1);
+          ctx.globalAlpha = prevA;
+          y += h + gap;
+        }
+      }
+    }
+
     // Skill button (DOM): label "Hidden Relic" + cooldown overlay
     const skillBtn = document.getElementById('hunt-skill-btn');
     if (skillBtn) {
@@ -2228,6 +2288,15 @@
         });
       }
     });
+    // W-FX-Polish-Pass — gap 2: track buff expiry/consume for HUD ghost pills.
+    function _ghostFor(id) {
+      const def = (window.WG && WG.Buffs && WG.Buffs.BUFFS) ? WG.Buffs.BUFFS[id] : null;
+      const short = (def && def.short) || (id || '').toUpperCase();
+      _buffGhosts.push({ id, short, expiredAt: performance.now() });
+    }
+    WG.Engine.on('buff:expired',  ({ id }) => _ghostFor(id));
+    WG.Engine.on('buff:consumed', ({ id }) => _ghostFor(id));
+
     WG.Engine.on('construct:built', ({ site }) => {
       addTrauma(0.30);
       WG.Engine.hitPause(80);

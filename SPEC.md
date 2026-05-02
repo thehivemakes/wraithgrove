@@ -329,7 +329,7 @@ Each character has **staged appearances unlocked through Rebirth events** at sta
 - **Third currency name** — currently "cards", should be "ADS" voucher
 - **Stat name** — "Gather" should be "Lumber Efficiency"; "Logging Speed" similarly incorrect
 - **Stat count** — Wraithgrove has 5 stats (Attack/HP/Defense/Crit/Gather); HD source shows only 2 visible at base (Attack + Lumber Efficiency). Reduce to 2 for base, unlock more at higher Ascension
-- **Skin model** — currently 8 separate skins; should be 9-character roster + Rebirth-tier visual progression per character
+- ~~**Skin model** — currently 8 separate skins; should be 9-character roster + Rebirth-tier visual progression per character~~ ✅ shipped 2026-05-01 in W-Roster-And-Rebirth: 9-character catalog with per-character Rebirth-tier ladder, active-character-only bonus, in-place 1.2s portrait crossfade Rebirth modal, Cultivate ladder (800/2880/14400 coins for tiers 2/3/4), 3-col TAP-TO-PLAY picker. Per-character sprite draws still stub portraits — follow-up worker for true sprites.
 - **Boss visuals** — current procedural draws are ellipses; need cloaked humanoid silhouettes (samurai, jiangshi, etc.)
 - **Skill perks (Level Up draft)** — currently generic dmg/cd/maxhp/pickup/speed; should be Turret-related + Movement + Base-Range perks per HD source
 
@@ -340,7 +340,7 @@ Each character has **staged appearances unlocked through Rebirth events** at sta
 - **Catapult building variant** + 5 other locked Buildings tab structures
 - **Wave timer** in HUD active-wave hex
 - **Wave count scaling by stage tier** (5/10/15)
-- **Rebirth-event flow** — character visually upgrades on stage clear
+- ~~**Rebirth-event flow** — character visually upgrades on stage clear~~ ✅ shipped 2026-05-01 in W-Roster-And-Rebirth: stage-clear bumps `player.highestStageCleared`, finishHunt routes through `WG.AscendRebirth.maybeShow` → portrait crossfade + reward chips + Cultivate (coin spend → tier advance) before HuntResults.
 - **Ad-gated Turret weapon pickups** in Battle (separate from construction sites)
 - **Audio system** — engine wired, files not sourced yet (manifest in `audio/MANIFEST.md`)
 - **Real receipt validation** in `worker/worker.js` (Apple StoreKit + Google Play Billing + Stripe)
@@ -368,6 +368,7 @@ Each character has **staged appearances unlocked through Rebirth events** at sta
 
 ## §18 — Changelog
 
+- **2026-05-01 v0.16 — W-Roster-And-Rebirth** — Skin catalog rewrite: 9 characters (lantern_acolyte / sigil_student / horned_oni / paper_priest / silent_seer / scythe_widow / ash_brawler / fox_kabuki / cap_apprentice), each with a 2–4-tier Rebirth ladder, total 25 tier appearances. Active-character-only bonus model implemented. Polish-grade Rebirth event modal with golden border, in-place 1.2s portrait crossfade, sequenced reward chips, and tier-based Cultivate cost ladder (800/2880/14400 coins for tiers 2/3/4). 3-col TAP-TO-PLAY roster picker with active checkmark + scale-bounce. Power readout in HUD now annotates active character + next-tier preview line.
 - **2026-04-29 v0.9** — Trees are barriers (player collision blocks movement until chopped) + scythe rotates 360° continuously around player (Vampire Survivors model). Architect feedback corrections.
 - **2026-04-29 v0.8** — Initial spec written. Map-as-uniform-forest model grounded from Architect in-game screenshot. Tree count target ~600/stage on jittered grid. Construction sites moved to fixed 4-Turret + 1-Campfire array around base.
 - **2026-04-29 v0.7** — Trees rendered as standing pines (was stumps), 40-55 scattered (was 10-14). Architect later flagged this as still wrong (trees should be uniform across map).

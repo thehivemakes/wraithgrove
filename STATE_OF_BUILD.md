@@ -1,6 +1,6 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-01 by W-DayNight-And-Torch
+**Last updated:** 2026-05-01 by W-Buildings-Tab-UI
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
@@ -48,10 +48,10 @@
 - `ascend-render.js` — DOM UI: portrait, skin picker modal, weapon picker per slot, stat upgrade rows, total Power.
 
 ### Forge (`js/forge/` — 4 modules)
-- `forge-buildings.js` — 8-slot grid (Cave/Forge/Campfire unlocked + 5 locked). Idle coin generator tick.
-- `forge-craft.js` — 10-craft batch with RNG drop table + daily crafting cap.
-- `forge-daily.js` — 24-hour daily chest with day-streak rewards.
-- `forge-render.js` — DOM UI: Power readout, daily chest, building grid, crafting station + odds modal.
+- `forge-buildings.js` — 8-slot grid (Cave/Forge/Campfire unlocked + 5 locked). Idle coin generator tick. **GS-gated unlocks** (W-Buildings-Tab-UI 2026-05-01): `DEFS[*].unlockGS` thresholds (500/1500/3000/6000/10000); `tryUnlockByDiamonds` (200💎 bypass) and async `tryUnlockByAd` (rewarded-video unlock via `WG.Ads.showRewardedVideo`).
+- `forge-craft.js` — 10-craft batch with RNG drop table + daily crafting cap. **Tuned to spec baseline** (W-Buildings-Tab-UI 2026-05-01): Forge Lv.1 odds = 70 / 22 / 6 / 1.8 / 0.2 (Common/Rare/Epic/Legendary/Mythic); each Forge level shifts ~2.5% from Common into higher tiers.
+- `forge-daily.js` — 24-hour daily chest with **7-day streak tracker** (W-Buildings-Tab-UI 2026-05-01): `STREAK_REWARDS[7]` ladder, `STREAK_GRACE_MS = 48h` (skip threshold), day 7 hands out a guaranteed Rare relic.
+- `forge-render.js` — DOM UI: diorama canvas (~30vh, procedural cave + pagoda + animated campfire with two-frequency flicker), Power readout in red/orange, 7-day streak pip strip, 8-slot building grid (4×2), building detail modal with 5-row upgrade ladder, polished crafting modal with Craft × 10 + ⓘ Probability Info + material display, locked-slot unlock-flow modal (GS gate + Watch Ad + 200💎 bypass + Cancel), reward count-up animation (rAF, 700ms ease-out cubic), tap scale-bounce on every button. **DOM-based throughout** — diorama canvas is decorative only.
 
 ### Relics (`js/relics/` — 4 modules)
 - `relics-catalog.js` — 48 original relics × 5 rarity tiers (Common 12, Rare 12, Epic 12, Legendary 8, Mythic 4). Stat + value + icon.
@@ -110,7 +110,7 @@
 - Hunt Stage 1 (Lantern Vigil) launches; player visible at center; auto-attack ring fires; enemies spawn from edges; combat works; XP triggers level-up boon draft
 - Player took contact damage 100→90→80 HP confirming enemy contact damage path
 - Ascend tab: portrait, level-up button, ascend button, cultivate button, 3 equipment slots, 5 stats, Power summary (76 with starter loadout)
-- Forge tab: Power readout, Daily Chest claim, 8-slot building grid, crafting station with Craft x10 + Odds button
+- Forge tab: diorama canvas with procedural buildings, Power readout in red/orange (default-state Power = 208 with new building formula), 7-day streak pip strip + chest claim, 8-slot building grid (3 unlocked + 5 GS-locked), anvil station with Craft × 10 + ⓘ Odds → polished crafting modal, locked-slot tap → unlock-flow modal (Watch Ad + 200💎 bypass + GS gate readout)
 - Relics tab: 5 rarity filter tabs, Rare grid (all undiscovered), Forge CTA
 - Duel tab: Bronze rank, 0/5 daily duels, FIND OPPONENT button, full ranked ladder
 - **`runtime.mode`** (W-DayNight-And-Torch 2026-05-01): `'day'` or `'night'`, set in `wg-game.js#buildHuntRuntime()` from the lobby Battle-tab card tap, fixed for the duration of the stage. Day = existing baseline. Night = `NIGHT_SPAWN_MUL` (1.6) × spawn rate, `NIGHT_STAT_MUL` (1.4) × hp/dmg, plus the night overlay + torch system below.
