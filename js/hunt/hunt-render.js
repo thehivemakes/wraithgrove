@@ -1673,17 +1673,21 @@
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.78, Math.max(24, sz + 6), c.hp, c.maxHp);
   }
 
-  // Architect 2026-05-02: Banshee — large ghostly shrieking spirit, Night-only rare.
+  // W-Banshee-Enemy — Architect 2026-05-02: large ghostly shrieking spirit, Night-only rare.
   // Body trapezoid white-violet trailing robe, hollow purple eye glow, flowing dark
-  // hair, pulsing aura. During shriek-charge (c._chargeTimer > 0): expanding ring.
+  // hair, pulsing aura. During shriek-charge (c._chargeTimer > 0): expanding ring +
+  // gaping mouth. Pre-shriek tell: aura sin-pulses faster as shriekTimer < 0.6.
   function drawBanshee(ctx, sx, sy, c) {
+    const fx = _creatureHitFx(c); sx += fx.wobble;
     const t = performance.now() / 1000;
     const sz = c.size;
     const wind = Math.sin(t * 4 + c.x * 0.01) * 4;
     const charging = (c._chargeTimer || 0) > 0;
-    // 3-layer aura
+    const aboutToShriek = !charging && (c._shriekTimer != null) && c._shriekTimer < 0.6;
+    // 3-layer aura — pulses faster when about to shriek
+    const auraPulse = aboutToShriek ? Math.sin(t * 18) * 0.10 : Math.sin(t * 2) * 0.04;
     for (let i = 3; i > 0; i--) {
-      ctx.fillStyle = `rgba(160, 96, 255, ${0.10 + Math.sin(t * 2 + i) * 0.04})`;
+      ctx.fillStyle = `rgba(160, 96, 255, ${0.10 + auraPulse * (i / 3)})`;
       ctx.beginPath(); ctx.arc(sx + wind, sy, sz * 0.7 + i * 6, 0, Math.PI*2); ctx.fill();
     }
     // Drop shadow
@@ -1737,7 +1741,8 @@
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(sx + wind, sy, ringR, 0, Math.PI*2); ctx.stroke();
     }
-    // HP bar above
+    _creatureFlash(ctx, sx, sy, sz, fx.flash);
+    // HP bar above (Banshee 220 HP — needs visible gauge)
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(28, sz+8), c.hp, c.maxHp);
   }
 

@@ -525,6 +525,14 @@
   // render to pick up. Emits construction:built for FX hooks.
   const CONSTRUCT_RADIUS = 28;       // matches drawConstructionSites r
   const CONSTRUCT_TICK_S = 0.22;     // time per wood consumed (faster = more responsive)
+
+  // W-Building-Repair — hover-repair tunables. Architect monetization hook:
+  // could later sell ad-buff "repair 2× speed" by halving REPAIR_RATE while
+  // a buff is active. All named constants — no magic numbers in render/UI.
+  const REPAIR_HOVER_DELAY = 3.0;   // seconds player must stand near before repair starts
+  const REPAIR_RATE        = 0.25;  // seconds per wood consumed during repair
+  const REPAIR_HP_PER_WOOD = 8;     // HP restored per wood spent
+  const REPAIR_RANGE       = 36;    // world units — proximity threshold (slightly past CONSTRUCT_RADIUS)
   function constructionTick(dt) {
     if (runtime.pendingLevelUp) return;
     if (!window.WG.HuntRender || !WG.HuntRender.getStageProps || !runtime.stage) return;
@@ -572,11 +580,67 @@
     }
   }
 
+  // W-Building-Repair — hover-repair for damaged built turrets. Mirrors the
+  // constructionTick proximity-drain pattern: stand within REPAIR_RANGE for
+  // REPAIR_HOVER_DELAY seconds, then wood drains at REPAIR_RATE consuming
+  // REPAIR_HP_PER_WOOD HP per wood until full HP or wood-out. Player leaving
+  // range resets both timers (no resume-from-partial-progress).
+  //
+  // Edge cases:
+  //   - pendingLevelUp gates repair (matches autoAttack/constructionTick).
+  //   - Campfires (no hp/maxHp) skipped via type check.
+  //   - Multiple damaged turrets in range: each ticks independently.
+  //   - HP already full: timers cleared so a fresh damage event starts the
+  //     hover delay over (player must re-enter intent).
+  function repairTick(dt) {
+    if (runtime.pendingLevelUp) return;
+    if (!window.WG.HuntRender || !WG.HuntRender.getStageProps || !runtime.stage) return;
+    const props = WG.HuntRender.getStageProps(runtime.stage);
+    if (!props.constructions) return;
+    const p = runtime.player;
+    for (const c of props.constructions) {
+      if (!c.built || c.type !== 'turret') continue;
+      if (typeof c.hp !== 'number' || typeof c.maxHp !== 'number') continue;
+      if (c.hp >= c.maxHp) {
+        c.repairHover = 0;
+        c.repairDrainTimer = 0;
+        continue;
+      }
+      const dx = p.x - c.x, dy = p.y - c.y;
+      const inRange = (dx*dx + dy*dy) <= REPAIR_RANGE * REPAIR_RANGE;
+      if (!inRange) {
+        c.repairHover = 0;
+        c.repairDrainTimer = 0;
+        continue;
+      }
+      c.repairHover = (c.repairHover || 0) + dt;
+      if (c.repairHover < REPAIR_HOVER_DELAY) continue;
+      // Hover threshold reached. Drain wood at REPAIR_RATE.
+      if ((runtime.runWood || 0) <= 0) continue;
+      c.repairDrainTimer = (c.repairDrainTimer || 0) + dt;
+      while (c.repairDrainTimer >= REPAIR_RATE) {
+        c.repairDrainTimer -= REPAIR_RATE;
+        if ((runtime.runWood || 0) <= 0) { c.repairDrainTimer = 0; break; }
+        runtime.runWood = Math.max(0, runtime.runWood - 1);
+        c.hp = Math.min(c.maxHp, c.hp + REPAIR_HP_PER_WOOD);
+        WG.Engine.emit('repair:tick', { site: c, x: c.x, y: c.y });
+        if (c.hp >= c.maxHp) {
+          c.hp = c.maxHp;
+          c.repairHover = 0;
+          c.repairDrainTimer = 0;
+          WG.Engine.emit('repair:complete', { site: c, x: c.x, y: c.y });
+          break;
+        }
+      }
+    }
+  }
+
   function tick(dt) {
     if (!runtime || !runtime.player || runtime.player.hp <= 0) return;
     autoAttack(dt);
     pickupTick(dt);
     constructionTick(dt);
+    repairTick(dt);
     // Turret auto-fire + campfire HP regen — owned by W-Turret-And-Campfire-Combat
     // worker. Runs after constructionTick so a turret completed this tick begins
     // ticking next frame, not the same one (prevents fire-during-build edge cases).
@@ -585,6 +649,15 @@
     tickTorch(dt);
   }
 
+  // Render reads REPAIR_HOVER_DELAY + REPAIR_RANGE through here so there's a
+  // single source of truth (matches WG.HuntTurret.TUNABLES pattern).
+  const REPAIR_TUNABLES = Object.freeze({
+    REPAIR_HOVER_DELAY, REPAIR_RATE, REPAIR_HP_PER_WOOD, REPAIR_RANGE,
+  });
+
   function init() {}
-  window.WG.HuntPlayer = { init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice };
+  window.WG.HuntPlayer = {
+    init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice,
+    REPAIR_TUNABLES,
+  };
 })();

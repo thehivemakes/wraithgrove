@@ -57,6 +57,10 @@
     { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
     // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
     { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
+    // W-Banshee-Enemy — boss_die.mp3 is a placeholder until a dedicated
+    // banshee_screech.mp3 is sourced. throttleMs gates rapid-fire shrieks if
+    // multiple banshees ever stack (cap is 1 alive but defensive).
+    { event: 'enemy:shriek',          id: 'boss_die',      bus: 'sfx', throttleMs: 600, vol: 0.85 },
   ];
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.

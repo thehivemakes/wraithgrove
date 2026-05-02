@@ -104,9 +104,32 @@
     return safe;
   }
 
+  // W-Banshee-Enemy — 5% rare-roll for the banshee scare per spawn-tick.
+  // Night-only and capped at 1 alive at a time per stage. Counts banshees alive
+  // in runtime.creatures rather than tracking a counter — kill bookkeeping is
+  // already in the engine via hp<=0; an explicit counter would have to be
+  // decremented on every cleanup path.
+  function _rollBanshee(runtime) {
+    if (runtime.mode !== 'night') return null;
+    const TYPES = WG.HuntEnemies.TYPES;
+    if (!TYPES.banshee) return null;
+    if (Math.random() >= 0.05) return null;
+    let alive = 0;
+    for (const c of runtime.creatures) {
+      if (c.type === 'banshee' && c.hp > 0) { alive++; if (alive >= 1) return null; }
+    }
+    return 'banshee';
+  }
+
   function spawnOne(runtime, stage) {
-    const types = _modeMixFor(runtime, stage);
-    const t = types[Math.floor(Math.random() * types.length)];
+    const rare = _rollBanshee(runtime);
+    let t;
+    if (rare) {
+      t = rare;
+    } else {
+      const types = _modeMixFor(runtime, stage);
+      t = types[Math.floor(Math.random() * types.length)];
+    }
     // Pick spawn point near map edge, away from player
     const W = runtime.mapW, H = runtime.mapH;
     const p = runtime.player;
