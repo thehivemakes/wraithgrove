@@ -1,0 +1,52 @@
+# W-Horror-Direction-Research.done
+
+**Completed:** 2026-05-02
+**Worker:** Fresh Sonnet, scheduled task `w-horror-direction-research`
+**Protocol:** Hive 9x3x3 (3 rounds × 3 queries × 3 AIs = 27 queries) — Gemini 2.5 Flash with Search grounding (default), Perplexity Sonar, Brave Search.
+**Herd Lens diagnostic:** Round 1 PASS (P(genuine)≈0.78), Round 2 PASS-CAVEAT (P(genuine)≈0.65, qualitative-heavy), Round 3 CONDITIONAL PASS (P(genuine)≈0.60 — one Perplexity metrics table flagged as likely-fabricated and excluded from the recommendation).
+
+## Recommendation summary
+
+**1. Genre lock:** Eastern folk-horror as host, refined to *Identity-V-shaped* (gothic-asymmetric-arena), not *Onmyoji-shaped* (yokai gacha-RPG). The orchestrator pre-read direction holds; the data-grounded refinement is the shape. Identity V's ~$880M lifetime mobile revenue + 3M MAU is the load-bearing proof point.
+
+**2. Tonal arc:** 4 tiers across 18 stages — CALM (1-3) → UNEASE (4-9) → DREAD (10-14) → HORROR (15-18). Inscryption-style tutorial-as-lulling: the rules taught in calm-tier turn on the player by Stage 4-5. Strategic respite at Stage 11-12 to prevent desensitisation. Stage 18 must change Stage 1 on replay (NG+ pattern, Inscryption Act 3 lesson).
+
+**3. Cross-IP framework — The Rift Pattern (reusable for all future Hive crossovers):**
+- Lore bridge: the Wraithgrove is a *thinning place*; deeper stages thin the veil; eldritch-tier rifts pull characters from other Hive realities across.
+- Visual conformance: ink-wash overlay + canon mark (a single pale eye on the brow) — Wraithgrove's equivalent of Identity V's button-eyes solve.
+- Diminished-state framing: guests are weakened by the rift, speak in fragments, partial abilities. Preserves host-tone, prevents power-creep, justifies their absence after the event.
+- Cap: 2 eldritch-tier unlocks/year. Each must be a narrative event with a signature mechanic, never cosmetic-only.
+
+**4. Ysabel-specific (KingshotPro AI advisor → Wraithgrove):** Cast as "Cartographer of Lost Kingdoms" — mid-stage Oracle (Stage 12-14 NPC counsel). Rift Sigil drop from Stage 12+ bosses unlocks her for the next run. **CRITICAL: hold the Ysabel debut until KingshotPro has shipped to a real user base.** Ship Wraithgrove with the Rift mechanic plumbed and Sigil drop-table populated, but the first guest unannounced. The cross-IP marketing-lift premise fails if KingshotPro has no audience to cross over from.
+
+**5. Top risks:**
+- KingshotPro readiness gating Ysabel debut (HIGH likelihood, HIGH severity)
+- Stage 1 first-90s containing zero horror cues — D1 retention loss otherwise (HIGH/HIGH)
+- Aesthetic mismatch between Simli AI video Ysabel and hand-illustrated folk-horror — solved by two-layer media split (Simli for meta-layer advisor screen, 2D static art for in-arena)
+- Brand erosion if cross-IP becomes a treadmill — solved by 2/year cap
+
+**6. Explicit non-findings (honesty audit):**
+- No primary D1/D7/D30 retention data for any Eastern folk-horror mobile title (inferred from sustained revenue only)
+- No primary ARPU data
+- Perplexity Round 3 Q3 produced a too-clean metrics table (15% DAU lift, 20% D7 lift, $5M+ revenue, 30% DAU uplift) — flagged as likely-fabricated, excluded from the recommendation
+- No primary developer postmortems for Limbo/Inside/Inscryption/Mortuary Assistant calm-onboarding (mechanism reconstructed from community design analyses)
+
+## Disagreement note (per protocol)
+
+The orchestrator pre-read was directionally correct. The contribution of this research is the *refinement*: pinning the genre to Identity-V-shaped gothic-asymmetric folk-horror (not Onmyoji-shaped), specifying the 4-tier tonal progression, and articulating the Rift Pattern as a reusable Hive-wide cross-IP mechanic with the diminished-state and 2/year-cap discipline that competitor patterns lack.
+
+## Deliverable
+
+Full decision document: [`docs/HORROR_DIRECTION_v1.md`](../../docs/HORROR_DIRECTION_v1.md)
+
+## What the Architect must ratify before any character/genre commit
+
+1. Genre lock: Identity-V-shaped Eastern folk-horror (✓ recommend ratify)
+2. 4-tier tonal arc with NG+ Stage 18 (✓ recommend ratify)
+3. Rift Pattern as reusable Hive cross-IP mechanic (✓ recommend ratify)
+4. Diminished-state framing for all guests (non-negotiable in spec) (✓ recommend ratify)
+5. **Hold Ysabel debut until KingshotPro ships** (recommend ratify — alternative is to ship in tandem)
+6. 2 eldritch-tier unlocks/year cap (recommend ratify)
+7. Should we run a 9x3x3 Round 2 follow-up to source primary retention data for Eastern folk-horror titles before any character work begins? (Architect's call — research worker neither requires nor opposes.)
+
+NO CODE CHANGES this worker. Pure research + decision doc as specified.

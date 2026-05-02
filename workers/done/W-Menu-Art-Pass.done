@@ -1,0 +1,143 @@
+# W-Menu-Art-Pass — DONE
+
+**Architect 2026-05-02**: "Spin up a sonnet to fix the graphics on the menu to look beautiful in terms of what's in the picture. For stage selection, we need it to look beautiful. And the character there, too."
+
+Replaced the gradient-blob + CSS-triangle hero with painterly canvas-rendered biomes + actual character sprite + atmospheric polish. Reference frame: Wood Siege "Ghost Marriage" home.
+
+## Commits
+
+| # | SHA | Concern |
+|---|-----|---------|
+| A | `6c00e2c` | Canvas-rendered biome backgrounds (6 biomes, animated) |
+| B | `a0f5007` | Canvas character preview (drawMenuCharacter, tier-tinted) |
+| C | `8a4ff33` | Polish — vignette, glyphic divider, BATTLE pulse, dot gap |
+| D | (this commit) | Asset slot hooks — BIOME_ART / CHARACTER_PORTRAITS / RIFT_BIOMES |
+
+## Concern A — Biome backgrounds
+
+Replaced the two `<div>` gradients + 6 CSS triangle trees in `renderHero()` with a single DPR-aware `<canvas>` driven by a 60fps `requestAnimationFrame` loop. Six biome painters, each with a layered parallax background + 3-5 atmospheric props + subtle animation:
+
+| Biome | Sky | Mid silhouette | Foreground | Animation |
+|-------|-----|---------------|------------|-----------|
+| `forest_summer` | green-deep gradient + mist band | distant pagoda + 7 pine ridge | grass-stipple floor | 4 paper lanterns bob @ 1.4 Hz with warm radial glow |
+| `forest_autumn` | amber-rust gradient | wavy ridge + 5 maple silhouettes (3-ellipse crowns) | leaf-litter stipple | 14 falling leaves drift + sway downward |
+| `cold_stone` | blue-grey gradient | 8-peak jagged mountains with white snow caps | 5 ice spires + snow stipple | 22 snowflakes drift downward with horizontal sway |
+| `temple` | red-brown gradient | 3-tier pagoda silhouette dominating mid-frame | sand-stone stipple | 18 ember motes rise upward with brightness pulse |
+| `cave` | black-purple gradient | top ceiling silhouette + 7 stalactites + edge highlights | wet rock + 5 stalagmites | water-drip glints flash on stalactite tips periodically |
+| `eldritch` | deep-violet gradient | violet star field + 6 broken sigil shards on horizon | violet-stone floor | 4 sigil glyphs (circle + crosshair) pulse @ 2.5 Hz |
+
+All painters take `(ctx, w, h, t, isNight, pal)`. Night mode darkens each biome's palette without changing structure. Deterministic `_hash(i)` pseudo-noise lets stipple/star fields stay still across frames without storing arrays.
+
+**rAF lifecycle**: module-scope `_menuRaf`, `cancelMenuLoop()` called from:
+- `renderHero()` re-entry (carousel arrow / mode pill change)
+- `switchTab(tab !== 'hunt')` (leaving Hunt)
+- `startHunt()` (entering a stage)
+- `document.visibilitychange` (background tab → save CPU)
+
+Verified no leak: after switching to Forge, canvas pixel sample stayed identical for 300ms; after returning to Hunt, character canvas pixel sums drifted across 3 samples (idle bob alive). Zero console errors.
+
+## Concern B — Character preview
+
+Replaced the `radial-gradient` blob `<div>` with a 96×140 `<canvas>` overlaid on the biome canvas at `bottom:18%`, centered. `drawMenuCharacter(ctx, cx, cy, t, color, accent)` mirrors the body of `hunt-render.js` `drawAnimeGirl` (legs / skirt / shirt / sash / arms / head / hair / eyes) at 2× scale, idle facing-S — no rotating scythe (this is the at-rest menu pose).
+
+**Tier-derived tinting**: reads `WG.AscendSkins.currentTier(activeId)` and uses `tier.color` for the skirt + `tier.accent` for sash, shoes, hair ribbon. Gives each unlockable character (lantern_acolyte through cap_apprentice) visible identity in the preview without needing per-character sprite assets. Falls back to `pal.accent` if no tier resolved.
+
+**Idle bob**: `Math.sin(t * 2π / 1.5) * 2` px Y offset (2px @ 1.5s period). Soft ground shadow ellipse `(14×4)*scale` at 45% black for contact weight. Tiny rim-light dot on cheek for liveness.
+
+## Concern C — Polish
+
+**Vignette** (`renderHero`): radial-gradient `<div>` overlay, `mix-blend-mode: multiply`, opacity 0.4 — drops focus toward frame center without crushing biome art. Sits at z-index 2, between biome canvas (z 1) and chrome (z 3).
+
+**Glyphic title divider**: stage name now sits above a three-piece divider (gradient line ↔ glowing accent dot ↔ mirrored gradient line), tinted with the biome accent. Reads as a "place" header instead of plain text.
+
+**Carousel dots**: gap tightened 4 → 5px (matches 18-stage row breathing room) + z-index bumped to 3 so vignette doesn't dim them.
+
+**BATTLE button pulse**: new `@keyframes battlePulse` in `index.html` throbs the ember-orange box-shadow on a 2s ease-in-out cycle (12px → 22px blur, 0.45 → 0.80 opacity). Applied only when stage is unlocked; lock branch strips animation.
+
+## Files touched
+
+- `js/wg-game.js` — biome painters, drawMenuCharacter, canvas wiring, vignette/divider/dot polish, cancelMenuLoop wiring (switchTab + startHunt + visibilitychange)
+- `index.html` — `@keyframes battlePulse` (8 lines added)
+
+Spec-allowed scope held: zero edits to mechanics catalogs, hunt-render, hunt-stage, hunt-enemies. Mode pills, carousel logic, lock progression, modals all untouched.
+
+## Verification
+
+```
+node --check build-v2/js/wg-game.js  → OK
+grep -cE "renderHero|cancelAnimationFrame|drawMenuCharacter|battlePulse|paintBiome_" → 24 occurrences
+```
+
+Browser smoke test on `http://localhost:3996/`:
+- ✅ Stage 1 (forest_summer): pagoda + lanterns + pines + character render
+- ✅ Stage 4 (cold_stone): peaks + snow caps + ice spires + drift snow
+- ✅ Stage 7 (forest_autumn): maple silhouettes + falling leaves
+- ✅ Stage 10 (temple): 3-tier pagoda + ember motes
+- ✅ Stage 13 (cave): stalactites + stalagmites + drip glints
+- ✅ Stage 16 (eldritch): broken sigils + pulsing sigil glyphs
+- ✅ Locked stage 17: lock overlay + "🔒 LOCKED" button + animation stripped + biome still painting underneath
+- ✅ Switch to Forge: rAF cancelled (300ms pixel sample identical)
+- ✅ Switch back to Hunt: rAF restarted (character canvas pixel sums drift)
+- ✅ Zero console errors throughout
+
+## Concern D — Asset slot hooks (Architect 2026-05-02)
+
+Architect locked visual direction: **ukiyo-e meets dark illustration** for menus
+(painterly, paper-textured, ink-line, washed color). Combat keeps current
+sprites. Procedural canvas from A-C is the immediate shipping path; illustration
+commissions / AI-generated + cleaned art swap in via these hooks zero-rewrite.
+
+**Three constants at the top of the menu paint block (`js/wg-game.js` ~line 351):**
+
+```js
+const BIOME_ART = {
+  forest_summer: null, forest_autumn: null,
+  cold_stone:    null, temple:        null,
+  cave:          null, eldritch:      null,
+};
+const CHARACTER_PORTRAITS = {};
+const RIFT_BIOMES = new Set();
+```
+
+Setting any value to a URL replaces the procedural path with an `<img>` overlay
+(`decoding="async"`, `loading="lazy"`); the procedural canvas remains as the
+in-DOM fallback. On `load` → procedural canvas hidden. On `error` → img is
+removed from the DOM and the procedural path stays visible.
+
+**Cross-IP rift intrusion** — when `stage.biome` is in `RIFT_BIOMES`, the
+biome image **and** character portrait carry the `wg-rift-intrude` class:
+
+```css
+.wg-rift-intrude {
+  filter: drop-shadow(0 0 8px rgba(192,96,255,0.6)) hue-rotate(15deg);
+  animation: wgRiftGlitch 3.5s steps(1, end) infinite;
+}
+@keyframes wgRiftGlitch { /* 80ms pixel offset every ~3.5s */ }
+```
+
+Marks "this character / place doesn't fully belong" — violet drop-shadow + a
+brief 80ms transform shake every ~3.5s. The keyframe owns `transform`, so
+Concern D restructured the character portrait from `transform: translateX(-50%)`
+centering to `left: calc(50% - 48px)` so the glitch shake doesn't undo the
+centering on rift biomes.
+
+**Header comment in `wg-game.js`** documents the slot:
+
+```
+// ART SLOTS: Set BIOME_ART[id] / CHARACTER_PORTRAITS[id] to a URL when
+// illustrated assets ship. Cross-IP intrusions trigger violet drop-shadow +
+// glitch keyframe.
+```
+
+**Files touched (Concern D):**
+- `js/wg-game.js` — three slot consts + biome img branch + portrait img branch + portrait centering restructure (`translateX(-50%)` → `left: calc(50% - 48px)`)
+- `index.html` — `.wg-rift-intrude` rule + `@keyframes wgRiftGlitch`
+
+**Verification (Concern D):**
+- `node --check build-v2/js/wg-game.js` → OK
+- Live preview after reload, all slots null:
+  - 2 canvases, 0 imgs (procedural path active)
+  - Carousel scroll across stages 1→6 (Lantern Vigil → Pale Crossing → Hollow Shrine → Frostbound Watch → Glacier Mouth → Throat of Ice) — biomes render distinctly, no img elements appear
+  - `getComputedStyle('.wg-rift-intrude')` resolves: `filter: drop-shadow(... rgba(192,96,255,0.6) 0 0 8px) hue-rotate(15deg)`, `animation-name: wgRiftGlitch`, `animation-duration: 3.5s`
+  - Locked Stage 6 still renders biome + lock overlay + suppressed BATTLE pulse
+  - Zero console errors
