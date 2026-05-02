@@ -1,7 +1,7 @@
 # Wraithgrove SPEC — Wood Siege clone, current truth
 
-**Last updated:** 2026-05-01 (Architect locked Q&A)
-**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.12.0-construction-build`)
+**Last updated:** 2026-05-01 (v0.15.1 roster catalog — orchestration runtime stalled)
+**Live build:** https://defimagic.io/wraithgrove/ (cache-bust `0.15.1-roster-catalog`)
 
 ## §0 — ARCHITECT-LOCKED ARCHITECTURE TRUTHS (2026-05-01)
 
