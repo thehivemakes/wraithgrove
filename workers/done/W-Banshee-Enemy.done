@@ -1,0 +1,53 @@
+# W-Banshee-Enemy — DONE
+
+Architect 2026-05-02: "We need a shrieking scary banshee randomly attack and go nuts and is big."
+
+## Type entry — js/hunt/hunt-enemies.js
+
+`WG.HuntEnemies.TYPES.banshee` — name 'Banshee', hp 220, damage 22, speed 130, size 36, xp 30, color #e8e0f0, accent #a060ff, ai 'banshee_charge', mode 'night', rare:true, shriekCooldown 4.0, cooldown 1.0.
+
+## AI behavior — banshee_charge
+
+Per-tick branch in `tickOne`:
+- Erratic chase: forward velocity toward player + sin-wave perpendicular lateral (40% of base speed) — feels frenzied, hard to predict.
+- Every shriekCooldown (4s): emit `enemy:shriek`, then enter 0.8s charge state (1.8× speed straight at player). On charge end, resume erratic.
+- Contact damage uses the standard cooldown timer.
+- Polish on shriek-fire (the dopamine peak): trauma 0.3 + 16-particle violet `pickupFragment` HuntFX burst + screen flash `#a060ff` @ 0.3 alpha for 200ms.
+
+## Sprite — drawBanshee in js/hunt/hunt-render.js
+
+- Size 36 — visually 2× normal enemies.
+- 3-layer purple aura behind body, sin-pulsing; pulses faster when about to shriek (shriekTimer < 0.6) as a visual tell.
+- Wind-shifted white-violet trapezoidal robe + violet-tinted shadow side.
+- 5 flowing dark hair strands, quadratic Bezier curves driven by sin-wave wind.
+- Pale violet head with hollow black eye sockets and additive purple eye glow (sin-pulsed).
+- Gaping dark mouth — wider during charge.
+- Expanding purple ring during the 0.8s charge (radius grows from 0 → 50px).
+- Shared `_creatureHitFx()` wobble + `_creatureFlash()` white-additive hit-flash.
+- HP bar above head (Banshee 220 HP — visible gauge needed).
+- Dispatch case added to `drawCreatures` switch.
+
+## Audio — js/core/wg-audio.js
+
+EVENT_MAP entry: `enemy:shriek` → `boss_die` (placeholder, sfx bus, throttle 600ms, vol 0.85). Comment notes file is placeholder until a dedicated `banshee_screech.mp3` is sourced.
+
+## Spawn config — js/hunt/hunt-waves.js
+
+`_rollBanshee(runtime)` — 5% per spawn-tick when `runtime.mode === 'night'`, capped at 1 alive at a time (linear scan of `runtime.creatures` — explicit counter would require extra cleanup-path bookkeeping). Result wired into `spawnOne` ahead of the standard mode-mix roll.
+
+## Commits
+
+- A — `ed651a9` W-Banshee-Enemy A — banshee type entry + banshee_charge AI (this commit also carried the polish FX wiring).
+- B — drawBanshee sprite + dispatch landed in `7520eaf` (W-Building-Repair B). The parallel Building-Repair worker captured the shared working tree on commit, so the banshee render-side work shipped under that commit's banner. The polish edits (`_creatureHitFx` + `_creatureFlash` + faster aura pulse) are present in HEAD.
+- C — `<this commit>` W-Banshee-Enemy C — `enemy:shriek` audio mapping + 5% rare-roll Night-only banshee spawn rule + done marker.
+
+## Constraints honored
+
+- Night-only and rare — feels like a SCARE, not a fixture (5% per tick, max 1 alive).
+- No other enemy types touched.
+- No new files created (extended existing modules + this marker).
+- One concern per commit on the work I owned end-to-end (A and C).
+
+## Cross-worker note
+
+`wraith_fast` and `skull_swarmer` entries in `hunt-enemies.js` and their sprites/dispatch cases in `hunt-render.js` belong to the parallel `W-Spawn-Tuning` worker. They were already in the working tree when I arrived and were folded into `7520eaf` by the Building-Repair worker's commit (out of all our control — see `feedback_dont_push_other_claude.md`). Those entries are NOT my work; the W-Spawn-Tuning worker still owns its remaining concerns (waves spawn-rate boost + per-stage enemyMix updates + their own marker).

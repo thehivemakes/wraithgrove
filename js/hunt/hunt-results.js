@@ -4,6 +4,33 @@
   const REVIVE_COUNTDOWN_SEC = 5;     // dramatic 5s window before stage truly ends
   const REVIVE_LIMIT_PER_RUN = 1;     // one ad-revive per stage run
 
+  // W-Dopamine-P1 §C — count-up animation. ease-out cubic, 800ms default.
+  // Emits ui:button at each 25% milestone for tick audio.
+  function tweenCounter(el, target, durationMs) {
+    if (!el || !(target > 0)) return;
+    const start = performance.now();
+    const milestones = [0.25, 0.5, 0.75, 1.0];
+    let lastMile = 0;
+    function step(now) {
+      const t = Math.min(1, (now - start) / durationMs);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      el.textContent = String(Math.round(target * ease));
+      while (lastMile < milestones.length && t >= milestones[lastMile]) {
+        if (window.WG && WG.Engine) WG.Engine.emit('ui:button', {});
+        lastMile++;
+      }
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function comboTierColor(n) {
+    if (n >= 20) return '#ff4040';
+    if (n >= 10) return '#ff8c00';
+    if (n >= 5)  return '#ffd870';
+    return '#f0d890';
+  }
+
   function show(opts) {
     // opts: { stageId, cleared, mins, kills, rewards }
     const root = document.getElementById('modal-root');
@@ -36,15 +63,22 @@
           ` : ''}
           <div style="display:flex;justify-content:space-around;margin-bottom:8px;">
             <div><div style="font-size:11px;color:#a89878;">SURVIVED</div><div style="font-size:18px;color:#f0d890;">${(opts.mins||0).toFixed(1)}m</div></div>
-            <div><div style="font-size:11px;color:#a89878;">KILLS</div><div style="font-size:18px;color:#f0d890;">${opts.kills||0}</div></div>
+            <div><div style="font-size:11px;color:#a89878;">KILLS</div><div id="hr-kills" style="font-size:18px;color:#f0d890;">0</div></div>
           </div>
           <div style="font-size:11px;color:#a89878;text-align:center;margin-bottom:6px;">REWARDS</div>
           <div style="display:flex;justify-content:center;gap:14px;font-size:13px;">
-            ${r.coins?`<div>🪙 ${r.coins}</div>`:''}
+            ${r.coins?`<div>🪙 <span id="hr-coins">0</span></div>`:''}
             ${r.diamonds?`<div>💎 ${r.diamonds}</div>`:''}
             ${r.cards?`<div>🎴 ${r.cards}</div>`:''}
             ${r.fragments?`<div>✦ ${r.fragments}</div>`:''}
+            ${r.riftSigils?`<div style="color:#c080ff;">🔮 ×${r.riftSigils} Rift Sigil</div>`:''}
           </div>
+          ${(opts.peakCombo > 0) ? `
+            <div style="text-align:center;margin-top:8px;">
+              <span style="font-size:11px;color:#a89878;letter-spacing:1px;">PEAK COMBO</span>
+              <span id="hr-peak-combo" style="font-size:18px;font-weight:900;margin-left:6px;color:${comboTierColor(opts.peakCombo)};">0</span>
+            </div>
+          ` : ''}
         </div>
         <div class="modal-btn-row">
           ${opts.cleared ? '<button class="btn primary" id="hr-next">NEXT STAGE</button>' : '<button class="btn primary" id="hr-retry">RETRY</button>'}
@@ -65,6 +99,11 @@
       document.head.appendChild(st);
     }
     root.appendChild(wrap);
+
+    // W-Dopamine-P1 §C — kick off count-up tweens (800ms each, staggered 80ms)
+    setTimeout(() => tweenCounter(wrap.querySelector('#hr-kills'),     opts.kills || 0, 800), 80);
+    setTimeout(() => tweenCounter(wrap.querySelector('#hr-coins'),     r.coins    || 0, 800), 80);
+    setTimeout(() => tweenCounter(wrap.querySelector('#hr-peak-combo'),opts.peakCombo || 0, 800), 80);
 
     function close() { wrap.remove(); }
 

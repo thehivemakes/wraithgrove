@@ -1,0 +1,74 @@
+# W-Enemy-Catalog — DONE 2026-05-01
+
+Three commits, one concern each.
+
+## Type IDs added (js/hunt/hunt-enemies.js TYPES)
+- `red_zombie`        — day baseline (mode: both, ai: walker, hp 22)
+- `pumpkin_lantern`   — night-only (mode: night, ai: walker, hp 32, retuned)
+- `jiangshi`          — night-only (mode: night, ai: walker, hp 50)
+- `samurai_grunt`     — both modes (mode: both, ai: walker, hp 70, size 22)
+
+Existing five (lurker / walker / sprite / brute_small / caller) gained
+explicit `name` + `mode: 'both'` fields. Absence of `mode` is treated
+as 'both' for back-compat.
+
+## Mode filter (js/hunt/hunt-waves.js)
+`spawnOne` filters the stage's enemyMix by `runtime.mode` using
+`c._typeData.mode`. Filtered list cached on the stage object so the
+filter pass runs once per stage rather than every spawn.
+
+## Stage enemyMix (js/hunt/hunt-stage.js)
+All 18 stages now list day + night ids; the spawner filters at spawn
+time. Day stages effectively get red_zombie + samurai_grunt + classic
+five; night stages add pumpkin_lantern + jiangshi.
+
+## Sprite functions added (js/hunt/hunt-render.js)
+- `_creatureHitFx` / `_creatureFlash` — shared 80ms additive white
+  hit-flash + 200ms damped-sine x-wobble (Architect mandate: hit-flash
+  + small wobble for every enemy type).
+- `drawZombie` (refactored) — used by red_zombie + classic five.
+- `drawPumpkin` (refactored, retained polish) — for pumpkin_lantern.
+- `drawJiangshi` (NEW) — conical straw hat, paper amulet with red
+  brush mark, outstretched sleeve arms, pale green-tinged face,
+  red dot eyes.
+- `drawSamurai` (NEW) — wide red-armor robe with gold seam + hem,
+  dark cuirass with gold rivets, sode shoulder pads, mempo grimace,
+  horned gold kabuto helmet with red dome + crest, katana with
+  tsuba + dark hilt at hip.
+
+## Boss sprite pass (js/hunt/hunt-render.js)
+All six boss draws redone as humanoid silhouettes (head + face +
+robe + arms + identity accessory) rather than colored shapes. Each
+applies the same wobble + flash hit FX via `_bossHitFx` / `_bossFlash`.
+Existing `drawBossAura` halo logic preserved per boss.
+
+- pale_bride: cream gown + translucent veil + red bridal sash + blossom crown
+- frozen_crone: ice-blue robe + frost-rimed hem + 5-shard ice crown
+- autumn_lord: orange under-robe + brown cloak + pumpkin-mask + branching antlers
+- temple_warden: red ceremonial robe + gold trim + bishop cap + pillar staff
+- cave_mother: tattered earth-tone cloak + black-void hood with 6 eye-glints
+- wraith_father: void cloak + bone clasps + crown of thorns + purple-glow pupils
+
+## Verification
+- `node --check` clean on all touched files.
+- Browser smoke test on stage 3 night-mode at http://localhost:3996/:
+  spawned all four new enemy types side-by-side; all read as
+  distinct silhouettes at thumbnail glance (red zombie hood /
+  pumpkin head / jiangshi hat+amulet / samurai gold helmet+horns).
+- Boss pass: each of the six was spawned individually; all read
+  as humanoid figures with their identity accessory.
+- Hit-flash + wobble verified via `WG.HuntEnemies.damage(c, 5)`.
+- No console errors.
+
+## Constraints respected
+- Existing five enemy types untouched in behavior.
+- Numerical tunables stay in `WG.HuntEnemies.TYPES` at module top.
+- One concern per commit, three commits total.
+- Other worker's WIP (W-Turret-And-Campfire-Combat) was stashed
+  before edits and restored after — none of their pending work
+  was committed by this worker.
+
+## Commits
+1. `W-Enemy-Catalog A — 4 new enemy types + per-stage mode filter`
+2. `W-Enemy-Catalog B — sprite draws for jiangshi + samurai + shared hit FX`
+3. `W-Enemy-Catalog C — boss humanoid silhouette pass`

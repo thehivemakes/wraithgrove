@@ -3,12 +3,12 @@
   // SPEC §0 / W-Hard-Tuning-And-Monetization: wave-driven spawning.
   //   - stage.waveCount waves per stage (5 / 10 / 15 by tier — see hunt-stage.js)
   //   - stage.waveDurationSec per wave (90 / 100 / 110)
-  //   - per-wave spawn-rate multiplier compounds 1.5× each wave (WAVE_RATE_MUL)
+  //   - per-wave spawn-rate ramp: rate * (1 + waveIndex0 * WAVE_TIER_RAMP)
   //   - per-wave stat multiplier 1 + (waveIndex0 * WAVE_STAT_BASE) on hp/maxHp/damage
   //   - boss (if any) spawns at the START of the last wave so it shares the
   //     final wave's chaos rather than dropping into an empty arena
-  //   - within a wave, baseRateInWave ramps 0.5 → 1.5 enemies/sec so wave 1
-  //     opens approachable and wave-N tail-end is the brutal moment
+  //   - within a wave, baseRateInWave ramps WAVE_BASE_RATE_MIN → WAVE_BASE_RATE_MAX
+  //     so wave 1 opens approachable and wave-N tail-end is the brutal moment
   //
   // Wave 1 (waveIndex0=0) intentionally gives a 1.0 multiplier on both spawn
   // rate and stat scaling so new players have a foothold per architect mandate.
@@ -17,13 +17,17 @@
   const NIGHT_SPAWN_MUL = 1.6;   // applied to spawn rate when runtime.mode === 'night'
   const NIGHT_STAT_MUL  = 1.4;   // applied to enemy + boss hp/maxHp/damage at spawn
 
-  // Per-wave compounding (named constants — exposed via WG.HuntWaves for tunables doc)
-  const WAVE_RATE_MUL  = 1.5;    // spawn rate × this each wave (compounds)
-  const WAVE_STAT_BASE = 0.18;   // STAT_MUL = 1 + (waveIndex0 * 0.18)
+  // W-Spawn-Tuning 2026-05-02: WAVE_RATE_MUL replaced with linear WAVE_TIER_RAMP
+  // per Architect brief — compounding 1.5^N produced absurd wave-15 rates
+  // (433× base @ within-max). Linear `1 + w0*0.15` keeps late-wave intensity
+  // strong but bounded (3.1× at wave 15). Base rate also bumped 1.4× both
+  // modes for global density boost.
+  const WAVE_TIER_RAMP = 0.15;   // spawn rate *= (1 + waveIndex0 * 0.15)
+  const WAVE_STAT_BASE = 0.18;   // STAT_MUL = 1 + (waveIndex0 * 0.18) — unchanged
 
-  // Within-wave intensity ramp (enemies/sec)
-  const WAVE_BASE_RATE_MIN = 0.5;
-  const WAVE_BASE_RATE_MAX = 1.5;
+  // Within-wave intensity ramp (enemies/sec) — ×1.4 from prior 0.5/1.5 baseline
+  const WAVE_BASE_RATE_MIN = 0.7;
+  const WAVE_BASE_RATE_MAX = 2.1;
 
   function applyNightScaling(runtime, ent) {
     if (!ent || runtime.mode !== 'night') return ent;
@@ -61,7 +65,7 @@
     const w0 = wave.index - 1;
     const within = Math.min(1, wave.elapsedInWave / wave.durationSec);
     const baseRate = WAVE_BASE_RATE_MIN + (WAVE_BASE_RATE_MAX - WAVE_BASE_RATE_MIN) * within;
-    let rate = baseRate * Math.pow(WAVE_RATE_MUL, w0);
+    let rate = baseRate * (1 + w0 * WAVE_TIER_RAMP);
     if (runtime.mode === 'night') rate *= NIGHT_SPAWN_MUL;
 
     runtime.spawnAccum += rate * dt;
@@ -121,16 +125,12 @@
     return 'banshee';
   }
 
-  function spawnOne(runtime, stage) {
-    const rare = _rollBanshee(runtime);
-    let t;
-    if (rare) {
-      t = rare;
-    } else {
-      const types = _modeMixFor(runtime, stage);
-      t = types[Math.floor(Math.random() * types.length)];
-    }
-    // Pick spawn point near map edge, away from player
+  // W-Spawn-Tuning 2026-05-02 — cluster-spawn jitter radius for swarmer types.
+  // 30-unit radius matches the brief's CHARGE polish mandate: tight enough to
+  // read as a single threat-blob, loose enough that 4 imps don't overlap.
+  const CLUSTER_JITTER_RADIUS = 30;
+
+  function _pickEdgePoint(runtime) {
     const W = runtime.mapW, H = runtime.mapH;
     const p = runtime.player;
     let x, y, tries = 0;
@@ -142,11 +142,44 @@
       else                 { x = W - 30;            y = Math.random() * H; }
       tries++;
     } while (tries < 4 && p && Math.hypot(x-p.x, y-p.y) < 200);
-    const e = WG.HuntEnemies.spawn(t, x, y);
+    return { x, y };
+  }
+
+  function _pushSpawn(runtime, type, x, y) {
+    const e = WG.HuntEnemies.spawn(type, x, y);
     if (e) {
       applyWaveScaling(runtime, e);
       applyNightScaling(runtime, e);
       runtime.creatures.push(e);
+    }
+    return e;
+  }
+
+  function spawnOne(runtime, stage) {
+    const rare = _rollBanshee(runtime);
+    let t;
+    if (rare) {
+      t = rare;
+    } else {
+      const types = _modeMixFor(runtime, stage);
+      t = types[Math.floor(Math.random() * types.length)];
+    }
+
+    const { x, y } = _pickEdgePoint(runtime);
+
+    // Cluster spawn for swarm-tagged types (catalog `swarmSize`). POLISH MANDATE:
+    // jitter within CLUSTER_JITTER_RADIUS so the four don't overlap into a
+    // single dot — they should read as a CHARGE pouring in from the edge.
+    const td = WG.HuntEnemies.TYPES[t];
+    const swarm = (td && td.swarmSize > 1) ? td.swarmSize : 1;
+    if (swarm > 1) {
+      for (let i = 0; i < swarm; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * CLUSTER_JITTER_RADIUS;
+        _pushSpawn(runtime, t, x + Math.cos(a) * r, y + Math.sin(a) * r);
+      }
+    } else {
+      _pushSpawn(runtime, t, x, y);
     }
   }
 
@@ -165,7 +198,8 @@
   window.WG.HuntWaves = {
     init, spawnInWindow,
     NIGHT_SPAWN_MUL, NIGHT_STAT_MUL,
-    WAVE_RATE_MUL, WAVE_STAT_BASE,
+    WAVE_TIER_RAMP, WAVE_STAT_BASE,
     WAVE_BASE_RATE_MIN, WAVE_BASE_RATE_MAX,
+    CLUSTER_JITTER_RADIUS,
   };
 })();

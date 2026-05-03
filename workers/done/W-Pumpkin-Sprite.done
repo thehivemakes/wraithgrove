@@ -1,0 +1,15 @@
+W-Pumpkin-Sprite — DONE — 2026-04-28T00:00:00Z
+Files touched: js/hunt/hunt-enemies.js, js/hunt/hunt-render.js
+Commits: 3e9c799 (Concern A), d3971c6 (Concern B)
+Notes:
+- Added cooldown:1.2 to pumpkin_lantern TYPES entry — spec omitted it but
+  tickOne uses t.cooldown for attack timing; without it enemy can't attack.
+- speed:78 kept as spec suggested despite ai:'walker' label — faster than
+  sprite (60). Could be tuned down for a slower creeping register later.
+- hunt-render.js was already modified (unstaged) before this session;
+  Concern B commit includes those prior changes + the new drawPumpkin code.
+  All verified clean with node --check.
+- Sprite design grounded in screenshot_4 night-mode frame: large round
+  orange head, dark stick body, glowing triangular eyes + jagged mouth,
+  per-creature sin-wave glow pulse to avoid group sync.
+- Not added to any stage enemyMix — that is a separate worker per scope.

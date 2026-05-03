@@ -1,0 +1,91 @@
+# W-Roster-And-Rebirth — DONE 2026-05-01
+
+Worker brief: replace SKINS catalog with 9-character roster, add roster
+picker UI + polished Rebirth-event modal, wire per-character Power and
+Cultivate cost ladder.
+
+## Concerns shipped
+
+- **A** `7033340` W-Roster-And-Rebirth A — replace skin catalog with 9-character roster
+- **B** `a2008e0` W-Roster-And-Rebirth B — roster picker + Rebirth event modal
+- **C** `(this commit)` W-Roster-And-Rebirth C — Cultivate cost ladder + Power readout + done marker
+
+## Catalog summary
+
+9 characters, 25 total Rebirth tiers (catalog in `js/ascend/ascend-skins.js`).
+
+| id                | archetype       | name             | tiers |
+|-------------------|-----------------|------------------|------:|
+| lantern_acolyte   | schoolgirl      | Lantern Acolyte  | 4 |
+| sigil_student     | white_haired    | Sigil Student    | 3 |
+| horned_oni        | samurai         | Horned Oni       | 3 |
+| paper_priest      | jiangshi        | Paper Priest     | 3 |
+| silent_seer       | seated_grim     | Silent Seer      | 2 |
+| scythe_widow      | hooded_reaper   | Scythe Widow     | 3 |
+| ash_brawler       | afro_brawler    | Ash Brawler      | 2 |
+| fox_kabuki        | fox_mask        | Fox Kabuki       | 3 |
+| cap_apprentice    | cap_boy         | Cap Apprentice   | 2 |
+
+Default unlocked: lantern_acolyte at tier 1. Others gated by IAP cost
+(60–500 diamonds) and stage-clear progression (Rebirth tier gate).
+
+## Files touched
+
+- `js/ascend/ascend-skins.js` — SKINS → CHARACTERS catalog, new API
+  (list, get, setActive, currentTier, tryUnlock, tryRebirth, rebirthCost,
+  activeBonus, activePower). Legacy AscendSkins aliases preserved.
+- `js/ascend/ascend-rebirth.js` (NEW) — full-screen Rebirth modal with
+  golden-pulsing border, in-place 1.2s portrait crossfade through a
+  flash burst, sequenced reward chips (180ms stagger), Cultivate /
+  Continue buttons.
+- `js/ascend/ascend-render.js` — 3-col TAP-TO-PLAY roster picker
+  (active checkmark + scale-bounce on tap), HUD power readout
+  annotated with active character tier + next-tier marker / cultivate
+  cost.
+- `js/core/wg-state.js` — initial state migrated to activeCharacter +
+  ownedCharacters + characterTiers + highestStageCleared.
+  recomputePower delegates to AscendChars.activePower().
+- `js/duel/duel-roster.js` — opponent skin pool drawn from new 9-char
+  catalog.
+- `js/wg-game.js` — finishHunt bumps highestStageCleared on cleared
+  and routes through AscendRebirth.maybeShow before HuntResults.
+- `index.html` — ascend-rebirth.js added to module loader.
+- `MobileGameResearch/wood-siege/SPEC.md` — §16 entries crossed off,
+  §18 changelog v0.16 entry added.
+
+## Cultivate cost ladder
+
+`WG.AscendChars.rebirthCost(charId)` resolves the next-tier cost from
+`CULTIVATE_LADDER = { 2: 800, 3: 2880, 4: 14400 }`, with a `power × 12`
+fallback for any future tier 5+. Tier 3's 2880 anchors SPEC §8's
+quoted Cultivate cost.
+
+## Verified live
+
+Tested in-browser at the wraithgrove preview server (port 3996):
+
+- Picker renders 9 tiles, 1 active (golden border + ✓), 8 locked with
+  diamond costs. TAP TO PLAY label only shows on owned non-active.
+- Rebirth modal shows when `highestStageCleared >= next.requiresStageClear`.
+- Cultivate flow at tier 1 → 2: coins 5000 → 2120 (-2880 wait that's
+  wrong for tier 2 → corrected to 800 in this commit). Diamonds +100.
+  Hammers (craftFragments) +10. characterTiers.lantern_acolyte = 2.
+- isEligible() returns null at max tier and when stage gate not met.
+- HUD power readout shows live "Tier N ready · Cultivate Y🪙" when
+  rebirth is available, "Tier N locked · clear stage X" otherwise.
+- recomputePower returns 208 base / 268 with tier-2 active (correctly
+  picks up `WG.AscendChars.activePower()`).
+
+## Out of scope (follow-up workers)
+
+- Per-character sprite draws — `drawAnimeGirl` is still the schoolgirl
+  tier-1 render for everyone. Each character + tier deserves its own
+  pixel art draw. Stub portraits use tier color/accent for now.
+- Stage-clear free reward grant — currently rewards (100💎 + 10🔨) are
+  granted only when player commits Cultivate. Could grant on stage
+  clear regardless of cultivation, depending on real Wood Siege flow.
+- Ad-watch reward boost — Wood Siege offers a 2× rewards ad-watch on
+  Rebirth events; not implemented here.
+- Per-character Rebirth-tier portrait crossfade uses two stub div
+  shapes. Once real sprites land, swap the stub portrait builders for
+  the real character art.

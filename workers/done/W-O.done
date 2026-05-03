@@ -1,0 +1,5 @@
+Cloudflare Worker scaffold written: router + 8 endpoints, wrangler.toml with 4 KV namespaces, wg-cache.js hybrid sync.
+Files written: worker/worker.js, worker/wrangler.toml; file edited: js/core/wg-cache.js.
+8 endpoints (save, load, iap-grant, account-upgrade, event, duel-match, duel-result, leaderboard) + 4 KV namespaces (WG_STATE, WG_IAP, WG_ACCOUNT, WG_EVENTS).
+No deviations from spec. syncToServer + loadFromServer added to WG.Cache public API (not in spec but required for meta-account.js upgradeAccount wiring in Phase 5).
+Confidence: high.

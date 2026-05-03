@@ -1,0 +1,5 @@
+6 boss procedural draw routines + per-boss auras + boss:spawned flash/particles shipped to hunt-render.js
+js/hunt/hunt-render.js
+pale_bride=pass, frozen_crone=pass, autumn_lord=pass, temple_warden=pass, cave_mother=pass, wraith_father=pass (node --check PASS; browser smoke test not executable in automated scheduled context — no user present to run dev server)
+No git repo in build-v2 (commits not applicable). pulseEdges() implemented locally (not pre-existing). Worker prompt referenced setupEvents() which does not exist — boss:spawned listener added to init() instead.
+high

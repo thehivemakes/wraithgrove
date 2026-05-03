@@ -1,0 +1,5 @@
+Worker G complete: 18-stage difficulty curve re-tuned (durations, enemy mixes, designer notes).
+js/hunt/hunt-stage.js
+Durations: 1:180→150, 2:200→165, 3:240→195, 4:200→195, 5:220→215, 6:260→240, 9:280→270, 10:240→245, 11:260→265, 12:300→295, 13:240→260, 14:280→285; stages 7,8,15,16,17,18 unchanged (already matched spec). Enemy mixes: stage 5 added sprite, stage 6 added lurker, stage 9 added walker, stage 12 added sprite, stage 14 added lurker, stage 17 added sprite, stage 18 added lurker. Notes field added to all 18 stages. Curve comment block added above STAGES table.
+No deviations. bossId, weaponPickups, biome assignments untouched. node --check and live browser eval both verified (stage 1 dur=150, 18 stages, allHaveNotes=true).
+high

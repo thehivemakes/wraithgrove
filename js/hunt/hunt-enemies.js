@@ -30,6 +30,15 @@
     // SPEC §0 register. AI 'banshee_charge': erratic sin-wave pursuit + 0.8s charge
     // every shriekCooldown sec. `rare` flag → wave-spawner 5% pre-roll, max 1 alive.
     banshee:         { name: 'Banshee',        hp:220,speed:130,damage:22, cooldown:1.0, size:36, color:'#e8e0f0', accent:'#a060ff', xp:30, mode:'night', ai:'banshee_charge', rare:true, shriekCooldown:4.0 },
+
+    // W-Spawn-Tuning — Architect 2026-05-02: 2 new types to thicken the mix.
+    // Wraith Stalker: fast Night ghost wisp, light HP, tight hitbox. Drives
+    // dodge-priority panic at scale. Sprite drawn in hunt-render `drawWraithFast`.
+    wraith_fast:     { name: 'Wraith Stalker', hp:18, speed:140,damage:7,  cooldown:1.1, size:14, color:'#404858', accent:'#a8c0e8', xp:4,  mode:'night', ai:'walker' },
+    // Skull Imp: small skeletal swarmer. `swarmSize:4` is read by hunt-waves
+    // spawnOne — when this type is picked, four spawn in a 30-unit jittered
+    // cluster (POLISH MANDATE: feel like a CHARGE, not overlapping pile).
+    skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:0.8, size:12, color:'#e8e0d0', accent:'#3a2010', xp:2,  mode:'both',  ai:'walker', swarmSize:4 },
   };
 
   let nextId = 1;

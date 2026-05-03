@@ -1,0 +1,5 @@
+Capacitor 5 wrap complete: package.json + capacitor.config.ts + .capignore written; iOS (ios/App/) + Android (android/) scaffolds initialized; Capacitor lifecycle (splash/status-bar/app-state) wired into index.html; haptic hooks added to hunt-render.js for player:damaged + boss:defeated events.
+package.json, capacitor.config.ts, .capignore, index.html (Capacitor wiring block), js/hunt/hunt-render.js (haptic listeners), www/ (build output dir), ios/ (Xcode skeleton), android/ (Gradle skeleton), package-lock.json
+npm install (103 packages); npm run build (rsync to www/); npx cap add ios; npx cap add android; npx cap sync ios; npx cap sync android
+DEVIATION: webDir changed from '.' to 'www' — Capacitor 5 rejects '.' as invalid; build script (npm run build) rsyncs web assets to www/ before native sync. Capacitor init skipped (config already present). iOS pod install skipped (CocoaPods not installed — Architect task). Xcode full install required before pod install. --skip-appid-validation flag not available in installed CLI version (unused). player:damaged and boss:defeated were new event listeners (no existing handlers to append to).
+high

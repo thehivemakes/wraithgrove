@@ -1,0 +1,5 @@
+4-step first-play tutorial overlay for Stage 1: shows on first entry, gates on stage1Seen, SKIP/START both dismiss, _tutorialPaused freezes simulation while render continues.
+js/hunt/hunt-tutorial.js (new), js/wg-game.js (startHunt + frame + init + getHuntRuntime + public API), index.html (MODULES loader array)
+PASS — pause integration verified (_tutorialPaused=false after dismiss), state.tutorial.stage1Seen persists (true after START and SKIP), no re-show on second Stage 1 entry, eval reset re-shows correctly
+No git repo present in build-v2 — three commits not possible; all three concerns shipped as file writes in sequence. Boot overlay z-index (200) blocked initial preview_click test; worked around via eval after dismissing boot programmatically.
+high

@@ -1,0 +1,5 @@
+Worker H complete: 20 relic stat values rebalanced to enforce a clean tier-doubling power curve.
+files edited: js/relics/relics-catalog.js
+stat-curve changes: common attack 4→2, 5→3; rare attack 10→7, 12→9; rare hpMax 35→32; rare critRate 0.03→0.023; epic attack 24→17, 28→19, 32→22; epic hpMax 110→95; epic defense 16→15; epic critRate 0.07→0.06; legendary attack 60→38, 80→47, 95→55; legendary hpMax 280→230; legendary defense 40→33; legendary critRate 0.15→0.14; mythic attack 200→135; mythic defense 120→103; stat-curve comment block added above RELICS array; 28 relics already within range left unchanged
+deviations: no git repo present in build-v2/ — commit skipped; file edit confirmed via node --check + browser reload (48 relics, tier counts Common 12 / Rare 12 / Epic 12 / Legendary 8 / Mythic 4 verified, sample values confirmed in live WG.RelicsCatalog, no console errors)
+confidence: high

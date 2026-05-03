@@ -1,0 +1,59 @@
+# W-DayNight-And-Torch — DONE 2026-05-01
+
+Three commits, one concern each. SPEC §0 truths honored.
+
+## Files touched
+
+- `js/hunt/hunt-waves.js` — Concern A
+- `js/hunt/hunt-render.js` — Concern A + Concern B
+- `js/hunt/hunt-player.js` — Concern B
+- `STATE_OF_BUILD.md` — Concern C
+- `workers/done/W-DayNight-And-Torch.done` — Concern C
+
+## Named constants used (all inline at top of their modules)
+
+`hunt-waves.js`:
+- `NIGHT_SPAWN_MUL = 1.6`
+- `NIGHT_STAT_MUL = 1.4`
+
+`hunt-render.js`:
+- `NIGHT_OVERLAY_TOP = '#02010a'`
+- `NIGHT_OVERLAY_MID = '#0a0818'`
+- `NIGHT_MAX_ALPHA = 0.93`
+- `NIGHT_PLAYER_LIGHT_R = 80`
+- `NIGHT_CAMPFIRE_LIGHT_R = 140`
+- `NIGHT_PLAYER_FLICKER = 3`
+- `NIGHT_CAMPFIRE_FLICKER = 6`
+
+`hunt-player.js`:
+- `TORCH_INITIAL = 1.0`
+- `TORCH_DECAY_PER_S = 0.012`
+- `TORCH_RELIGHT_R = 100`
+- `TORCH_DROP_CHANCE = 0.20`
+
+## Polish (Architect mandate)
+
+- **Smooth easing on torch decay** — linear decay with cubic-in-out perceptual mapping in the overlay, so darkness rises slowly at first and accelerates through the danger zone (not stair-step).
+- **Considered overlay gradient** — vertical indigo gradient (sky → horizon → sky) plus a corner vignette (tunnel-vision feel), not flat black.
+- **Torch flicker animation** — two-frequency sine flicker on player torch (~7.3 Hz + 13.1 Hz overtone) and campfire light (~4.7 Hz + 9.2 Hz overtone) so adjacent flames don't pulse in lockstep.
+- **Edge cases handled inline** —
+  - `torchAmount` undefined → defaults to 1.0, no overlay (allows Concern A standalone).
+  - Player exactly on campfire boundary → soft radial gradient = no hard edge; relight uses `<=` (boundary counts as inside, generous).
+  - Multiple campfires overlap → `destination-out` compounds naturally; relight loop short-circuits on first in-range fire.
+  - Mode switch mid-tick → guard at top of every Night-only function returns immediately when `runtime.mode !== 'night'`.
+
+## Verification (live browser smoke test, port 3996)
+
+- Day Mode Stage 1 → bright (no overlay).
+- Day Mode @ torch=0 forced → still bright (mode guard intact).
+- Night Mode Stage 1 → overlay engages as `torchAmount` drops; campfire near spawn keeps player lit (relight works).
+- Night Mode @ torch=0, player moved to corner → full screen darkness with glowing player torch hole + campfire glow at base.
+- Stat scaling sanity: lurker base hp 10 → 14 after night-spawn, base dmg 5 → 7. Ratio 1.40 confirmed.
+
+## Spec deviation noted
+
+The worker spec mentions `hunt-pickups.js` as a place to spawn Torch items at chopped-tree positions. That module's existing scope is ad-gated weapon-pickup platforms (modal flow, locked sprites). All other field drops (coin/wood/orb/fragment) live in `hunt-player.js` via `runtime.drops` + `pickupTick`, so the Torch field-drop follows that pattern for symmetry. `hunt-pickups.js` untouched.
+
+## Working-tree state at handoff
+
+`hunt-render.js` and `hunt-player.js` carry uncommitted changes from another worker (W-Turret-And-Campfire-Combat — drawBuiltStructures, DOM levelup modal rewrite, constructionTick, etc.). Per the Hive rule "Don't push another Claude's work without asking," those hunks were NOT committed by this worker — only the Day/Night + Torch hunks land in HEAD. The other worker's WIP remains in the working tree for whoever picks it up.

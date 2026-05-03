@@ -1,0 +1,5 @@
+W-F shipped: docs/DECISIONS.md created with genesis entry (Path A faithful clone, original IP layer, 5-tab structure, all transcribed from BLUEPAPER §14)
+Files written: docs/DECISIONS.md
+Verification: pass — file exists, header + entry present, format matches CLAUDE.md "Decisions" rules (newest-at-top discipline)
+Deviation: marker file dropped post-hoc by orchestrator (spawned Sonnet completed the work but did not write the marker)
+Confidence: high

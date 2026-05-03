@@ -1,0 +1,36 @@
+W-FX-Trauma-And-HitPause — DONE — 2026-04-30T23:03:34Z
+Files: js/core/wg-engine.js, js/wg-game.js, js/hunt/hunt-render.js
+Commits: 8c7d390 (A — trauma), 92cce88 (B — hit-pause + sprite-juice)
+Trauma triggers wired: 6 — enemy:killed (0.18), boss:damaged (0.10),
+  boss:defeated (0.65), player:damaged (0.30 + amount/200), player:skill (0.45),
+  stump:chopped (0.05). stump:hit explicitly excluded (would constant-shake
+  with the spinning scythe at 5 chops/sec — DOPAMINE_DESIGN §9 constraint).
+HitPause triggers wired: 4 — enemy:killed (30ms), boss:damaged (40ms),
+  boss:defeated (220ms), player:damaged amount>20 (60ms). NOT wired on
+  stump:* — would kill chop-flow (DOPAMINE_DESIGN §9 explicit).
+Notes:
+- Marker template said "Files: wg-engine.js, hunt-render.js" but the brief
+  itself instructed the rAF tick caller (wg-game.js) to gate on isHitPaused()
+  so runtime.elapsed wouldn't advance during the pause window. Touched
+  wg-game.js minimally — added "&& !WG.Engine.isHitPaused()" to the
+  existing _tutorialPaused guard. Not on the do-not-touch list.
+- Hit-flash on enemies overlays an additive-white ellipse over the body
+  silhouette for 80ms (alpha decay from 0.6 to 0). c._lastDamageAt is set
+  via subscription to enemy:damaged from hunt-render init() — no edit
+  required to hunt-enemies.js.
+- Player squash-and-stretch on player:swing wraps drawAnimeGirl in a
+  ctx.scale transform: 1.08x / 0.92y at t=0, eased back to 1.0 over 60ms.
+- Trauma transform wraps WORLD render only (between WG.Render.clear and
+  the existing ctx.scale(ZOOM,ZOOM)) so HUD + edge-pulse stay screen-anchored.
+- drawStump foliage flashBoost factor bumped 30→48 per "slightly increase
+  the flash intensity" hint in the brief. drawStump's existing wobble +
+  hit-flash was kept as-is otherwise.
+- Concurrent workers (W-FX-NumbersAndPulse Concern B HUD-pulse, and
+  W-FX-Particles-And-Magnet adding js/hunt/hunt-fx.js + 3 hookup lines)
+  had uncommitted work in the same hunt-render.js. Stashed/popped around
+  my commits to avoid clobbering; their work is preserved in the working
+  tree (uncommitted, theirs to commit).
+- Verified live in wraithgrove preview server (port 3996): WG.HuntRender.addTrauma,
+  WG.Engine.hitPause, WG.Engine.isHitPaused all defined; calling
+  hitPause(120) immediately reports isHitPaused()===true. No console
+  errors after reload.

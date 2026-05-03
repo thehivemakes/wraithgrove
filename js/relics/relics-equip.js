@@ -5,6 +5,8 @@
   function tryEquip(id) {
     const s = WG.State.get();
     if (!s.relics.owned[id]) return { ok: false, reason: 'not-owned' };
+    const r = WG.RelicsCatalog.byId(id);
+    if (r && r.equippable === false) return { ok: false, reason: 'not-equippable' };
     if (s.relics.equipped.includes(id)) return { ok: false, reason: 'already-equipped' };
     if (s.relics.equipped.length >= MAX_EQUIPPED) return { ok: false, reason: 'max-equipped' };
     s.relics.equipped.push(id);

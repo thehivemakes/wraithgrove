@@ -1,0 +1,26 @@
+# W-Stat-Polish — DONE
+
+## Shipped
+
+**Concern B — Rename** (commit 7b477c0)
+- `gatherRate` label renamed to **"Wood Yield"** in both `ascend-stats.js` UPGRADES catalog and `ascend-render.js` lines array.
+- Rationale: `step: 0.05` on a gather-rate multiplier = wood pickup yield. "Wood Yield" is self-describing; "Gather Rate" was not.
+
+**Concern A — Stat surface reduction** (commit 7adac96)
+- Primary visible stats: **Attack + HP Max** (rendered immediately, with upgrade buttons).
+- Secondary stats: **Defense, Crit, Wood Yield** moved into a native `<details>` / `<summary>` collapsible ("DETAILED STATS"), closed by default.
+- All 5 stats retain their upgrade buttons and continue aggregating into Power. Power total is unchanged.
+
+**Concern C — Cultivate UI** (commit 38197a5)
+- Button disabled (opacity 0.45) when `currencies.diamonds < 5`.
+- `title` attribute: "Cultivate · Cost: 5 💎 · Grants +2 ATK and +8 HP".
+- Click opens confirmation modal (cost + bonus displayed, CANCEL / CONFIRM).
+- On confirm: calls `tryCultivate()`, 600ms gold-flash overlay, `recomputePower()`, `refresh()`.
+- Mechanics unchanged (`tryCultivate` costs 5 💎, grants +2 ATK +8 HP as before).
+
+## Verified
+Browser smoke test at http://localhost:3996/ — Ascend tab confirmed:
+- Attack + HP Max visible; DETAILED STATS disclosure closed by default.
+- Inside details: Defense, Crit, Wood Yield labels confirmed via DOM query.
+- CULTIVATE button present; enabled when diamonds ≥ 5 (player had 20 — button active, title correct).
+- No console errors.

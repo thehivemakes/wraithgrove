@@ -65,6 +65,30 @@
   #boot-tap { font-size: 12px; color: #b0a070; margin-top: 28px; opacity: 0; transition: opacity 400ms; letter-spacing: 2px; }
   #boot-tap.show { opacity: 1; animation: pulse 2s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  /* W-Menu-Art-Pass §C — ember-orange BATTLE button idle throb (only when
+     unlocked; renderHero strips the animation on locked stages). */
+  @keyframes battlePulse {
+    0%, 100% { box-shadow: 0 4px 12px rgba(232,80,32,0.45), 0 0 0 1px rgba(255,200,120,0.35) inset; }
+    50%      { box-shadow: 0 4px 22px rgba(248,160,48,0.80), 0 0 0 1px rgba(255,210,140,0.55) inset; }
+  }
+  /* W-Menu-Art-Pass §D — cross-IP "rift intrusion" cue. Applied via class on
+     biome-art and character-portrait <img> elements when the stage's biome
+     is in wg-game.js RIFT_BIOMES. Violet drop-shadow + 15° hue rotate marks
+     "this place / character does not fully belong"; the glitch keyframe
+     fires every ~3.5s for an 80ms pixel offset. The keyframe owns transform
+     entirely — elements wearing this class must center via left/right offset,
+     not translateX(-50%), or the centering will be overwritten. */
+  .wg-rift-intrude {
+    filter: drop-shadow(0 0 8px rgba(192,96,255,0.6)) hue-rotate(15deg);
+    animation: wgRiftGlitch 3.5s steps(1, end) infinite;
+  }
+  @keyframes wgRiftGlitch {
+    0%, 97%   { transform: translate(0, 0); }
+    97.5%     { transform: translate(2px, -1px); }
+    98%       { transform: translate(-2px, 1px); }
+    98.5%     { transform: translate(1px, 2px); }
+    99%, 100% { transform: translate(0, 0); }
+  }
 
   /* Generic modal */
   .modal-overlay {
@@ -253,7 +277,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.20.0-menu-art-1777731122', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.21.0-dopamine-stat-rift-1777780633', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');

@@ -1,0 +1,5 @@
+Ad-gated in-stage weapon pickup platforms shipped — spawn, tick, modal, draw, auto-claim all verified.
+js/hunt/hunt-pickups.js (new), index.html (script loader), js/wg-game.js (init+spawn+tick), js/hunt/hunt-render.js (drawFrame integration)
+pass — lock modal fires on player proximity; PAY 5 💎 deducts diamonds, unlocks, auto-claims; heldPickupId confirmed set; pickup disappears from canvas
+No deviations — all three concerns implemented per spec; worldToScreen passed as w2s from hunt-render drawFrame; duplicate-modal guard added (getElementById before create) as defensive measure
+high

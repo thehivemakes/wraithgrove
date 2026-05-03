@@ -1,0 +1,85 @@
+W-Building-Repair — DONE 2026-05-02
+
+Architect 2026-05-02: "If the player hovers next to the building for 3 seconds,
+repair starts which drains wood." Mirrors the constructionTick proximity-drain
+pattern as additive behavior — does not change the build flow.
+
+## Tunables (NAMED — Architect monetization hook for future ad-buff "repair 2× speed")
+
+- REPAIR_HOVER_DELAY  = 3.0 s   (player must stand near before repair starts)
+- REPAIR_RATE         = 0.25 s  (per wood consumed)
+- REPAIR_HP_PER_WOOD  = 8       (HP restored per wood)
+- REPAIR_RANGE        = 36      (world units — proximity threshold, just past CONSTRUCT_RADIUS=28)
+
+Exposed on `WG.HuntPlayer.REPAIR_TUNABLES` (frozen) for hunt-render.
+
+## Commits (one concern each)
+
+### A — 7d2cbf9 — repairTick proximity-drain logic
+- js/hunt/hunt-player.js:535-540   tunables block (REPAIR_HOVER_DELAY/RATE/HP_PER_WOOD/RANGE)
+- js/hunt/hunt-player.js:587-628   repairTick(dt): iterates props.constructions filtered to
+                                   {built, type==='turret', hp<maxHp}; range gate; hover timer;
+                                   wood drain + HP restore; emits repair:tick + repair:complete;
+                                   resets timers on leave-range AND on hp==maxHp
+- js/hunt/hunt-player.js:632-636   repairTick(dt) wired into tick() after constructionTick
+- js/hunt/hunt-player.js:639-642   REPAIR_TUNABLES exported on WG.HuntPlayer
+- Gates on runtime.pendingLevelUp (matches autoAttack/constructionTick)
+
+### B — 7520eaf — hover ring + wrench/sparkles + audio routing
+- js/hunt/hunt-render.js:602-647   drawBuiltStructures additive block:
+                                   hover-progress ring (ease-out cubic per Polish mandate)
+                                   growing as repairHover/REPAIR_HOVER_DELAY fills;
+                                   at 1.0 switches to active-repair wrench glyph + bobble
+- js/hunt/hunt-fx.js:54-59         repairSparkle (2 particles, green) + repairBurst (12 ring) types
+- js/hunt/hunt-fx.js:204-216       repair:tick listener (sparkle burst at turret position),
+                                   repair:complete listener (burst + addTrauma(0.15) +
+                                   emits audio:repair_complete)
+- js/core/wg-audio.js:58-59        EVENT_MAP: audio:repair_complete → existing craft sample (sfx, vol 0.7)
+
+### C — 2026-05-02 — done marker (this file)
+
+## Verification
+
+- node --check on all 4 modified js files — PASS
+- Browser smoke test (port 3996, /wraithgrove):
+  - WG.HuntPlayer.REPAIR_TUNABLES → { REPAIR_HOVER_DELAY: 3, REPAIR_RATE: 0.25, REPAIR_HP_PER_WOOD: 8, REPAIR_RANGE: 36 } ✓
+  - All 47 WG modules load clean, no console errors
+  - Synthetic end-to-end (force-built turret @ HP 30/80, player on top, 20 wood):
+    - tick(2.95): HP unchanged (hover < threshold) ✓
+    - tick(1.05) after threshold: HP=62 (+32 = 4 wood × 8 HP), wood=16, 4 repair:tick events ✓
+    - tick more to fill: HP capped at 80, repair:complete fired once,
+      audio:repair_complete fired once (forwarded by hunt-fx listener) ✓
+    - Player walks out of range: repairHover=0, repairDrainTimer=0 (timers reset) ✓
+- Console errors: zero from W-Building-Repair scope.
+
+## Polish Mandate (Architect 2026-05-02)
+
+- Hover ring eased growth: `1 - Math.pow(1 - t01, 3)` — ease-out cubic, fast initial
+  growth that settles near 1.0 (read: "wind-up tension resolving").
+- Wrench gentle bobble: `Math.sin(t * 5.5) * 1.6` px on Y during active repair
+  (~5.5 rad/s = ~0.88 Hz, low amplitude — alive, not jittery).
+- repair:complete trauma: 0.15 (between repair:tick silence and turret:destroyed 0.4 — small
+  but felt punctuation for the heal payoff).
+- Green burst: 12 particles, ring shape, life 0.70s, colors a8f0a0/80e088/fff0c0
+  (green + warm cream tone — heal not poison).
+
+## Out of scope (per worker brief)
+
+- Campfire repair: not in scope (campfires don't have HP; only turrets do).
+- "Repair 2× speed" ad-buff: tunables are NAMED constants ready for that hook;
+  the buff itself is a future worker.
+- Visual playtest gif: scheduled-task run cannot synthesize a real user gesture
+  to dismiss "tap to begin" splash, so the in-game hover→drain→complete visual
+  sequence was verified through (1) functional event-chain unit test in eval,
+  (2) syntax check, (3) code inspection against drawCampfireRegenRings pattern.
+  Manual playtest by the Architect: build a turret (or instant_turret buff),
+  let an enemy damage it, walk within 36u, watch ring fill 3s → wrench appears
+  → wood drains 0.25s/each, HP +8/wood until full (or wood out).
+
+## Note on prior in-tree state
+
+Found uncommitted player:damaged audio tuning in build-v2/js/core/wg-audio.js
+(throttleMs 200→450, vol 0.8→0.32 — Architect tuning). Per build-v2/CLAUDE.md
+"don't push another Claude's work without asking" — preserved untouched in the
+working tree, not included in commit B. Only my single audio:repair_complete
+row was committed in concern B's wg-audio.js diff.

@@ -1,0 +1,15 @@
+W-FX-Particles-And-Magnet — DONE — 2026-04-30T23:11:30Z
+Files: js/hunt/hunt-fx.js (new, 148 lines), js/hunt/hunt-player.js, js/hunt/hunt-render.js, index.html
+Commits: 7871a62 (A — hunt-fx pool + types + subs), 4ea1b00 (B — magnet tuning + wood drop)
+Particle types implemented: 8 (chopChip, enemyHit, enemyKill, pickupCoin, pickupOrb, pickupFragment, levelUp, bossKill)
+Magnet types tuned: 4 (wood — 200ms pop + 100ms linger + lerp 0.18; coin — 20px pop + lerp 0.22; orb — base 0.18; fragment — base 0.18)
+Notes:
+- hunt-render.js drawFrame already had HuntFX.tick + HuntFX.draw + HuntFX.init hooks committed by predecessor 063b0df, so concern A only needed the new module + index.html MODULES list entry + drawDrops wood case.
+- Pool cap 200 (DOPAMINE_DESIGN §9). Pool exhaustion drops new spawns silently, no throw. Verified by 50× bossKill burst (1500 particles requested → cap at 200 → tick(2.0) clears → fresh burst succeeds).
+- §2 compliance: runWood increment moved from chop-time to wood-pickup-time. The counter only ticks when a wood chunk reaches the player, satisfying "nothing the player earns appears on the counter without traveling through screen space first."
+- Existing per-type drop branching in pickupTick preserved; added 'wood' case alongside orb/coin/fragment.
+- pickup:coin, pickup:orb, pickup:wood, pickup:fragment events now emit with {x, y, amount} — HuntFX + HuntFXNumbers + wg-audio all consume these.
+- pickupTick signature changed (no-arg → dt). Sole caller is HuntPlayer.tick(dt) on line 405; updated.
+- WG.Render.spawnParticles legacy calls in hunt-render.js untouched per worker brief — additive layering only.
+- Concern B's hunt-player.js diff includes pre-existing uncommitted features from prior session (resolveTreeCollisions, modal-pause-during-attack, autoAttack stump-chop block, xpToNext=12 tuning). Preserved verbatim; magnet logic layered on top. Documented in commit 4ea1b00 message.
+- Verified live in wraithgrove preview (port 3996): all 4 drop types collect via HuntPlayer.tick(0.05) loop, all 4 pickup events fire with correct payloads, no console errors.

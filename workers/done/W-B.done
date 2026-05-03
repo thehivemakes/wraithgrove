@@ -1,0 +1,5 @@
+Added tileHash + drawDecoration helpers and wired drawDecoration call into drawTiles inner loop; all 6 biome decorations (grass-tufts, snow-flecks, leaves, tiles, rocks, sigils) ship in js/hunt/hunt-render.js
+js/hunt/hunt-render.js
+pass — all 6 biomes visually confirmed: grass-tufts (S1 vertical strokes), snow-flecks (S4 dense white dots), leaves (S7 rust rectangles), tiles (S10 gold crosses), rocks (S13 grey pebbles), sigils (S16 purple circle+cross); no console errors
+Deviation 1: spec used hash >> N (signed shift) but corrected to hash >>> N (unsigned) to keep decoration coords within tile bounds for hashes >= 2^31 — spec said "careful coordinate computation", >>> is required to honor that constraint. Deviation 2: no git repo exists at build-v2 or Hive root, so the commit step was skipped.
+high

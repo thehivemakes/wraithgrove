@@ -33,6 +33,7 @@
     { event: 'player:level',          id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 0.9 },
     { event: 'pet:attack',            id: 'pet_attack',    bus: 'sfx', throttleMs: 100, vol: 0.5 },
     { event: 'boss:damaged',          id: 'boss_hit',      bus: 'sfx', throttleMs: 120, vol: 0.6 },
+    { event: 'enemy:crit',           id: 'boss_hit',      bus: 'sfx', throttleMs:  60, vol: 0.85 }, // W-Dopamine-P1 §B
     { event: 'boss:defeated',         id: 'boss_die',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
     // Pickups (require Concern B emits — fail-silent until then)
     { event: 'pickup:orb',            id: 'orb',           bus: 'sfx', throttleMs: 40,  vol: 0.4 },

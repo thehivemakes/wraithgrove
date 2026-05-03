@@ -1,5 +1,29 @@
-// WG.HuntPickups — in-stage ad-gated weapon pickup platforms
+// WG.HuntPickups — in-stage ad-gated weapon pickup platforms + rift-sigil drop table
 (function(){'use strict';
+
+  // Rift Sigil drop tunables (Concern B — W-Rift-Mechanic-Plumbing).
+  // RIFT_SIGIL_DROP_RATE_BOSS: Wraith Father (stage 18 boss) always drops 1 sigil on clear.
+  // RIFT_SIGIL_DROP_RATE_STAGE_CLEAR: 1% per eldritch stage clear (stages 16-18).
+  // Both rates apply on stage 18 clear: boss drop + independent stage-clear roll.
+  const RIFT_TUNABLES = {
+    RIFT_SIGIL_DROP_RATE_BOSS:        1.0,
+    RIFT_SIGIL_DROP_RATE_STAGE_CLEAR: 0.01,
+  };
+
+  // Returns how many rift sigils to grant at the end of a cleared stage.
+  // Called by wg-game.js finishHunt(true). Zero cost if eldritch biome not reached.
+  function rollSigilDrop(stageId, bossDefeated) {
+    const stage = WG.HuntStage.get(stageId);
+    if (!stage || stage.biome !== 'eldritch') return 0;
+    let count = 0;
+    if (bossDefeated && stage.bossId === 'wraith_father' && Math.random() < RIFT_TUNABLES.RIFT_SIGIL_DROP_RATE_BOSS) {
+      count += 1;
+    }
+    if (Math.random() < RIFT_TUNABLES.RIFT_SIGIL_DROP_RATE_STAGE_CLEAR) {
+      count += 1;
+    }
+    return count;
+  }
 
   const POSITIONS = [
     [0.25, 0.30],
@@ -232,5 +256,5 @@
 
   function init() {}
 
-  window.WG.HuntPickups = { init, spawnForStage, draw, tick };
+  window.WG.HuntPickups = { init, spawnForStage, draw, tick, rollSigilDrop, RIFT_TUNABLES };
 })();

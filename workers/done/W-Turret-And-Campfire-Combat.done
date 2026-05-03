@@ -1,0 +1,80 @@
+# W-Turret-And-Campfire-Combat — DONE 2026-05-01
+
+Three commits, one concern each. SPEC §0 turret + campfire mechanics live.
+
+## Files touched
+
+- `js/hunt/hunt-turret.js` — new, all combat behavior + tunables (Concerns A + B)
+- `js/hunt/hunt-player.js` — wires HuntTurret.tick into the player tick after constructionTick (Concern A)
+- `js/hunt/hunt-render.js` — projectile trail/glow render, cannon reads c.aimAngle, turret HP bar, campfire regen ring (Concerns A + B)
+- `js/hunt/hunt-fx.js` — muzzleFlash + turretExplode + campfireSparkle particle types + event subscriptions (Concerns A + B)
+- `js/hunt/hunt-enemies.js` — melee creatures within turret hit range attack the turret instead of pursuing the player (Concern B)
+- `index.html` — new script tag for hunt-turret.js in dependency order (Concern A)
+- `workers/done/W-Turret-And-Campfire-Combat.done` — this file (Concern C)
+
+## Named constants — tunables for monetization
+
+All in `js/hunt/hunt-turret.js`. Read via `WG.HuntTurret.TUNABLES` (frozen).
+
+### Turret combat
+- `TURRET_FIRE_RATE       = 1.4`     seconds between shots
+- `TURRET_RANGE           = 200`     world units — target acquisition radius
+- `TURRET_DAMAGE          = 12`      per projectile
+- `TURRET_PROJ_SPEED      = 360`     world units / sec
+- `TURRET_PROJ_LIFE       = 1.4`     seconds (range/speed ≈ 0.55s; margin)
+- `TURRET_AIM_LERP        = 0.18`    smoothing factor toward desired angle
+- `TURRET_AIM_FIRE_THRESH = 0.35`    radians — fire only when aim within this
+- `TURRET_BARREL_LEN      = 14`      muzzle offset along aim direction (world units)
+- `TURRET_PROJ_COLOR      = '#ffe48a'`
+
+### Turret durability
+- `TURRET_MAX_HP          = 80`
+- `TURRET_HIT_RANGE       = 14`      enemy attacks turret if within this distance
+
+### Campfire
+- `CAMPFIRE_REGEN_RADIUS  = 60`
+- `CAMPFIRE_REGEN_RATE    = 4`       hp / sec while inside
+- `CAMPFIRE_SPARKLE_PERIOD= 0.16`    seconds between green-sparkle emissions
+
+## Architect-mandated polish (POLISHED PRODUCT)
+
+- **Eased lerp aim tracking** — shortest-path angle lerp at 0.18/tick. Cannon barrel reads `c.aimAngle` (was a fake sine animation) so the visual matches what the targeting logic actually thinks.
+- **Aim-tolerance fire gate** — turrets only fire when aim is within 0.35 rad of target, so a cannon spinning to acquire a side-target doesn't loose a 90°-off shot. Once gated, fireTimer is held at 0 so the next shot pops the moment aim catches up — feels responsive on fast-moving targets.
+- **Muzzle flash** — `muzzleFlash` particle type (5 yellow/orange particles, 0.18s, sMin 90 sMax 160). Fires at the muzzle tip on every `turret:fire` event.
+- **Projectile trail + glow halo** — projectiles get a `_trail: []` array; `drawProjectiles` populates 8 samples per frame + draws a fading streak (alpha + width grow toward the head) + a radial-gradient glow halo at the head. Reads as "moving fast" not "drifting dot."
+- **Animated turret HP bar** — `_hpDisplayed` is lerped from `hp` at rate dt*8 in `tickOne`, rendered with hue shift green→yellow→red. Damage reads as a smooth sweep, not a snap. Dark background frame for readability over green tile.
+- **Turret destruction explosion** — `turret:destroyed` event triggers `turretExplode` particle burst (18 ring particles, 0.65s, orange→brown). Slot reverts to dashed-circle for rebuild (have=0, built=false).
+- **Campfire regen sparkles** — `campfireSparkle` type (1 sparkle per emission, 0.85s life, negative gravity = drift up, green palette) emitted at 6 Hz while player regenerating. Cumulative density reads as a healing aura.
+- **Faint pulsing regen ring on the ground** — dashed green-white ring at every built campfire. Brightness + line width step up when player is inside the radius (visual confirmation that regen is active). Reads radius from `HuntTurret.TUNABLES` (single source of truth).
+
+## Edge cases handled inline
+
+- Turret HP/aim/fireTimer fields lazy-initialised on first tick (so a stage that mutates `props.constructions` outside the build flow still gets correct fields on next tick).
+- Rebuild after destruction → `_resetOnRebuild` restores HP fields fresh when `built` flips from false→true with `hp <= 0`.
+- Aim wraparound at ±π handled by `lerpAngle` shortest-path math — no spinning the long way around when target crosses behind the turret.
+- No targets in range → cannon drifts gently back toward up (lerp factor * 0.25), doesn't freeze pointing wherever the last enemy died.
+- Player not in stage → tick early-returns via runtime/player guards.
+- Ranged enemies (Caller) ignore turrets — they keep firing at the player from range. Turrets don't tank ranged.
+- Enemy turret-attack range adds `c.size/2` so a Brute (size 24) engages from a sensible standoff instead of overlapping the wagon sprite.
+- Sparkle accumulator resets to 0 the moment player leaves regen radius — no carry-over emit on re-entry.
+
+## Verification (live browser smoke test, port 3996)
+
+- Stage 1 day mode entered, all 4 turrets and the campfire force-built, 3 walkers spawned 60–100 units from a turret. Sim ticked 80 frames @ dt=0.05 (4s).
+- **11 turret-damage events fired**, **1 turret destroyed** — slot correctly reappeared as a dashed "Turret 0/4" build circle (rebuildable).
+- HP bar **lerped smoothly** — captured `_hpDisplayed = 6.0` mid-decay while `hp = 0` (post-destruction lerp catching up).
+- **Player HP regen verified**: started 40, ended 56 after 4s @ CAMPFIRE_REGEN_RATE=4 = exact match (16 hp gained).
+- **Projectile trails captured visually** — yellow streaks visible in flight from active turrets to distant walkers (screenshot at 12 ticks @ 0.05).
+- **Animated HP bars visually verified** on damaged turrets — yellow at ~50% hp, green at ~87%.
+- **Pulsing dashed regen ring visually verified** around the campfire when player stood on it.
+- **No console errors** at any point.
+
+## Working-tree state at handoff
+
+The Worker only committed the W-Turret-And-Campfire-Combat hunks (3 commits). Other modifications already present in the working tree before this worker started (KingshotPro, Lastlight, MobileGameResearch sibling projects, etc.) were left untouched per the "don't push another Claude's work without asking" rule.
+
+## Three commits
+
+1. `11ea629` — W-Turret-And-Campfire-Combat A — turret auto-fire + projectile trail + smooth aim
+2. `ea1e02a` — W-Turret-And-Campfire-Combat B — turret HP + enemy attacks + campfire regen viz
+3. (this commit) — W-Turret-And-Campfire-Combat C — done marker + tunables doc

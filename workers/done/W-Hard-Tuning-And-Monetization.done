@@ -1,0 +1,136 @@
+# W-Hard-Tuning-And-Monetization — DONE
+
+**Worker:** HTM (Hard Tuning + Monetization)
+**Date:** 2026-05-01
+**Commits:**
+- A — `7d09e92` wave-driven spawning + 5/10/15 tier scaling
+- B — `addbe44` buff system + ad-revive
+- C — this marker
+
+---
+
+## Files touched
+
+### Concern A — Hard tuning + wave scaling
+- `js/hunt/hunt-stage.js` — added waveCount + waveDurationSec per stage tier;
+  `durationSec` now derived (waveCount × waveDurationSec).
+- `js/hunt/hunt-waves.js` — replaced single-curve `frac`-based ramp with
+  per-wave compounding spawn rate + per-wave stat scaling; boss spawns at
+  start of last wave; emits `wave:advanced`.
+- `js/hunt/hunt-render.js` — banner format `Highest Wave Reached: X / N Waves`;
+  hex size + spacing scale down for 10/15-wave stages.
+
+### Concern B — Buff system + ad-revive
+- `js/meta/meta-buffs.js` — NEW. WG.Buffs registry.
+- `js/hunt/hunt-player.js` — read damage_x2 in `baseDamage`, wood_x2 on
+  stump-chop, instant_turret in `constructionTick`, revive on death in
+  `takeDamage`.
+- `js/hunt/hunt-results.js` — death-modal "Watch Ad to Revive" button with
+  heartbeat-pulse + 5s countdown; per-run limit via `runtime.reviveCount`.
+- `js/hunt/hunt-render.js` — active buff badges drawn top-right of HUD.
+- `js/wg-game.js` — `appendBuffStrip` 4-button level-select panel,
+  `flashScreen` activation feedback, `runtime.reviveCount` init,
+  `WG.Buffs.init()` + `WG.Audio.init()` calls; removed
+  `huntRuntime.player = null` in finishHunt so revive can restore HP.
+- `index.html` — wired `js/core/wg-audio.js` + `js/meta/meta-buffs.js`
+  into module loader.
+
+---
+
+## Tunables — single source of truth
+
+### Wave scaling (`js/hunt/hunt-stage.js` + `js/hunt/hunt-waves.js`)
+
+| Constant            | Value | Module            | Effect                                                          |
+| ------------------- | ----- | ----------------- | --------------------------------------------------------------- |
+| `WAVE_COUNT_EARLY`  | 5     | hunt-stage.js     | Stages 1–6 wave count                                           |
+| `WAVE_COUNT_MID`    | 10    | hunt-stage.js     | Stages 7–12 wave count                                          |
+| `WAVE_COUNT_LATE`   | 15    | hunt-stage.js     | Stages 13–18 wave count                                         |
+| `WAVE_SEC_EARLY`    | 90    | hunt-stage.js     | Per-wave duration (s), early tier                               |
+| `WAVE_SEC_MID`      | 100   | hunt-stage.js     | Per-wave duration (s), mid tier                                 |
+| `WAVE_SEC_LATE`     | 110   | hunt-stage.js     | Per-wave duration (s), late tier                                |
+| `WAVE_RATE_MUL`     | 1.5   | hunt-waves.js     | Spawn-rate multiplier compounded each wave                      |
+| `WAVE_STAT_BASE`    | 0.18  | hunt-waves.js     | STAT_MUL = 1 + (waveIndex0 × WAVE_STAT_BASE), applied to hp/dmg |
+| `WAVE_BASE_RATE_MIN`| 0.5   | hunt-waves.js     | Within-wave start spawn rate (enemies/s)                        |
+| `WAVE_BASE_RATE_MAX`| 1.5   | hunt-waves.js     | Within-wave end spawn rate (enemies/s)                          |
+| `NIGHT_SPAWN_MUL`   | 1.6   | hunt-waves.js     | Night-mode spawn-rate multiplier                                |
+| `NIGHT_STAT_MUL`    | 1.4   | hunt-waves.js     | Night-mode hp/dmg multiplier                                    |
+
+Wave 1 (waveIndex0 = 0) → 1.0× spawn rate, 1.0× stats — approachable per
+architect mandate. Wave 5 → 5.06× spawn, 1.72× stats. Wave 15 → 291× spawn
+rate (capped naturally by within-wave ramp ceiling), 3.52× stats. Boss spawns
+at start of the final wave so it shares the chaos rather than dropping into
+an empty arena.
+
+Stage `durationSec` now equals `waveCount × waveDurationSec`:
+- Tier 1 (5 × 90s)  = 450s = 7.5 min per stage
+- Tier 2 (10 × 100s) = 1000s = 16.7 min per stage
+- Tier 3 (15 × 110s) = 1650s = 27.5 min per stage
+
+### Buff system (`js/meta/meta-buffs.js`)
+
+| Buff ID          | Kind     | Default duration | Hooked at                                                                    |
+| ---------------- | -------- | ---------------- | ---------------------------------------------------------------------------- |
+| `damage_x2`      | duration | 60 000 ms        | `hunt-player.baseDamage` — multiplies output damage ×2                        |
+| `wood_x2`        | duration | 90 000 ms        | `hunt-player.autoAttack` stump-chop — drops a second wood + a second coin    |
+| `instant_turret` | oneshot  | n/a              | `hunt-player.constructionTick` — turret slot auto-completes, buff consumed   |
+| `revive`         | oneshot  | n/a              | `hunt-player.takeDamage` — at hp ≤ 0 restores maxHp, no `player:died` emit   |
+
+Activation paths:
+1. Level-select panel — 4 gold-bordered buttons → `WG.Ads.showRewardedVideo()`
+   → `WG.Buffs.activate(id, ms)` + gold screen flash + cha_ching audio (via
+   reused `iap:purchase` event in EVENT_MAP).
+2. Death modal — `Watch Ad to Revive` button (heartbeat-pulse animation +
+   5s dramatic countdown) → ad → restore HP, increment
+   `runtime.reviveCount`. Limit 1 per stage run (`REVIVE_LIMIT_PER_RUN`).
+
+### Death-modal revive (`js/hunt/hunt-results.js`)
+
+| Constant                 | Value | Effect                                            |
+| ------------------------ | ----- | ------------------------------------------------- |
+| `REVIVE_COUNTDOWN_SEC`   | 5     | Dramatic window before stage truly ends           |
+| `REVIVE_LIMIT_PER_RUN`   | 1     | Max ad-revives per stage run                      |
+
+CSS animation `@keyframes hr-heartbeat` injects on first death modal: 0.9s
+infinite scale 1 → 1.06 + box-shadow ripple in red. Visible in stage 1 fail.
+
+---
+
+## Architect mandate compliance
+
+- Difficulty curve: wave 1 baseline (1.0× / 1.0×); late waves brutal but
+  predictable from compounding constants — not random-feeling.
+- Ad-buff buttons visually distinct: gold border, gold ► AD pill, scale-bounce
+  on tap (0.94×). "ON" pill swaps in when buff active.
+- Revive modal: heartbeat-pulse (CSS keyframes), 5s countdown, dramatic
+  red-on-black panel above the stats row.
+- Buff activation: cha_ching audio (via `iap:purchase` emit hitting existing
+  EVENT_MAP row), full-screen gold flash (`flashScreen`), persistent HUD
+  badge `2× DMG 60s` drawn top-right of the canvas HUD.
+
+---
+
+## Verification
+
+- `node --check` clean across all touched JS modules.
+- Browser smoke test at `http://localhost:3996/`:
+  - 4 buff buttons render in level-select with gold border + ad pill.
+  - Buff activation flow: tap → ad placeholder → "ON" pill appears, gold
+    flash, badge `2× DMG 55s` visible in-game HUD.
+  - Stage 1 (tier 1): 5 hex indicators, banner `Highest Wave Reached: 0 / 5 Waves`.
+  - Stage tier inspection: stage 1 → waveCount 5 / 90s; stage 10 → 10 / 100s;
+    stage 18 → 15 / 110s.
+  - Wave scaling verified: wave 4 lurker hp 10 → 15 (round(10 × 1.54)),
+    damage 5 → 8 (round(5 × 1.54)). Boss spawn on stage 3 last wave: Pale
+    Bride hp 380 → 654 (round(380 × 1.72)).
+  - No console errors.
+
+---
+
+## Constraints honored
+
+- Buffs are READ-only signals; only `WG.Buffs.activate/consume/clearAll`
+  mutate active state.
+- All ad calls go through `WG.Ads.showRewardedVideo()`.
+- `meta-iap.js` SKU table untouched.
+- One concern per commit. Three commits total (A, B, C).

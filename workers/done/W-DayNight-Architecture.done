@@ -1,0 +1,16 @@
+W-DayNight-Architecture — DONE — 2026-04-28T00:00:00Z
+Output: docs/DAYNIGHT_ARCHITECTURE.md (745 lines)
+
+Open questions surfaced for Architect:
+1. WAVE_CONFIG timing ratios (§1.3) — chosen: wave-bounded day/night with day 35-55s, night 30-65s. Unconfirmed by live capture. Override before W-DayNight-Engine runs if wrong.
+2. Building activation UI — chosen: auto-build on proximity, no menu. HD §H.2 unresolved. If source shows a build-menu, spec must change.
+3. Battery function (§2.2) — chosen: powers structures at night, charges via Campfire + map pickups. HD §H.5 explicitly uncertain. Live capture would resolve.
+4. Construction slot count per stage (§3.1) — Stage 1 and 2 fully specced; stages 3-18 use minimal defaults. Stage-specific slot designs need Architect sign-off before tuning.
+5. HD screenshots referenced in worker file not found at reference/screenshots_hires/carousel/ — used HD_SOURCE_OBSERVATIONS_2026-04-28.md written observations as visual ground truth instead.
+
+Recommended next workers (in dependency order):
+  W-DayNight-Engine    — implement hunt-daynight.js, hunt-resources.js, split hunt-waves.js, wire wg-game.js
+  W-DayNight-Buildings — implement hunt-buildings.js, extend hunt-enemies.js, populate all 18 stage slots
+  W-DayNight-Render    — add drawPhaseOverlay/drawConstructionSites/drawResourceNodes/drawDayNightHud to hunt-render.js
+  W-DayNight-Tuning    — play-balance WAVE_CONFIG, RESOURCE_CONFIG, BUILDING_TYPES after prior 3 workers ship
+  W-DayNight-HUD-Polish — audio/visual transition signals, NIGHT MODE modal, cleanup elapsed-timer banner

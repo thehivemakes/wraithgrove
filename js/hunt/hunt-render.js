@@ -2433,6 +2433,29 @@
     WG.Engine.on('player:skill',  () => addTrauma(0.45));
     WG.Engine.on('stump:chopped', () => addTrauma(0.05));
 
+    // W-Dopamine-P1 §B — crit visual feedback: additive trauma + critBurst particles
+    WG.Engine.on('enemy:crit', ({ x, y }) => {
+      addTrauma(0.05);
+      // 8 magenta sparkles radial
+      for (let i = 0; i < 8; i++) {
+        const a = (Math.PI * 2 / 8) * i;
+        WG.Render.spawnParticles({
+          x, y,
+          angle: a, speed: 160 + Math.random() * 80,
+          life: 0.35, color: '#ff40c0', size: 3,
+        });
+      }
+      // Ring-flash: 12 outward sparks at slightly randomised angles
+      for (let i = 0; i < 12; i++) {
+        const a = (Math.PI * 2 / 12) * i + (Math.random() - 0.5) * 0.3;
+        WG.Render.spawnParticles({
+          x, y,
+          angle: a, speed: 80 + Math.random() * 40,
+          life: 0.18, color: '#ffe060', size: 2,
+        });
+      }
+    });
+
     // Hit-pause triggers (DOPAMINE_DESIGN §9). NOT wired on stump:hit / stump:chopped
     // — would kill chop-flow at 5/sec (explicit DOPAMINE_DESIGN constraint).
     WG.Engine.on('enemy:killed',   () => WG.Engine.hitPause(30));
@@ -2477,6 +2500,71 @@
         });
       }
     });
+
+    // W-Dopamine-P1 §A — Combo HUD
+    // Inject keyframes once
+    if (!document.getElementById('wg-combo-css')) {
+      const st = document.createElement('style');
+      st.id = 'wg-combo-css';
+      st.textContent = `
+        #wg-combo-hud {
+          position: fixed;
+          top: 72px;
+          left: 50%;
+          transform: translateX(-50%);
+          pointer-events: none;
+          z-index: 90;
+          display: none;
+          text-align: center;
+          font-family: system-ui, sans-serif;
+          font-weight: 900;
+          letter-spacing: 2px;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+          line-height: 1.1;
+        }
+        #wg-combo-hud .combo-count { font-size: 28px; }
+        #wg-combo-hud .combo-label { font-size: 13px; opacity: 0.85; }
+        @keyframes combo-pop {
+          0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
+          40%  { transform: translateX(-50%) scale(1.22); opacity: 1; }
+          100% { transform: translateX(-50%) scale(1.0);  opacity: 1; }
+        }
+        @keyframes combo-pulse {
+          0%,100% { text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 0px #ff2020; }
+          50%     { text-shadow: 0 2px 8px rgba(0,0,0,0.7), 0 0 18px #ff6040; }
+        }
+      `;
+      document.head.appendChild(st);
+    }
+    const _comboHud = document.createElement('div');
+    _comboHud.id = 'wg-combo-hud';
+    _comboHud.innerHTML = '<div class="combo-count"></div><div class="combo-label">COMBO</div>';
+    document.body.appendChild(_comboHud);
+    const _comboCt = _comboHud.querySelector('.combo-count');
+
+    function _comboColor(n) {
+      if (n >= 20) return '#ff4040';
+      if (n >= 10) return '#ff8c00';
+      if (n >= 5)  return '#ffd870';
+      return '#ffffff';
+    }
+
+    WG.Engine.on('combo:step', ({ count }) => {
+      const col = _comboColor(count);
+      _comboCt.textContent = 'x' + count;
+      _comboHud.style.color = col;
+      _comboHud.style.animation = 'none';
+      // Force reflow so re-adding the class triggers the keyframe
+      void _comboHud.offsetWidth;
+      const pulse = count >= 20 ? ', combo-pulse 0.7s ease-in-out infinite' : '';
+      _comboHud.style.animation = 'combo-pop 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards' + pulse;
+      _comboHud.style.display = 'block';
+    });
+    WG.Engine.on('combo:reset', () => {
+      _comboHud.style.display = 'none';
+    });
+    // Hide on stage exit so it doesn't bleed into menus
+    WG.Engine.on('hunt:stage-start', () => { _comboHud.style.display = 'none'; });
   }
 
   // Expose getStageProps so hunt-player can damage stumps on swing.

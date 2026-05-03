@@ -32,6 +32,8 @@
       kills: 0,
       // SPEC W-Hard-Tuning-And-Monetization §B — limit ad-revive uses per run
       reviveCount: 0,
+      // W-Dopamine-P1 §A — kill-combo tracker
+      combo: { count: 0, lastKillAt: 0, peak: 0 },
     };
     huntRuntime = rt;
     WG.HuntRender.setRuntime(rt);
@@ -196,10 +198,19 @@
     const baseCoin = cleared ? (60 + stageId * 25) : (15 + stageId * 5);
     const baseDia  = cleared ? (stageId % 3 === 0 ? 5 : 2) : 0;
     const baseFrag = cleared ? 2 : 0;
-    const rewards = { coins: baseCoin + huntRuntime.kills * 2, diamonds: baseDia, fragments: baseFrag };
+    const rewards = { coins: baseCoin + huntRuntime.kills * 2, diamonds: baseDia, fragments: baseFrag, riftSigils: 0 };
     if (cleared) WG.State.grant('coins', rewards.coins); else WG.State.grant('coins', rewards.coins);
     if (rewards.diamonds) WG.State.grant('diamonds', rewards.diamonds);
     if (rewards.fragments) WG.State.get().forge.craftFragments += rewards.fragments;
+    // Rift sigil drops — eldritch tier only; zero cost on earlier stages.
+    if (cleared && WG.HuntPickups && WG.HuntPickups.rollSigilDrop) {
+      const sigils = WG.HuntPickups.rollSigilDrop(stageId, huntRuntime.bossDefeated);
+      if (sigils > 0) {
+        WG.State.get().rift.sigils += sigils;
+        rewards.riftSigils = sigils;
+        WG.Engine.emit('rift:sigil-found', { count: sigils, total: WG.State.get().rift.sigils });
+      }
+    }
     // Update best wave / unlock next
     const s = WG.State.get();
     if (cleared) {
@@ -212,7 +223,7 @@
     } else {
       WG.Engine.emit('hunt:stage-failed', { stageId, mins, kills: huntRuntime.kills });
     }
-    const showResults = () => WG.HuntResults.show({ stageId, cleared, mins, kills: huntRuntime.kills, rewards });
+    const showResults = () => WG.HuntResults.show({ stageId, cleared, mins, kills: huntRuntime.kills, rewards, peakCombo: huntRuntime.combo ? huntRuntime.combo.peak : 0 });
     if (cleared && WG.AscendRebirth && WG.AscendRebirth.maybeShow) {
       huntRuntime.rebirthPending = !!WG.AscendRebirth.isEligible();
       WG.AscendRebirth.maybeShow({ stageId, onContinue: showResults });

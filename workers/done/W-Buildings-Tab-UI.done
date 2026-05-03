@@ -1,0 +1,92 @@
+# W-Buildings-Tab-UI — DONE 2026-05-01
+
+Three commits, one concern each. SPEC §9 + HD source `scr_02` honored.
+
+## Commits
+
+| Concern | Hash    | Files touched                                                      |
+|---------|---------|---------------------------------------------------------------------|
+| A       | ea9fea1 | `js/forge/forge-render.js`                                          |
+| B       | a2c49a9 | `js/forge/forge-render.js`, `forge-buildings.js`, `forge-daily.js`, `js/core/wg-state.js` |
+| C       | (this)  | `js/core/wg-state.js`, `js/forge/forge-craft.js`, `STATE_OF_BUILD.md`, this marker |
+
+## UI elements shipped (per scr_02 reference)
+
+- **Diorama (~30vh canvas)** — procedurally drawn cave + pagoda + animated
+  campfire with two-frequency flicker (4.7 Hz + 9.2 Hz). Tier-shaped pagoda
+  roof grows with level; campfire flame scales with level.
+- **Power readout** — `Power: <N>` in red/orange centered below diorama
+  (`#ff8838` with text-shadow glow).
+- **8-slot building grid (4×2)** — Cave / Forge / Campfire unlocked + Fence /
+  Cannon / Anvil / Range / Trap locked; tap unlocked = detail modal, tap
+  locked = unlock-flow modal.
+- **Building detail modal** — 5-row upgrade ladder (next 5 levels) with
+  cost + benefit per tier, primary Upgrade button.
+- **Daily Chest with 7-day streak strip** — pip row of days (current
+  day glowing, claimed days dimmed); reward count-up animation on claim
+  (700 ms ease-out cubic); day 7 hands out a guaranteed Rare relic.
+- **Forge anvil station** — anvil glyph on stone-platform shape; tap →
+  polished crafting modal with Craft × 10 + ⓘ Probability Info + material
+  display + disabled state when fragments / daily cap insufficient.
+- **Locked-slot unlock flow** — GS gate readout (orange when not met),
+  standard unlock (only when GS met), 200💎 bypass, Watch Ad bypass via
+  `WG.Ads.showRewardedVideo`.
+- **Polish** — tap scale-bounce on every button; `modal-pop` 200 ms keyframe
+  animation (already in index.html); reward count-up; diorama rAF stops
+  when Forge tab loses focus.
+
+## Tunables (all inline at the top of their respective modules)
+
+`forge-buildings.js`:
+- `DIAMOND_BYPASS_COST = 200`
+- `AD_REWARD_AVAILABLE = true`
+- `DEFS[*].unlockGS` — 500 / 1500 / 3000 / 6000 / 10000 (Fence / Cannon /
+  Anvil / Range / Trap)
+- `DEFS[*].unlockCost` — coins/diamonds resource cost once GS gate is met
+- `DEFS.cave.baseGen = 0.6` (idle coin trickle)
+
+`forge-daily.js`:
+- `DAY_MS = 24 h` (cooldown)
+- `STREAK_GRACE_MS = 48 h` (skip threshold — beyond this, streak resets)
+- `STREAK_REWARDS[7]` — coin / diamond / card / fragment ladder
+- Day 7 sets `rareRelicChance: true` → guaranteed Rare relic drop
+
+`forge-craft.js`:
+- Drop probabilities at Forge Lv.1: Common 70% / Rare 22% / Epic 6% /
+  Legendary 1.8% / Mythic 0.2% (visible in Probability Info modal).
+  Each Forge level shifts ~2.5% from Common into higher tiers.
+- `craftDailyMax = 10` batches/day
+- `costPerBatch = 30 fragments`
+
+`forge-render.js`:
+- `DIORAMA_HEIGHT_VH = 30`
+- `DIORAMA_FLICKER_HZ_PRIMARY = 4.7`, `_OVERTONE = 9.2`
+
+## Power formula update (Concern C)
+
+`WG.State.recomputePower()` — buildings now contribute `level × 50`
+(previously `level × 6`).  Default-state Power moved 76 → 208, in line
+with scr_02's mid-tier 1347.
+
+## Verified in browser smoke test (localhost:3996)
+
+- Forge tab renders all 5 sections (h2, diorama canvas, Power readout,
+  buildings section with chest + grid, anvil section).
+- Locked-slot tap on Fence opens modal showing "Unlock at Power 500
+  (you: 208)" in orange + Watch Ad + Pay 200💎 + Cancel.
+- Craft × 10 button opens crafting modal; Probability Info nested modal
+  shows Common 70.0% / Rare 22.0% / Epic 6.0% / Legendary 1.8% / Mythic
+  0.2% at Forge Lv.1.
+- Daily Chest claim → reward modal with count-up animation; streak day
+  advances; pip strip updates next refresh.
+- Diorama canvas animates campfire flicker; rAF stops on tab change.
+- All 4 module files pass `node --check`.
+
+## Constraints honored
+
+- DOM-based UI throughout — diorama canvas is decorative only, every tap
+  target is a real DOM element. Reliable phone taps.
+- One concern per commit. Three commits.
+- Polish mandate satisfied: modal pop-in (CSS keyframe), reward count-up
+  (rAF), tap scale-bounce on every button.
+- Probability table baseline matches the spec's 70/22/6/1.8/0.2.

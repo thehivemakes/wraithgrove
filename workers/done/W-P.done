@@ -1,0 +1,5 @@
+Worker P shipped legal/privacy.html + legal/terms.html — full SDK-named privacy policy and Terms of Service.
+Files written: legal/privacy.html, legal/terms.html
+SDKs named: Capacitor (Ionic), Apple StoreKit, Google Play Billing, Stripe Checkout, Google AdMob — 5 total. All 12 IAP SKUs disclosed by name with price and grant. Analytics confirmed as own-server only (no third-party SDK per meta-events.js). AdMob creative restrictions from AD_SDK_LOCKDOWN.md referenced.
+Deviations: None. Privacy policy contains 9 ARCHITECT FILL markers (jurisdiction, entity, email, region, dates); terms.html contains 7. Both use yellow-highlighted .fill spans so markers are visually obvious in browser. No legalese filler — plain prose throughout.
+Confidence: high

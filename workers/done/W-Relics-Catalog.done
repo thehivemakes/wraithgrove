@@ -1,0 +1,10 @@
+W-Relics-Catalog — DONE — 2026-04-28T00:00:00Z
+Files touched: js/relics/relics-catalog.js, js/relics/RELICS_DESIGN.md
+Commits: e53b546 (Concern A), da23b45 (Concern B)
+Notes:
+  - node --check PASS on relics-catalog.js
+  - Worker prompt used field name 'rarity' and spaced colon — actual file uses 'tier' (no spaces) consistent with all other catalog modules. Kept 'tier' to avoid breaking WG.RelicsCatalog.byTier() callers. Verification grep adapted accordingly: grep -c "tier:'common'" returns 12 as expected.
+  - 12 original Wraithgrove Common names: Braided Cord, Ghost Script, Cracked Cup, Thrown Stone, Reed Chime, Paring Blade, Bone Ash, Kneaded Clay, Cloth Strip, Mold Sprig, Mourning Leaf, Dulled Hatchet.
+  - Mix: 4 weapons/tools + 3 mundane + 3 folk-horror ceremonial + 2 wildcards. No verbatim Wood Siege names.
+  - All stat/value/icon preserved from prior Common entries.
+  - Rare/Epic/Legendary/Mythic tiers untouched.

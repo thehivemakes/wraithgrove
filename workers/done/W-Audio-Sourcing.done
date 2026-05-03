@@ -1,0 +1,90 @@
+# W-Audio-Sourcing — done
+
+**Worker:** Audio Sourcing (AS)
+**Date:** 2026-05-01
+**Commits:**
+- A: 13 SFX files (`ed1d91e`)
+- B: 6 ambient + 6 UI files (`2580c64`)
+- C: manifest + STATE_OF_BUILD + this marker (this commit)
+
+## Files shipped
+
+| Bus      | Files | Bytes     |
+|----------|-------|-----------|
+| sfx      | 13    | ~156 KB   |
+| ambient  | 6     | ~6.4 MB   |
+| ui       | 6     | ~72 KB    |
+| **total**| **25**| **6.60 MB** of 50 MB budget |
+
+(Engine `EVENT_MAP` has 25 wired ids; manifest header had a typo of "16 sfx / 7 ui"
+which I corrected to match the engine — actual counts are 13/6/6 = 25.)
+
+## Sources
+
+**SFX + UI:** Kenney.nl CC0 packs only — no attribution required.
+- Impact Sounds, Interface Sounds, RPG Audio, Casino Audio, Voiceover Pack
+  (Fighter), Sci-Fi Sounds, Digital Audio.
+- Workflow: `curl` zip → `unzip` to `/tmp/wraith-audio/` → cherry-pick →
+  `ffmpeg -ac 1 -b:a 128k` → `audio/{sfx,ui}/<id>.mp3`.
+- Some sources trimmed (`-t 0.3`, `-t 0.4`) to match manifest duration ceilings.
+
+**Ambient:** synthesized via `ffmpeg -f lavfi` — original generation, no
+third-party samples, public-domain clean. Stereo 128 kbps mp3.
+- forest_day / forest_dusk / wind_stone: filtered noise beds (brown / brown /
+  white) with bandpass + slow tremolo
+- temple_drone: sine 82.4 + 123.5 Hz (root + perfect-5th) cluster
+- cave_drips: quiet bed + 600 Hz drip pings every 5 s
+- wraith_choir: sine 87.3 + 92.5 + 174.6 Hz (minor-2nd cluster) with tremolo
+
+## Files NOT placeholder-sourced (all 25 present)
+
+None — every wired id has a file on disk. The `WG.Audio._state().missing`
+array should be empty.
+
+## Honest quality flags (for the next ear)
+
+- **Voice grunts (player_hurt / player_die):** the Kenney Voiceover Pack
+  (Fighter) numbered files 1.ogg–10.ogg are unlabeled grunts/yells. I picked
+  1.ogg trimmed to 0.4 s for hurt and 7.ogg untrimmed (1.17 s) for death
+  without listening. They may not feel right tonally; review against the
+  Eastern folk-horror register and swap if jarring. Alternates inside the
+  same pack: 2–6 (likely shorter grunts), 8–10 (likely longer death cries).
+- **Ambient beds:** synthesized noise/drone, NOT field recordings. Drones
+  (temple, wraith, cave) work in the folk-horror register. Forest/wind beds
+  are tonally honest but lack birds, leaves, distant fauna. Replace with
+  Sonniss GDC archive or Freesound CC0 nature recordings when network/disk
+  budget allows. Proposed alternates documented in `audio/MANIFEST.md`
+  under "Sources used".
+- **Skill burst (skill_burst.mp3):** Kenney sci-fi `lowFrequency_explosion_001`
+  is a digital sub-bass thump, not a magical/elemental burst. Reads as
+  "heavy impact" but lacks magic timbre. If the 22-s-cooldown signature
+  sound deserves more, layer with a glass shatter or pull a Freesound CC0
+  spell-cast clip later.
+
+## Verification (do this in browser)
+
+1. `node --check` not applicable (no JS changed; engine untouched).
+2. Start server (`wraithgrove` launch.json), open `http://localhost:3996/`.
+3. Tap anywhere to arm Web Audio context.
+4. Console: `WG.Audio._state()` → `missing` array should be `[]` for all wired ids.
+5. Enter Hunt Stage 1. Confirm:
+   - Ambient `forest_day` loops at low volume.
+   - Swing fires on player auto-attack (chop thunk).
+   - Coin/orb/fragment ping on pickups.
+   - Boss hit/die fires on stage clear.
+6. Tab between Ascend/Forge/Relics/Duel — `ui_tab` should fire on each switch.
+
+## Scope I did NOT touch
+
+- `js/core/wg-audio.js` — engine left as-is per worker constraints.
+- `EVENT_MAP` rows — none added.
+- Settings panel UI for mute/volume sliders — flagged in manifest as
+  Architect-touch task, separate concern.
+- Music tracks — not in manifest scope; ambient-only register.
+
+## Dirty state at handoff
+
+- `audio/music/` directory exists, empty (created at scaffold time, no music
+  files in the spec). Left in place; harmless.
+- `/tmp/wraith-audio/` holds the downloaded Kenney zips and unpacks. Not
+  committed. Safe to delete.

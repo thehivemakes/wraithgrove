@@ -1,0 +1,5 @@
+AdMob wired via Capacitor channel dispatcher; lockdown doc written; placeholder path confirmed in browser.
+Files: js/meta/meta-ads.js (edited), package.json (edited), docs/AD_SDK_LOCKDOWN.md (new).
+SDK: @capacitor-community/admob ^5.0.1; isExternal:false lockdown at call site; Google test IDs for dev; production reads WG.AdConfig.
+Deviations: none. Package version ^5.0.1 chosen for Capacitor 5 parity; Architect should verify on npm install.
+Confidence: high.

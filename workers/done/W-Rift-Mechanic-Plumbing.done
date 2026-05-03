@@ -1,0 +1,47 @@
+# W-Rift-Mechanic-Plumbing — DONE
+Completed: 2026-05-02
+
+## Tunables (frozen on WG.HuntPickups.RIFT_TUNABLES)
+
+| Tunable | Value | Note |
+|---|---|---|
+| RIFT_SIGIL_DROP_RATE_BOSS | 1.0 | Wraith Father (stage 18) always drops 1 on clear |
+| RIFT_SIGIL_DROP_RATE_STAGE_CLEAR | 0.01 | 1% per eldritch stage clear (stages 16–18) |
+
+Both rolls fire independently on stage 18 clear: boss drop (guaranteed) + stage-clear roll (1%).
+Stages 16 and 17 have no boss drop — stage-clear roll only.
+
+## Drop state
+
+- `WG.State.get().rift.sigils` — cumulative integer counter.
+- `Math.floor(sigils / 3)` = unlocked guest slots.
+- Sigils never consumed — progress is cumulative.
+- Grant path: `wg-game.js finishHunt(true)` → `WG.HuntPickups.rollSigilDrop(stageId, bossDefeated)` → `state.rift.sigils += count` + `WG.Engine.emit('rift:sigil-found', ...)`.
+
+## Files changed
+
+| File | Change |
+|---|---|
+| `js/relics/relics-catalog.js` | Added `rift_sigil` (legendary, `equippable:false`, `stat:null`, `value:0`) |
+| `js/relics/relics-equip.js` | Guard: rejects equip if `r.equippable === false` |
+| `js/core/wg-state.js` | Added `rift: { sigils: 0 }` to state schema |
+| `js/hunt/hunt-pickups.js` | Added `RIFT_TUNABLES`, `rollSigilDrop()`, exposed both on `WG.HuntPickups` |
+| `js/wg-game.js` | `finishHunt`: calls `rollSigilDrop`, grants sigils to state, emits `rift:sigil-found` |
+| `js/hunt/hunt-results.js` | Shows `🔮 ×N Rift Sigil` in rewards row when sigils drop |
+| `js/ascend/ascend-render.js` | Added "RIFT GUESTS" collapsible section (default collapsed) |
+
+## ??? Slot UI description
+
+- Section header: "RIFT GUESTS" (11px, gold letter-spacing, right ▼/▲ toggle)
+- Default state (0 sigils): "The boundary is intact. Collect Rift Sigils from eldritch stages."
+- Slot tile: 🔒 icon, "??? — locked" (purple-grey), "Reveal pending."
+- Progress row: "0/3 Sigils" + violet progress bar (fills as sigils accumulate)
+- When 3 sigils reached: lock icon becomes 🔮, border shifts to `#6020a0`
+- Ysabel NOT named anywhere. Slot stays ??? pending Architect ratification.
+
+## Constraints respected
+
+- No mechanic balance change to existing relics or stages.
+- No guest character committed.
+- System is inert until player reaches eldritch biome — zero performance impact on stages 1–15.
+- All syntax checked: `node --check` passes on all 7 modified files.

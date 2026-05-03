@@ -1,0 +1,40 @@
+W-Navigation-Pivot — DONE — 2026-05-01
+
+SPEC §0 navigation model + Day/Night lobby chooser landed. Three commits.
+
+Files touched:
+  index.html
+    - CSS: body.in-stage hides #nav-bar, #top-strip, resets #hunt-hud inset to 0
+    - CSS: .back-btn pill (top-left of HUD, pointer-events:auto)
+    - DOM: #hunt-back-btn ("← MENU") added inside #hunt-hud
+  js/wg-game.js
+    - module-state: currentLevelMode = 'day' (persists across re-renders of stage select)
+    - buildHuntRuntime(stageId, mode): writes rt.mode ('day' | 'night')
+    - startHunt(stageId, mode): adds body.in-stage; emits hunt:stage-start with mode
+    - exitHunt(): removes body.in-stage; restores tabs + stage list
+    - setupNav(): wires #hunt-back-btn → exitHunt()
+    - showHuntStageList(): replaced flat 18-card list with [DAY | NIGHT] mode tabs
+      atop a 2-col grid of 18 cards. Day cards = warm green tint;
+      Night cards = deep blue tint + ☾ icon. All stages unlocked for now.
+
+Manual verification (preview server localhost:3996):
+  - Lobby: nav-bar + top-strip + 18 cards visible. Day/Night tabs render.
+  - Click NIGHT MODE → cards re-tint to deep blue, STAGE labels show ☾.
+  - Tap STAGE 1 card on NIGHT MODE → runtime.mode = 'night', stage 1 active.
+  - body.className === 'in-stage'. nav-bar display:none. top-strip display:none.
+  - hunt-back-btn visible, hunt-stage-select removed.
+  - Click ← MENU → runtime cleared, body.in-stage removed, nav + top-strip restored,
+    stage-select recreated with 18 cards.
+  - No console errors.
+
+Downstream: hunt-waves / hunt-render / hunt-torch (Night Mode mechanics from
+SPEC §0) read rt.mode === 'night' to apply enemy density, hidden bosses,
+torch-radius dimming. This worker only stores the value; downstream workers
+implement the gameplay differences.
+
+Known soft notes (not blocking):
+  - HuntTutorial.maybeStart still fires on Stage 1 entry — covers the screen
+    once on first run; existing behavior, not in this worker's scope.
+  - The "highest unlocked" gating was removed per worker spec ("all 18 stages
+    can be unlocked"). State.huntProgress.highestUnlocked is still updated
+    by results.js for future use.

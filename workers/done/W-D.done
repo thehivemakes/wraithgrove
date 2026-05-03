@@ -1,0 +1,5 @@
+Three Hunt bugs fixed: exitHunt reliably re-renders stage select; level-up boon options lock atomically per level-up; cd/dmg/speed boons now actually affect gameplay.
+wg-game.js, js/hunt/hunt-render.js, js/hunt/hunt-player.js, STATE_OF_BUILD.md
+Concern1(nav-fix): pass — exitHunt uses explicit tab activation + showHuntStageList always recreates panel | Concern2(lu-lock): pass — _luOptions set via spread, _luBounds rebuilt each frame atomically | Concern3(boon-plumbing): pass — cooldownMul initialized in place(), applied in autoAttack(); baseDamage reads p.bonusDmg; move() adds p.speedBonus; applyLevelChoice cd writes cooldownMul; node --check all pass
+No git repo present — changes on disk only (worker prompt acknowledged this case). No deviations from concern specs. hunt-results.js required no edits (BACK/RETRY/NEXT already correct per worker analysis).
+high

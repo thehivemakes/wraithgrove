@@ -14,6 +14,10 @@
   const TORCH_RELIGHT_R     = 100;     // SPEC §0: campfire 100-unit relight radius
   const TORCH_DROP_CHANCE   = 0.20;    // 20% per chopped tree in Night Mode
 
+  // W-Dopamine-P1 §B — crit tunables. Frozen: future relic boosts read these to
+  // compute additive chance / multiplicative modifier deltas, not replace them.
+  const CRIT_TUNABLES = Object.freeze({ chance: 0.12, multiplier: 1.6 });
+
   let runtime = null;
 
   function place(x, y, rt) {
@@ -159,8 +163,13 @@
         if (c.hp <= 0) continue;
         const dx = c.x - p.x, dy = c.y - p.y;
         if (dx*dx + dy*dy < r * r) {
-          const dmg = baseDamage(w);
-          if (WG.HuntEnemies.damage(c, dmg, { type:'player-melee' })) onEnemyKill(c);
+          let dmg = baseDamage(w);
+          const isCrit = Math.random() < CRIT_TUNABLES.chance;
+          if (isCrit) {
+            dmg = Math.round(dmg * CRIT_TUNABLES.multiplier);
+            WG.Engine.emit('enemy:crit', { x: c.x, y: c.y, amount: dmg });
+          }
+          if (WG.HuntEnemies.damage(c, dmg, { type:'player-melee', crit: isCrit })) onEnemyKill(c);
           hits++;
         }
       }
@@ -352,6 +361,23 @@
     if (Math.random() < 0.25) {
       runtime.drops.push({ x: c.x, y: c.y, type: 'orb', vx:0, vy:0 });
     }
+    // W-Dopamine-P1 §A — combo tracking
+    const combo = runtime.combo;
+    if (combo) {
+      combo.count++;
+      combo.lastKillAt = performance.now();
+      if (combo.count > combo.peak) combo.peak = combo.count;
+      WG.Engine.emit('combo:step', { count: combo.count });
+    }
+  }
+
+  function comboDecayTick() {
+    const combo = runtime.combo;
+    if (!combo || combo.count === 0) return;
+    if (performance.now() - combo.lastKillAt > 2500) {
+      combo.count = 0;
+      WG.Engine.emit('combo:reset', {});
+    }
   }
   function onBossKill() {
     const p = runtime.player;
@@ -368,6 +394,10 @@
     p.level++;
     runtime.pendingLevelUp = true;     // hunt-render shows the 3-card draft
     WG.Engine.emit('player:level', { level: p.level });
+    // W-Dopamine-P1 §C — full-screen flash + screen shake + freeze frame
+    if (window.WG && WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#f0c060', 0.5, 320);
+    if (window.WG && WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.4);
+    if (window.WG && WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(200);
   }
 
   function applyLevelChoice(choiceId) {
@@ -647,6 +677,7 @@
     if (window.WG.HuntTurret && WG.HuntTurret.tick) WG.HuntTurret.tick(dt);
     tickSkill(dt);
     tickTorch(dt);
+    comboDecayTick();
   }
 
   // Render reads REPAIR_HOVER_DELAY + REPAIR_RANGE through here so there's a
@@ -658,6 +689,6 @@
   function init() {}
   window.WG.HuntPlayer = {
     init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice,
-    REPAIR_TUNABLES,
+    REPAIR_TUNABLES, CRIT_TUNABLES,
   };
 })();

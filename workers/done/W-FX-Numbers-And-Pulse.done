@@ -1,0 +1,10 @@
+W-FX-Numbers-And-Pulse — DONE — 2026-04-30T23:15:00Z
+Files: js/hunt/hunt-fxnumbers.js (new), js/hunt/hunt-render.js (FXNumbers wire + HUD pulse cache + hud:pulse subscription), index.html (script load between hunt-render.js and hunt-tutorial.js), STATE_OF_BUILD.md
+Commits: 69b8c33 (Concern A — floating-number layer), 063b0df (Concern B — HUD counter pulse on increment)
+Notes:
+- Browser-verified at localhost:3996: floating numbers render with correct colors per event type (+1 wood-tint, +2 coin-tint, damage white-yellow, boss-damage orange, cyan LEVEL UP!, purple +1 frag); HUD wood/gold/Lv counters scale-bounce + warm-tint on increment.
+- Concern A landed alongside substantial pre-existing uncommitted polish work in hunt-render.js (ZOOM=2.0, denser forest grid, stage-prop refactor) — preserved that work in the same commit since reverting would have destroyed in-progress changes from a prior session. Concern A's own additions are scoped to the FXNumbers tick/draw calls + init wire.
+- W-FX-Trauma-And-HitPause worker (Sonnet 01) committed concurrently as 8c7d390. Their save overwrote my uncommitted Concern B edits; re-applied cleanly on top of their commit. Final hunt-render.js carries both workers' P0 contributions: trauma shake + HUD pulse + FX-numbers wires.
+- creature.lastDamage isn't set anywhere in hunt-enemies.js; FX module subscribes to enemy:damaged itself to cache amount on the creature for enemy:killed to read (no edit to hunt-enemies.js).
+- pickup:coin event isn't yet emitted anywhere in the codebase; subscriber is in place for when coin pickups land.
+- dt for FXNumbers.tick is derived inside drawFrame from performance.now() since drawFrame doesn't receive dt — a _lastFrameMs module-local clamps the first-frame dt to 0 to avoid a giant initial step.

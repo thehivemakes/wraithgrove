@@ -1,6 +1,6 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-01 by W-Buildings-Tab-UI
+**Last updated:** 2026-05-02 by W-Rift-Mechanic-Plumbing
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
@@ -13,6 +13,13 @@
 - `CLAUDE.md` — project protocol (this file's sibling)
 - `BUILD_PLAN.md` — phase queue (worker tasks)
 - `STATE_OF_BUILD.md` — this file
+
+### Rift mechanic (W-Rift-Mechanic-Plumbing 2026-05-02)
+- `state.rift.sigils` — cumulative counter; `floor(sigils/3)` = unlocked guest slots.
+- Drop path: `wg-game.js finishHunt` → `WG.HuntPickups.rollSigilDrop` → state grant + `rift:sigil-found` event.
+- Drop rates: Wraith Father (stage 18) always 1 on clear; 1% per eldritch stage clear.
+- `rift_sigil` catalog entry: legendary, `equippable:false` — cannot be slotted as combat relic.
+- Ascend tab: "RIFT GUESTS" collapsible section. Slot stays ??? — no guest announced.
 
 ### Core (`js/core/` — 7 modules)
 - `wg-engine.js` — event bus + tick driver

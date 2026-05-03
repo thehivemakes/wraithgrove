@@ -1,0 +1,16 @@
+W-Dopamine-Research — DONE — 2026-04-30T17:30:00Z
+Output: docs/DOPAMINE_DESIGN.md (408 lines)
+Sources cited: 21 distinct external sources (47 URL references inline)
+P0 items: 7 (floating-number layer, trauma-shake, sprite hit-flash + squash, hit-pause, particle pool, counter pulse, magnet tuning)
+P1 items: 9 (3-card pacing, crit, combo HUD, result count-up, per-run weapon levels, anchor drops, audio sourcing, level-up flash, magnet-vacuum signature)
+P2 items: 8 (evolutions, music density, boss-stagger, rebirth animation, building claim-all, relic cinematic, post-process, daily/login)
+Recommended next workers: W-FX-Numbers, W-FX-ScreenShake, W-FX-HitPause, W-FX-Sprites-Particles, W-Audio-Sourcing
+Notes:
+  - The genre's defining trait is STACKED feedback (3+ channels per input) — Wraithgrove ships ~1 channel today (sprite swap on chop). This is the pinpoint the Architect named.
+  - wg-audio.js infrastructure is sound; missing pieces are EVENT_MAP rows + asset files. Audio sourcing is a parallelizable side-quest.
+  - The floating-number layer (P0 #1) is the single highest-leverage addition — without it, all other juice whispers.
+  - Trauma-based screen shake (Squirrel Eiserloh, GDC 2016) is the canonical model; the squared-trauma curve gives perceptible escalation that linear shake cannot.
+  - Hit-pause is genre-non-negotiable for kills; it should NOT fire on tree chops (would cripple chop-flow at 5/sec).
+  - Survivor.io's "result screen count-up over ~1.5–2s" is itself the dopamine hit — instant-settle counters lose the entire reward beat. Verify hunt-results.js does NOT instant-settle.
+  - SPEC.md needs no rewrite; this doc is purely additive juice spec on top of the existing mechanics clone.
+  - Did NOT touch any code per worker brief constraint. Did NOT spawn agents. Read primary observations + SPEC + audio module to ground recommendations in actual file paths.

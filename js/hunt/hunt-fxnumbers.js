@@ -124,6 +124,16 @@
       const wx = (x != null) ? x : 0, wy = (y != null) ? y : 0;
       spawn(wx, wy - 4, '+' + (amount || 1), { color: COLOR_COIN, size: SIZE_BASE * 0.85 });
     });
+    // W-Dopamine-P1 §B — crit: 50% larger number, bright gold
+    WG.Engine.on('enemy:crit', ({ x, y, amount }) => {
+      if (x == null || y == null) return;
+      spawn(x, y - 10, '+' + Math.round(amount || 0), {
+        color: '#ffe060',
+        size: SIZE_BASE * 1.5,
+        duration: DEFAULT_DURATION_MS + 200,
+        velocity: DEFAULT_VELOCITY * 1.3,
+      });
+    });
     WG.Engine.on('relic:fragment-pickup', ({ x, y, amount }) => {
       const rt = (WG.Game && WG.Game.getHuntRuntime) ? WG.Game.getHuntRuntime() : null;
       const player = rt && rt.player;

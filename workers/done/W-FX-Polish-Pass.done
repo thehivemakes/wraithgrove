@@ -1,0 +1,46 @@
+W-FX-Polish-Pass — DONE 2026-05-01
+
+Closes audit AUDIT_BatchBCDE_20260501T200626Z.md §C.2 polish gaps 1, 2, 3, 5, 7.
+Five gameplay events that emitted with no listener now have FX/HUD/audio responses.
+
+## Commits (one concern each)
+
+### A — 7e76783 — player:revived + pickup:torch + turret:destroyed
+- js/hunt/hunt-fx.js:48-55     pickupTorch BURST_TYPE (warm orange-yellow sparkle, gravity -20)
+- js/hunt/hunt-fx.js:52-55     playerRevive BURST_TYPE (cyan + gold, 32 ring particles, life 0.9s)
+- js/hunt/hunt-fx.js:166-173   pickup:torch listener (burst + +TORCH float-text)
+- js/hunt/hunt-fx.js:174-187   player:revived listener (ring burst + 0.5 trauma + cyan flash + REVIVED text)
+- js/hunt/hunt-turret.js:165-167  addTrauma(0.4) on turret:destroyed (gap 5 — was missing screen kick)
+- js/wg-game.js:484             expose flashScreen on WG.Game (was private; player:revived flash needed it)
+
+### B — a7c8519 — buff:expired/consumed HUD desaturation + audio
+- js/hunt/hunt-render.js:42-47   BUFF_GHOST_DUR_MS=280 + _buffGhosts ghost-pill track
+- js/hunt/hunt-render.js:2253-2260  buff:expired/consumed listeners push ghost entry
+- js/hunt/hunt-render.js:1968-2018  HUD draw extended: ghost pills render desaturated (gray border + dim fill) and fade over 280ms before pruning — replaces snap-removal
+- js/hunt/hunt-fx.js:188-198    buff:consumed listener (gold confirm-burst at player + USED float-text)
+- js/core/wg-audio.js:51-58     EVENT_MAP rows for pickup:torch (orb), player:revived (level_up), buff:expired (ui_modal), buff:consumed (cha_ching)
+
+### C — fc372b9 — ad-revive countdown number pulse + color shift
+- js/hunt/hunt-results.js:75-101  countdown number scale 1.0→1.55→1.0 (overshoot ease-back) per second + color shift white→yellow(3s)→orange(2s)→red(1s)→fade(0)
+
+## Verification
+
+- node --check on all 5 modified js files — PASS
+- Browser smoke test (port 3996, /wraithgrove):
+  - WG.Game.flashScreen → function (was undefined before A)
+  - WG.HuntRender.addTrauma → function
+  - WG.Buffs.BUFFS catalog → present (ghost lookup uses .short via this)
+  - WG.Engine.emit('pickup:torch',{x,y}) — clean (no errors)
+  - WG.Engine.emit('player:revived',{}) — clean
+  - WG.Buffs.activate + has(expire) + consume — emits buff:expired and buff:consumed cleanly; HUD ghost track populated
+- Console errors: zero from W-FX-Polish-Pass scope. Pre-existing forge-render appendChild errors observed (unrelated, predates this worker).
+
+## Out of scope (per worker brief)
+
+- Gap 4 (Day↔Night transition) — deferred, scope-extension per AUDIT §C.2
+- Gap 6 (wave-tier transitions 5/10/15 silent) — deferred, scope-extension per AUDIT §C.2
+- hunt-stage / hunt-waves / hunt-enemies / hunt-bosses / meta-iap untouched per worker constraints
+
+## Note on prior in-tree state
+
+Found uncommitted partial changes in the working tree on entry (hunt-fx.js, hunt-turret.js, hunt-results.js) that mirrored the worker brief but had two issues: (1) used WG.HuntPlayer.runtime.player which is not exposed publicly, (2) called WG.Game.flashScreen which was not on the export list. Reset, rebuilt clean using WG.Game.getHuntRuntime().player and added flashScreen to the WG.Game export. Concern B's HUD desaturation + audio EVENT_MAP additions were entirely missing from the prior attempt and are new.

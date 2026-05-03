@@ -1,0 +1,29 @@
+W-Dopamine-P1 — DONE
+Committed: 3 commits (A/B/C) on branch claude/youthful-euler-4111f6
+
+CONCERN A — Kill-Combo HUD
+  Files: hunt-player.js, hunt-render.js, wg-game.js
+  - combo: { count, lastKillAt, peak } on buildHuntRuntime
+  - onEnemyKill increments count, records lastKillAt, tracks peak, emits combo:step
+  - comboDecayTick() called each tick: resets count→0 + emits combo:reset after 2500ms silence
+  - DOM overlay #wg-combo-hud, top-center, CSS z-index:900
+  - Color tiers: 1–4 #ffffff | 5–9 #ffd870 | 10–19 #ff8c00 | 20+ #ff4040
+  - combo:step → show, set text "x{n}", re-trigger @keyframes combo-pop
+  - combo:reset / hunt:stage-start → display:none
+  - peakCombo flows wg-game.js finishHunt → HuntResults.show({ peakCombo })
+
+CONCERN B — Crit Hits
+  Files: hunt-player.js, hunt-render.js, hunt-fxnumbers.js, wg-audio.js
+  CRIT_TUNABLES = Object.freeze({ chance: 0.12, multiplier: 1.6 })
+  - Melee auto-attack only: rolls Math.random() < 0.12; if crit, dmg ×1.6, emits enemy:crit
+  - hunt-fxnumbers: enemy:crit → spawn '+N' at (x, y-10), #ffe060, size 21px (1.5×base), +200ms duration, 1.3× velocity
+  - hunt-render: enemy:crit → addTrauma(0.05) + 8 magenta ring particles + 12 gold burst particles
+  - wg-audio: enemy:crit → boss_hit sample, vol 0.85, throttle 60ms
+  - CRIT_TUNABLES exported on WG.HuntPlayer for relic hooks
+
+CONCERN C — Results Count-Up + Level-Up Flash
+  Files: hunt-results.js, hunt-player.js
+  - tweenCounter(el, target, 800ms): ease-out cubic (1-(1-t)³), ticks ui:button at 25%/50%/75%/100%
+  - KILLS, COINS, PEAK COMBO all tween from 0 on modal open (80ms stagger)
+  - comboTierColor(n) drives PEAK COMBO label color: same 4 tiers as HUD
+  - hunt-player.js levelUp(): flashScreen('#f0c060', 0.5, 320) + addTrauma(0.4) + hitPause(200)

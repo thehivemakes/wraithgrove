@@ -10,7 +10,13 @@
     }
     for (const kid of kids) {
       if (kid == null) continue;
-      e.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
+      if (typeof kid === 'string' && kid.includes('<')) {
+        const t = document.createElement('template');
+        t.innerHTML = kid;
+        e.appendChild(t.content.cloneNode(true));
+      } else {
+        e.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
+      }
     }
     return e;
   }
@@ -52,7 +58,14 @@
 
     const ascRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
     ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryAscend(); refresh(); if(!r.ok) toast('Need lvl 30 + ' + WG.AscendCharacter.ascendCost(ps.ascendTier) + ' <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'); } }, `ASCEND (${WG.AscendCharacter.ascendCost(ps.ascendTier)} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`));
-    ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryCultivate(); refresh(); if(!r.ok) toast('Need 5 💎'); } }, 'CULTIVATE (5 💎)'));
+    const canCultivate = (WG.State.get().currencies.diamonds || 0) >= 5;
+    const cultivateBtn = el('button', {
+      class: 'btn' + (canCultivate ? '' : ' disabled'),
+      title: 'Cultivate · Cost: 5 💎 · Grants +2 ATK and +8 HP',
+      onclick: () => { if (canCultivate) showCultivateModal(); },
+    }, 'CULTIVATE (5 💎)');
+    if (!canCultivate) cultivateBtn.style.opacity = '0.45';
+    ascRow.appendChild(cultivateBtn);
     heroBox.appendChild(ascRow);
 
     scroll.appendChild(heroBox);
@@ -82,14 +95,17 @@
     const statsBox = el('div', { class:'scene-row' });
     statsBox.appendChild(el('h2', null, 'Stats'));
     const stats = ps.stats;
-    const lines = [
+    const primaryLines = [
       { label:'Attack', value: Math.round(stats.attack), upgrade:'attack' },
       { label:'HP Max', value: Math.round(stats.hpMax), upgrade:'hpMax' },
-      { label:'Defense', value: Math.round(stats.defense), upgrade:'defense' },
-      { label:'Crit',   value: ((stats.critRate||0)*100).toFixed(0)+'%', upgrade:'critRate' },
-      { label:'Gather', value: ((stats.gatherRate||0)*100).toFixed(0)+'%', upgrade:'gatherRate' },
     ];
-    for (const ln of lines) {
+    const detailLines = [
+      { label:'Defense',    value: Math.round(stats.defense), upgrade:'defense' },
+      { label:'Crit',       value: ((stats.critRate||0)*100).toFixed(0)+'%', upgrade:'critRate' },
+      { label:'Wood Yield', value: ((stats.gatherRate||0)*100).toFixed(0)+'%', upgrade:'gatherRate' },
+    ];
+
+    function makeStatRow(ln) {
       const u = WG.AscendStats.UPGRADES[ln.upgrade];
       const n = ps.stats['_lvl_'+ln.upgrade] || 0;
       const cost = u.cost(n);
@@ -97,8 +113,20 @@
       row.appendChild(el('span', { style:'color:#c8a868;' }, ln.label));
       row.appendChild(el('span', { style:'color:#f0d890;font-weight:600;' }, '' + ln.value));
       row.appendChild(el('button', { class:'btn', style:'font-size:9px;padding:4px 8px;', onclick: () => { const r = WG.AscendStats.tryUpgrade(ln.upgrade); refresh(); if(!r.ok) toast('Insufficient'); } }, '+ ' + cost + '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'));
-      statsBox.appendChild(row);
+      return row;
     }
+
+    for (const ln of primaryLines) statsBox.appendChild(makeStatRow(ln));
+
+    const details = document.createElement('details');
+    details.style.cssText = 'width:100%;';
+    const summary = document.createElement('summary');
+    summary.style.cssText = 'cursor:pointer;padding:6px 4px;font-size:10px;color:#a89878;letter-spacing:1px;list-style:none;';
+    summary.textContent = 'DETAILED STATS';
+    details.appendChild(summary);
+    for (const ln of detailLines) details.appendChild(makeStatRow(ln));
+    statsBox.appendChild(details);
+
     scroll.appendChild(statsBox);
 
     // Power summary — annotated with the active character's tier contribution
@@ -127,6 +155,66 @@
       }, note));
     }
     scroll.appendChild(pwrBox);
+
+    // Rift Guests — collapsible, default collapsed (W-Rift-Mechanic-Plumbing).
+    // Slot stays ??? until Architect ratifies the first guest reveal.
+    const riftState = WG.State.get().rift || { sigils: 0 };
+    const unlockedSlots = Math.floor(riftState.sigils / 3);
+    const sigilsInProgress = riftState.sigils - unlockedSlots * 3;
+
+    const riftBox = el('div', { class:'scene-row', style:'padding:0;overflow:hidden;' });
+    const riftHeader = el('div', {
+      style:'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;user-select:none;',
+    });
+    riftHeader.appendChild(el('div', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'RIFT GUESTS'));
+    const riftArrow = el('div', { style:'font-size:10px;color:#806040;' }, '▼');
+    riftHeader.appendChild(riftArrow);
+    riftBox.appendChild(riftHeader);
+
+    const riftBody = el('div', { style:'display:none;padding:0 12px 12px 12px;' });
+
+    riftHeader.addEventListener('click', () => {
+      const collapsed = riftBody.style.display === 'none';
+      riftBody.style.display = collapsed ? 'block' : 'none';
+      riftArrow.textContent = collapsed ? '▲' : '▼';
+    });
+
+    if (unlockedSlots === 0) {
+      riftBody.appendChild(el('div', {
+        style:'font-size:11px;color:#806040;line-height:1.6;margin-bottom:10px;',
+      }, 'The boundary is intact. Collect Rift Sigils from eldritch stages.'));
+    }
+
+    // Slot 1 — always visible; locked display until 3 sigils collected.
+    const slotLocked = unlockedSlots < 1;
+    const slotTile = el('div', {
+      style:`display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.3);border:1px solid ${slotLocked?'#3a1a4a':'#6020a0'};border-radius:6px;padding:8px 10px;`,
+    });
+    const slotIcon = el('div', {
+      style:`width:36px;height:36px;border-radius:4px;background:${slotLocked?'#1a0a20':'#2a0a3a'};display:flex;align-items:center;justify-content:center;font-size:18px;`,
+    }, slotLocked ? '🔒' : '🔮');
+    slotTile.appendChild(slotIcon);
+    const slotInfo = el('div', { style:'flex:1;' });
+    slotInfo.appendChild(el('div', { style:`font-size:13px;font-weight:600;color:${slotLocked?'#604080':'#c080ff'};` }, '??? — locked'));
+    slotInfo.appendChild(el('div', { style:'font-size:10px;color:#806040;margin-top:2px;' }, 'Reveal pending.'));
+    slotTile.appendChild(slotInfo);
+    riftBody.appendChild(slotTile);
+
+    // Sigil progress toward next unlock.
+    const progressRow = el('div', { style:'margin-top:8px;' });
+    progressRow.appendChild(el('div', {
+      style:'font-size:10px;color:#806040;text-align:center;margin-bottom:4px;letter-spacing:1px;',
+    }, `${sigilsInProgress}/3 Sigils`));
+    const barTrack = el('div', { style:'height:4px;background:rgba(96,32,160,0.2);border-radius:2px;overflow:hidden;' });
+    const barFill = el('div', {
+      style:`height:100%;width:${Math.round(sigilsInProgress/3*100)}%;background:linear-gradient(to right,#6020a0,#c080ff);border-radius:2px;`,
+    });
+    barTrack.appendChild(barFill);
+    progressRow.appendChild(barTrack);
+    riftBody.appendChild(progressRow);
+
+    riftBox.appendChild(riftBody);
+    scroll.appendChild(riftBox);
 
     syncTopStrip();
   }
@@ -182,6 +270,33 @@
       }
     `;
     document.head.appendChild(st);
+  }
+
+  function showCultivateModal() {
+    const root = document.getElementById('modal-root');
+    const wrap = el('div', { class:'modal-overlay show' });
+    const card = el('div', { class:'modal-card', style:'width:88%;max-width:320px;' });
+    card.appendChild(el('div', { class:'modal-title' }, 'CULTIVATE'));
+    card.appendChild(el('div', { style:'font-size:12px;color:#c8a868;margin:10px 0 4px;' }, 'Cost'));
+    card.appendChild(el('div', { style:'font-size:16px;color:#ffd870;font-weight:700;' }, '5 💎'));
+    card.appendChild(el('div', { style:'font-size:12px;color:#c8a868;margin:10px 0 4px;' }, 'Bonus'));
+    card.appendChild(el('div', { style:'font-size:14px;color:#80c8a0;' }, '+2 ATK  /  +8 HP'));
+    const btnRow = el('div', { class:'modal-btn-row', style:'margin-top:16px;' });
+    btnRow.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'CANCEL'));
+    btnRow.appendChild(el('button', { class:'btn primary', onclick: () => {
+      const r = WG.AscendCharacter.tryCultivate();
+      if (!r.ok) { wrap.remove(); toast('Need 5 💎'); return; }
+      wrap.remove();
+      // Gold flash overlay
+      const flash = el('div', { style:'position:fixed;inset:0;background:rgba(255,216,112,0.18);pointer-events:none;z-index:600;transition:opacity 600ms;' });
+      document.getElementById('modal-root').appendChild(flash);
+      requestAnimationFrame(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 620); });
+      WG.State.recomputePower();
+      refresh();
+    } }, 'CONFIRM'));
+    card.appendChild(btnRow);
+    wrap.appendChild(card);
+    root.appendChild(wrap);
   }
 
   function showSkinPicker() {

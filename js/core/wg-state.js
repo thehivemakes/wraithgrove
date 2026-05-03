@@ -60,6 +60,9 @@
       ownedSKUs: [],
       adRemovalActive: false,
     },
+    rift: {
+      sigils: 0,                   // cumulative rift sigil count; floor(sigils/3) = unlocked guest slots
+    },
     settings: {
       soundOn: true,
       musicOn: true,

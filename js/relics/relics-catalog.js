@@ -62,7 +62,7 @@
     { id:'r_ravenknot',  name:'Raven Knot',       tier:'epic',   icon:'🪡', stat:'attack',     value: 22 },
     { id:'r_dustcrown',  name:'Dust Crown',       tier:'epic',   icon:'👑', stat:'critRate',   value: 0.06 },
 
-    // Legendary (8)
+    // Legendary (8) + 1 special progression key
     { id:'r_moonshear',  name:'Moonshear',        tier:'legendary', icon:'🌙', stat:'attack',     value: 38 },
     { id:'r_souldrift',  name:'Souldrift',        tier:'legendary', icon:'💫', stat:'critRate',   value: 0.12 },
     { id:'r_marrowveil', name:'Marrowveil',       tier:'legendary', icon:'🌫', stat:'hpMax',      value: 230 },
@@ -71,6 +71,11 @@
     { id:'r_silentbell', name:'Silent Bell',      tier:'legendary', icon:'🪘', stat:'gatherRate', value: 0.30 },
     { id:'r_ashtongue',  name:'Ash Tongue',       tier:'legendary', icon:'🔥', stat:'attack',     value: 55 },
     { id:'r_hollowmark', name:'Hollow Mark',      tier:'legendary', icon:'⚜', stat:'critRate',   value: 0.14 },
+    // Rift Sigil — progression key only; no combat stat; not equippable.
+    // Drops from eldritch boss (stage 18 guaranteed) + 1% per eldritch stage clear.
+    // 3 collected → unlock next Rift Guest slot in Ascend tab.
+    // Icon: violet sigil 24×24 canvas draw — deferred to render worker.
+    { id:'rift_sigil', name:'Rift Sigil', tier:'legendary', icon:'🔮', stat:null, value:0, equippable:false },
 
     // Mythic (4)
     { id:'r_wraithheart',name:'Wraithheart',      tier:'mythic', icon:'💜', stat:'attack',     value: 135 },

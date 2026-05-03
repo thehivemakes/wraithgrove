@@ -1,0 +1,31 @@
+W-Relics-Catalog-Refresh — DONE — 2026-05-01
+
+Files touched:
+  - js/relics/relics-catalog.js (Common + Rare names refreshed)
+  - js/relics/RELICS_DESIGN.md (rewritten with current names + register guideline)
+
+Commits:
+  - 996fc41 W-Relics-Catalog-Refresh A — refresh Common-tier names with stronger eclectic mix
+  - 7a40b4e W-Relics-Catalog-Refresh B — refresh Rare-tier names with baroque eclectic mix
+  - (Concern C — RELICS_DESIGN.md + this marker, see commit hash on completion)
+
+Common (12) — 4 tools + 3 mundane + 3 ceremonial + 2 wildcards:
+  Twine Lash, Burnt Petition, Tin Bowl, River Cobble, Reed Pipe, Whetted Sliver,
+  Funeral Urn, Pickled Radish, Boiled Rag, Garlic Stalk, Joss Leaf, Rusted Hatchet.
+
+Rare (12) — practical Western + Eastern baroque ceremonial + folk-horror:
+  Iron Cog, Paper Moth, Brass Lantern, Embroidered Sash, Carved Tibia,
+  Cypress Resin, Bone Charm, Carpenter Maul, Knotted Cord, Salt Sack,
+  Vermilion Brush, Crow Plume.
+
+Verification:
+  - node --check on relics-catalog.js: PASS
+  - tier counts: common=12, rare=12, epic=12, legendary=8, mythic=4 (total 48) — unchanged
+  - Stat type, value, and icon glyph preserved per slot — balance curve untouched (W-H curve still authoritative)
+  - Epic / Legendary / Mythic tiers untouched per worker scope
+  - relics-equip / relics-collection / relics-render untouched per worker scope
+  - No verbatim Wood Siege names; mundane-absurd wildcard slot filled (Pickled Radish ≡ the Potato slot)
+
+Notes:
+  - ios/App/App/public/js/relics/relics-catalog.js is a Capacitor build artifact (out of worker scope — regenerated on next build)
+  - Predecessor refresh (W-Relics-Catalog, e53b546 + da23b45) had the right shape but the wildcard slot was under-played; this pass pushes the mundane-absurd register harder per HD_SOURCE §F (Potato/Roller-skates energy)
