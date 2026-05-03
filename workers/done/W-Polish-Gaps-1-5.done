@@ -1,0 +1,156 @@
+# W-Polish-Gaps-1-5 — DONE
+
+**Worker:** W-Polish-Gaps-1-5
+**Date:** 2026-05-03
+**Verdict:** **PASS** — all 5 audit polish gaps closed, one commit each.
+
+Closes the five non-blocking polish gaps surfaced by
+`audits/AUDIT_Menu_Banshee_Repair_Spawn_20260503T100016Z.md`
+(§"Polish gaps surfaced (non-blocking)").
+
+---
+
+## Concern A — Banshee tunables → catalog
+
+**Verdict:** PASS — pure refactor, no behavior change.
+**Commit:** `46faec1319`
+
+Promoted 7 inline magic numbers from the `banshee_charge` AI branch to
+named fields on `TYPES.banshee` in `js/hunt/hunt-enemies.js`:
+
+| Field | Value |
+|---|---|
+| chargeDuration | 0.8 |
+| chargeSpeedMul | 1.8 |
+| shriekParticleCount | 16 |
+| shriekTrauma | 0.3 |
+| shriekFlashAlpha | 0.3 |
+| shriekFlashDurationMs | 200 |
+| shriekLateralMult | 0.4 |
+
+AI branch reads via `c._typeData.<field>`. Flash color sources from the
+existing `accent` (`#a060ff`) field. All 7 substitutions are 1:1 with the
+original literals — `node --check` passed; live banshee shriek behaviour
+identical pre/post.
+
+## Concern B — Real banshee_screech.mp3
+
+**Verdict:** PASS — placeholder replaced with dedicated CC0 sample.
+**Commit:** `c300dd3498`
+
+- **Source:** "Monster / Banshee Scream" by SypherZent on freesound.org
+- **URL:** https://freesound.org/people/SypherZent/sounds/420682/
+- **License:** CC0 1.0 (public domain dedication, no attribution required)
+- **Conversion:** `ffmpeg -i 420682_banshee.mp3 -ac 1 -ar 44100 -b:a 128k -vn`
+- **Result:** mono 44.1 kHz mp3, 1.49 s, 24 KB
+
+Placed at `audio/sfx/banshee_screech.mp3`. EVENT_MAP entry updated:
+`enemy:shriek` id `boss_die` → `banshee_screech` (bus/throttle/vol
+unchanged: sfx / 600 ms / 0.85). Source URL + license documented in a
+comment block above the row. `audio/MANIFEST.md` updated with a source
+row.
+
+Verified live: `WG.Audio._state().missing` empty after force-emit of
+`enemy:shriek`; HEAD on `/audio/sfx/banshee_screech.mp3` returns
+200 `audio/mpeg`.
+
+## Concern C — Symmetric event-listener for shriek FX
+
+**Verdict:** PASS — structural refactor, behavior identical.
+**Commit:** `65faaf9bd1`
+
+Moved the `HuntFX.burst` + `flashScreen` calls out of `hunt-enemies.js`'s
+AI tick into a `WG.Engine.on('enemy:shriek', …)` subscriber in
+`hunt-fx.js`, mirroring the existing `repair:complete` pattern. The
+subscriber reads tunables from `creature._typeData.shriek*` /
+`creature._typeData.accent`, so designer edits to the catalog flow
+through without touching the FX module.
+
+Per the worker spec, `addTrauma` stays inline in the AI tick (kept
+tightly coupled to the shriek's timing). Trauma 0.3, particle count 16,
+flash `#a060ff` @ 0.3 alpha / 200 ms — all equivalent to pre-refactor
+state.
+
+## Concern D — `wg-rift-intrude` wired to procedural canvas
+
+**Verdict:** PASS — rift visual canon is now testable on the procedural
+canvas. **Visual test passed.** **Commit:** `934a9278f9`
+
+Added `RIFT_GUESTS = []` array in `js/wg-game.js`. When the active
+character id is in the array, `renderHero()` adds the
+`.wg-rift-intrude` class to the procedural character canvas AND
+switches its centering from `transform:translateX(-50%)` to
+`left:calc(50% - 48px)` — required because the `wgRiftGlitch`
+keyframe owns the `transform` property (per the comment on the CSS
+rule in `index.html:74-80`).
+
+**Test path executed:**
+1. Set `RIFT_GUESTS = ['lantern_acolyte']`.
+2. Loaded http://localhost:3996/ via Claude Preview.
+3. Confirmed via `preview_eval`:
+   - `activeId` is `lantern_acolyte`.
+   - The character canvas (96×140 css, z-index 2) carries the
+     `wg-rift-intrude` class.
+   - Inline style is `position: absolute; left: calc(50% - 48px);
+     bottom: 18%; width: 96px; height: 140px; …` (no `transform` —
+     keyframe-safe).
+4. Reverted `RIFT_GUESTS` to `[]`.
+5. Reloaded; confirmed via `preview_eval` that the class is gone and
+   centering is back to `left:50%; transform:translateX(-50%);`.
+
+`RIFT_GUESTS` ships empty — no rift class applied to anything — so
+shipped behavior is unchanged. The wiring is in place for the first
+real rift guest (Ysabel, queued behind KingshotPro launch) to flip
+the array.
+
+## Concern E — `runWood` defensive-repeat comment
+
+**Verdict:** PASS — pure intent documentation, no behavior change.
+**Commit:** `f42fb2eeed`
+
+Added the two-line comment from the spec above the second wood-zero
+guard inside `repairTick`'s drain loop in `js/hunt/hunt-player.js`
+(line 654). Documents that the guard covers the mid-batch drain edge
+case so a future cleanup pass doesn't strip it as duplicate.
+
+---
+
+## Verification summary
+
+- `node --check` PASS on every touched file before each commit:
+  - `js/hunt/hunt-enemies.js` (A, C)
+  - `js/core/wg-audio.js` (B)
+  - `js/hunt/hunt-fx.js` (C)
+  - `js/wg-game.js` (D)
+  - `js/hunt/hunt-player.js` (E)
+- Browser smoke at http://localhost:3996/ via Claude Preview:
+  - `WG.HuntEnemies.TYPES.banshee` exposes all 8 expected fields with
+    expected values.
+  - `WG.HuntFX` ready; `enemy:shriek` listener triggers without console
+    errors when emitted from console.
+  - `WG.Audio._state()` shows `ctx:true`, `missing:[]` after force-emit
+    — banshee_screech.mp3 loads cleanly.
+  - HEAD on the new mp3 returns 200 `audio/mpeg`.
+  - With `RIFT_GUESTS=[]`, character canvas has no rift class and
+    keeps the original `translateX(-50%)` centering.
+  - With temporary `RIFT_GUESTS=['lantern_acolyte']`, character canvas
+    carries `wg-rift-intrude` + `left:calc(50% - 48px)` centering
+    (no transform). Reverted before commit.
+
+## Commit summary (5 / 5)
+
+| § | SHA | Subject |
+|---|---|---|
+| A | 46faec1319 | banshee tunables → catalog |
+| B | c300dd3498 | real banshee_screech.mp3 |
+| C | 65faaf9bd1 | symmetric event-listener for shriek FX |
+| D | 934a9278f9 | wg-rift-intrude wired to procedural canvas |
+| E | f42fb2eeed | runWood defensive-repeat intent comment |
+
+Behavior changes are confined to **B** (placeholder audio replaced with
+dedicated sample) and **D** (RIFT_GUESTS wiring lives on disk, but the
+shipped array is empty so no visual change in default play). A, C, E
+are pure refactors / documentation.
+
+No scope creep beyond the 5 gaps. No new specs. No code in catalog
+files (catalog edits are pure data).

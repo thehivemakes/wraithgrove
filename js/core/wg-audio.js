@@ -58,10 +58,14 @@
     { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
     // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
     { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
-    // W-Banshee-Enemy — boss_die.mp3 is a placeholder until a dedicated
-    // banshee_screech.mp3 is sourced. throttleMs gates rapid-fire shrieks if
-    // multiple banshees ever stack (cap is 1 alive but defensive).
-    { event: 'enemy:shriek',          id: 'boss_die',      bus: 'sfx', throttleMs: 600, vol: 0.85 },
+    // W-Polish-Gaps-1-5 §B — real banshee shriek replaces the boss_die placeholder.
+    // Source: "Monster / Banshee Scream" by SypherZent on freesound.org
+    //   https://freesound.org/people/SypherZent/sounds/420682/
+    //   License: CC0 1.0 — no attribution required
+    //   Conversion: ffmpeg -ac 1 -ar 44100 -b:a 128k → mono 44.1 kHz, 1.49 s, 24 KB
+    // throttleMs gates rapid-fire shrieks if multiple banshees ever stack
+    // (cap is 1 alive per hunt-waves rare-roll, but defensive).
+    { event: 'enemy:shriek',          id: 'banshee_screech', bus: 'sfx', throttleMs: 600, vol: 0.85 },
   ];
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.

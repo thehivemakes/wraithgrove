@@ -365,18 +365,24 @@
   // null or the image errors at runtime. Direction (Architect 2026-05-02):
   // ukiyo-e meets dark illustration for menus; combat keeps current sprites.
   const BIOME_ART = {
-    forest_summer: null,
-    forest_autumn: null,
-    cold_stone:    null,
-    temple:        null,
-    cave:          null,
-    eldritch:      null,
+    forest_summer: 'images/biomes/forest_summer.png',
+    forest_autumn: 'images/biomes/forest_autumn.png',
+    cold_stone:    'images/biomes/cold_stone.png',
+    temple:        'images/biomes/temple.png',
+    cave:          'images/biomes/cave.png',
+    eldritch:      'images/biomes/eldritch.png',
   };
   const CHARACTER_PORTRAITS = {};
   // RIFT biomes are future cross-IP intrusion stages — when stage.biome is in
   // this set the menu hero gains a violet drop-shadow + intermittent glitch
   // (per index.html `.wg-rift-intrude` rule). Empty until rift content ships.
   const RIFT_BIOMES = new Set();
+  // W-Polish-Gaps-1-5 §D — character ids that should render with the rift
+  // glitch even when only the procedural canvas is showing. Lets the rift
+  // visual canon be testable now (e.g. ['lantern_acolyte']) without waiting
+  // for illustrated portraits. Currently empty — first guest (Ysabel) is
+  // queued behind KingshotPro launch.
+  const RIFT_GUESTS = [];
 
   // ─── Menu hero canvas paint pipeline ────────────────────────────────────────
   // W-Menu-Art-Pass (Architect 2026-05-02): replaces the CSS gradient + triangle
@@ -936,8 +942,15 @@
       // Character canvas — overlaid above biome (own canvas per W-Menu-Art-Pass §B).
       // Sized to a centered 96×140 CSS box near bottom-center so it composites
       // over the biome floor band. Lock overlay still wins via its own z-index.
+      // W-Polish-Gaps-1-5 §D — when activeId is a rift guest, center via
+      // `left:calc(50% - 48px)` (not translateX) so the wgRiftGlitch keyframe
+      // owns transform without overwriting the centering.
+      const charIsRift = RIFT_GUESTS.indexOf(activeId) !== -1;
       const charCanvas = document.createElement('canvas');
-      charCanvas.style.cssText = 'position:absolute;left:50%;bottom:18%;transform:translateX(-50%);width:96px;height:140px;display:block;pointer-events:none;z-index:2;';
+      charCanvas.style.cssText = charIsRift
+        ? 'position:absolute;left:calc(50% - 48px);bottom:18%;width:96px;height:140px;display:block;pointer-events:none;z-index:2;'
+        : 'position:absolute;left:50%;bottom:18%;transform:translateX(-50%);width:96px;height:140px;display:block;pointer-events:none;z-index:2;';
+      if (charIsRift) charCanvas.classList.add('wg-rift-intrude');
       heroContent.appendChild(charCanvas);
       const cctx = charCanvas.getContext('2d');
 

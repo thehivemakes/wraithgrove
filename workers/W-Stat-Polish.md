@@ -43,3 +43,19 @@ Update everywhere it appears: stats catalog, render, tooltips.
 ## Done marker
 
 `workers/done/W-Stat-Polish.done` with summary + chosen rename + Cultivate UI flow.
+
+## OUTPUT DISCIPLINE (Architect-mandated 2026-05-03)
+
+The worker may run in an ephemeral worktree that auto-cleans on exit. To survive cleanup, write outputs ONLY to these ABSOLUTE paths:
+
+- Done marker: `/Users/defimagic/Desktop/Hive/MobileGameResearch/wood-siege/build-v2/workers/done/<WORKER-ID>.done`
+- Audit/research doc (if applicable): `/Users/defimagic/Desktop/Hive/MobileGameResearch/wood-siege/build-v2/audits/<NAME>_<UTCstamp>.md` or `/.../docs/<NAME>.md`
+- Failure flag (if audit fails): `/Users/defimagic/Desktop/Hive/MobileGameResearch/wood-siege/build-v2/workers/AUDIT_FAIL.flag`
+
+After writing, RUN from `/Users/defimagic/Desktop/Hive`:
+```
+git add MobileGameResearch/wood-siege/build-v2/workers/done/ MobileGameResearch/wood-siege/build-v2/audits/ MobileGameResearch/wood-siege/build-v2/docs/
+git commit -m "<WORKER-ID> — done marker + outputs"
+```
+
+This guarantees output survives if the worktree is reaped.

@@ -140,6 +140,7 @@ All 25 files present (13 sfx + 6 ambient + 6 ui). Total disk: **6.6 MB** of 50 M
 | `sfx/coin.mp3` | Kenney RPG Audio | `Audio/handleCoins2.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
 | `sfx/fragment.mp3` | Kenney Interface Sounds | `Audio/glass_001.ogg` | CC0 — https://kenney.nl/assets/interface-sounds |
 | `sfx/craft.mp3` | Kenney RPG Audio | `Audio/metalPot2.ogg` | CC0 — https://kenney.nl/assets/rpg-audio |
+| `sfx/banshee_screech.mp3` | freesound.org / SypherZent — "Monster / Banshee Scream" #420682 | mp3 preview, ffmpeg → mono 44.1 kHz @ 128 kbps, 1.49 s | CC0 — https://freesound.org/people/SypherZent/sounds/420682/ |
 
 ### UI — Kenney CC0 packs (mono 128 kbps mp3)
 

@@ -650,6 +650,8 @@
       c.repairDrainTimer = (c.repairDrainTimer || 0) + dt;
       while (c.repairDrainTimer >= REPAIR_RATE) {
         c.repairDrainTimer -= REPAIR_RATE;
+        // Defensive repeat: covers the case where mid-batch turret repair drains the
+        // last wood after the first guard already passed. Do not strip on cleanup.
         if ((runtime.runWood || 0) <= 0) { c.repairDrainTimer = 0; break; }
         runtime.runWood = Math.max(0, runtime.runWood - 1);
         c.hp = Math.min(c.maxHp, c.hp + REPAIR_HP_PER_WOOD);

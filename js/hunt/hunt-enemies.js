@@ -27,9 +27,24 @@
     // Armored samurai grunt — both modes (boss-tier henchman across day/night).
     samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:10, mode:'both', ai:'walker' },
     // W-Banshee-Enemy — Architect 2026-05-02: large Night-only rare frenzied scare.
-    // SPEC §0 register. AI 'banshee_charge': erratic sin-wave pursuit + 0.8s charge
-    // every shriekCooldown sec. `rare` flag → wave-spawner 5% pre-roll, max 1 alive.
-    banshee:         { name: 'Banshee',        hp:220,speed:130,damage:22, cooldown:1.0, size:36, color:'#e8e0f0', accent:'#a060ff', xp:30, mode:'night', ai:'banshee_charge', rare:true, shriekCooldown:4.0 },
+    // SPEC §0 register. AI 'banshee_charge': erratic sin-wave pursuit + chargeDuration
+    // sec of locked-on charge every shriekCooldown sec. `rare` flag → wave-spawner
+    // 5% pre-roll, max 1 alive. W-Polish-Gaps-1-5 (A): chargeDuration / chargeSpeedMul
+    // / shriek* fields promoted from inline magic numbers for designer-tunability.
+    banshee: {
+      name: 'Banshee',
+      hp: 220, speed: 130, damage: 22, cooldown: 1.0, size: 36,
+      color: '#e8e0f0', accent: '#a060ff', xp: 30,
+      mode: 'night', ai: 'banshee_charge', rare: true,
+      shriekCooldown: 4.0,
+      chargeDuration: 0.8,         // seconds of locked-on charge after shriek
+      chargeSpeedMul: 1.8,         // forward-speed multiplier during charge
+      shriekParticleCount: 16,     // pickupFragment burst count per shriek
+      shriekTrauma: 0.3,           // camera-shake trauma added on shriek
+      shriekFlashAlpha: 0.3,       // screen-flash alpha (#a060ff)
+      shriekFlashDurationMs: 200,  // screen-flash duration ms
+      shriekLateralMult: 0.4,      // sin-wave perpendicular factor (idle pursuit)
+    },
 
     // W-Spawn-Tuning — Architect 2026-05-02: 2 new types to thicken the mix.
     // Wraith Stalker: fast Night ghost wisp, light HP, tight hitbox. Drives
@@ -125,28 +140,30 @@
       }
     } else if (c._typeData.ai === 'banshee_charge') {
       // Frenzied AI — erratic sin-wave lateral motion + periodic shriek-charge.
-      c._shriekTimer = (c._shriekTimer == null) ? c._typeData.shriekCooldown : c._shriekTimer - dt;
+      // All tunables read from catalog (W-Polish-Gaps-1-5 §A — no magic numbers).
+      const td = c._typeData;
+      c._shriekTimer = (c._shriekTimer == null) ? td.shriekCooldown : c._shriekTimer - dt;
       const charging = c._chargeTimer > 0;
       if (c._shriekTimer <= 0 && !charging) {
-        c._chargeTimer = 0.8;  // 0.8s of locked-on charge
-        c._shriekTimer = c._typeData.shriekCooldown;
+        c._chargeTimer = td.chargeDuration;
+        c._shriekTimer = td.shriekCooldown;
+        // W-Polish-Gaps-1-5 §C — burst + flash moved to a hunt-fx.js listener
+        // for symmetry with repair:complete. Trauma stays inline (kept tightly
+        // coupled to the AI tick that owns the shriek's timing).
         WG.Engine.emit('enemy:shriek', { creature: c });
-        // Polish mandate — shriek is the dopamine peak.
-        if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.3);
-        if (window.WG.HuntFX && WG.HuntFX.burst) WG.HuntFX.burst(c.x, c.y, 'pickupFragment', { count: 16, life: 0.7 });
-        if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#a060ff', 0.3, 200);
+        if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(td.shriekTrauma);
       }
       if (c._chargeTimer > 0) {
         c._chargeTimer -= dt;
-        // Hard charge — straight at player, 1.8× speed
-        c.x += (dx/dist) * c.speed * 1.8 * dt;
-        c.y += (dy/dist) * c.speed * 1.8 * dt;
+        // Hard charge — straight at player, chargeSpeedMul × speed
+        c.x += (dx/dist) * c.speed * td.chargeSpeedMul * dt;
+        c.y += (dy/dist) * c.speed * td.chargeSpeedMul * dt;
       } else {
         // Erratic — sin-wave lateral perpendicular to forward direction
         const lateralA = Math.sin(performance.now() / 280 + c.x * 0.01);
         const px = -dy/dist, py = dx/dist; // perpendicular unit
-        c.x += (dx/dist) * c.speed * dt + px * lateralA * c.speed * 0.4 * dt;
-        c.y += (dy/dist) * c.speed * dt + py * lateralA * c.speed * 0.4 * dt;
+        c.x += (dx/dist) * c.speed * dt + px * lateralA * c.speed * td.shriekLateralMult * dt;
+        c.y += (dy/dist) * c.speed * dt + py * lateralA * c.speed * td.shriekLateralMult * dt;
       }
       if (dist <= contactDist) {
         c.attackTimer -= dt;

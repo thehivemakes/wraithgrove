@@ -1,0 +1,34 @@
+# W-Audit-Menu-Banshee-Repair-Spawn — DONE 2026-05-03 (read-only audit)
+
+## Verdict: **PASS**
+
+All five batches verified clean. No code changes made.
+
+## Scope audited
+1. Banshee enemy (catalog + AI + render + shriek event)
+2. Building Repair (hover detection + wood drain + HP regen + FX + audio)
+3. Spawn Tuning (rate +40% + wraith_fast + skull_swarmer in all 18 stages)
+4. Hero menu redesign (single-tile carousel + lock progression + side icons + BATTLE button + Day/Night pills)
+5. Painterly menu art (6 biome painters + character canvas + vignette + BATTLE pulse + asset slot hooks + rAF lifecycle)
+
+## Per-batch checklist results
+- §A node --check on all 8 touched .js files → 8/8 PASS
+- §B Done-marker claims traceable to code → PASS for all four markers (menu redesign has no own marker — orchestrator inline; verified via code)
+- §C Catalog consistency (no magic numbers in render/UI) → PASS
+- §D rAF lifecycle + DOM listener churn + particle pool bounded → PASS
+- §E Spawn ramp + Banshee HP pinned to spec → PASS
+- §F Failure modes (locked stage, HP-zero turret, menu-while-in-stage, banshee day-mode suppression, alive cap, hover-timer reset on leave-range, banshee first-tick init) → PASS
+
+## Polish gaps surfaced (non-blocking)
+1. Banshee inline tunables (0.8s charge, 1.8× speed, FX magic numbers) live in AI layer — consider promoting to catalog
+2. `enemy:shriek` audio is placeholder (`boss_die` sample) — needs `banshee_screech.mp3`
+3. Banshee shriek FX inlined in AI tick rather than via event listener — asymmetric vs `repair:complete`
+4. Procedural canvas does not carry `wg-rift-intrude` class — rift glitch fires only after illustrated assets ship
+5. `runWood` mid-batch exhaustion safety repeat (intentional defensive)
+
+## Output
+- Audit doc: `audits/AUDIT_Menu_Banshee_Repair_Spawn_20260503T100016Z.md`
+- No `AUDIT_FAIL.flag` written.
+
+## Notes
+Read-only audit per worker brief — zero code changes. The hero menu redesign (item 4) shipped via `W-Navigation-Pivot B` (`0407885`) plus inline orchestrator tuning; W-Menu-Art-Pass A–D layered the painterly canvas + asset slot hooks on top. All carousel + lock + side-icon + BATTLE + Day/Night pill behavior verified live in `js/wg-game.js`.

@@ -215,6 +215,23 @@
       if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.15);
       WG.Engine.emit('audio:repair_complete', { x, y });
     });
+    // W-Polish-Gaps-1-5 §C — symmetric event-listener for banshee shriek FX.
+    // Mirrors the repair:complete pattern (subscriber owns burst + flash);
+    // hunt-enemies.js AI now only emits the event + addTrauma. Tunables read
+    // through creature._typeData so designer edits to TYPES.banshee.shriek*
+    // propagate to FX without touching this file.
+    WG.Engine.on('enemy:shriek', ({ creature }) => {
+      if (!creature) return;
+      const td = creature._typeData || {};
+      const count = (td.shriekParticleCount != null) ? td.shriekParticleCount : 16;
+      burst(creature.x, creature.y, 'pickupFragment', { count, life: 0.7 });
+      if (window.WG.Game && WG.Game.flashScreen) {
+        const color = td.accent || '#a060ff';
+        const alpha = (td.shriekFlashAlpha != null) ? td.shriekFlashAlpha : 0.3;
+        const durMs = (td.shriekFlashDurationMs != null) ? td.shriekFlashDurationMs : 200;
+        WG.Game.flashScreen(color, alpha, durMs);
+      }
+    });
     // W-FX-Polish-Pass — gap 2 (consume side): instant_turret/revive consumed.
     // Gold confirm-burst at the player + small "USED" float-text. HUD pill
     // desaturation for both consumed AND expired is handled in hunt-render.js.
