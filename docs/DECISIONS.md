@@ -1,3 +1,25 @@
+# Decision 2026-05-03 — Stage durations cut aggressively for mobile pacing
+
+**Architect verbal directive 2026-05-03 14:50 EDT:** *"the enemy waves during battle are way too long. people don't want to wait that long. Especially for stage 1."*
+
+## Was
+- Early (1-6): 5 waves × 90s = **7.5 min/stage**
+- Mid (7-12): 10 waves × 100s = **16.7 min/stage**
+- Late (13-18): 15 waves × 110s = **27.5 min/stage**
+
+## Now
+- Early (1-6): 3 waves × 30s = **1.5 min/stage**
+- Mid (7-12): 5 waves × 50s = **4.2 min/stage**
+- Late (13-18): 7 waves × 60s = **7 min/stage**
+
+## Why
+Mobile hook window for Day 1 retention is 30-90 seconds for first win. We were 5× too long. Stage 1 at 7.5 min loses the player before the dopamine peak ever lands. Late endgame at 7 min is still long enough to feel epic but won't burn out the marathon player.
+
+## Risk acknowledged vs BLUEPAPER
+BLUEPAPER §0 prior wave-spec window was 90-120s/wave. This decision narrows below that floor. Architect verbal ratification overrides bluepaper window. BLUEPAPER §3 wave config will be updated to match in next sweep.
+
+---
+
 # DECISIONS — Wraithgrove Architectural Log
 
 Newest at top. Each entry: date, one-line verdict, decisions made, commits/refs.

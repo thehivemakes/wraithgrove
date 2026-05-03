@@ -104,12 +104,15 @@
   // sits inside the spec-mandated 90–120s window so wave 1 feels approachable
   // and the curve ramps via WAVE_TIER_RAMP + WAVE_STAT_BASE in hunt-waves.
   const TIER_BREAKS = { early: 6, mid: 12 }; // ≤6 early, 7..12 mid, ≥13 late
-  const WAVE_COUNT_EARLY = 5;
-  const WAVE_COUNT_MID   = 10;
-  const WAVE_COUNT_LATE  = 15;
-  const WAVE_SEC_EARLY   = 90;
-  const WAVE_SEC_MID     = 100;
-  const WAVE_SEC_LATE    = 110;
+  // Architect 2026-05-03: stages were way too long. Stage 1 was 7.5 min — bailed
+  // the mobile-hook window. Cut for modern pacing. Early hooks players in 90s;
+  // late endgame caps at 7 min for brag-rights without burnout. See docs/DECISIONS.md.
+  const WAVE_COUNT_EARLY = 3;   // was 5
+  const WAVE_COUNT_MID   = 5;   // was 10
+  const WAVE_COUNT_LATE  = 7;   // was 15
+  const WAVE_SEC_EARLY   = 30;  // was 90 — stage 1-6 now 1.5 min total
+  const WAVE_SEC_MID     = 50;  // was 100 — stage 7-12 now 4.2 min total
+  const WAVE_SEC_LATE    = 60;  // was 110 — stage 13-18 now 7 min total
 
   function tierFor(id) {
     if (id <= TIER_BREAKS.early) return 'early';
