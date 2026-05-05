@@ -39,17 +39,22 @@
     document.body.appendChild(el);
     const startMs = performance.now();
     const dur = 380;
+    let rafId = 0;
+    let cancelled = false;
+    // audit polish gap — cancel-guard for early-dismiss safety
+    el.dataset.flyIconActive = '1';
     function step(now) {
+      if (cancelled || !el.parentNode) { if (rafId) cancelAnimationFrame(rafId); return; }
       const t   = Math.min(1, (now - startMs) / dur);
       const ease = 1 - Math.pow(1 - t, 2);
       el.style.left      = (x0 + (destX - x0) * ease) + 'px';
       el.style.top       = (y0 + (destY - y0) * ease) + 'px';
       el.style.transform = 'translate(-50%,-50%) scale(' + (1.5 - 0.5 * ease).toFixed(2) + ')';
       el.style.opacity   = t > 0.8 ? String((1 - t) / 0.2) : '1';
-      if (t < 1) requestAnimationFrame(step);
+      if (t < 1) rafId = requestAnimationFrame(step);
       else { el.remove(); if (onArrive) onArrive(); }
     }
-    requestAnimationFrame(step);
+    rafId = requestAnimationFrame(step);
   }
 
   function comboTierColor(n) {

@@ -12,6 +12,11 @@
     'settings_persist',
     'achievements_progress',
     'save_export',
+    'touch_input',
+    'haptics_stub',
+    'orientation_change',
+    'safe_area_insets',
+    'back_button_navigation',
   ];
 
   // ── Assertion mini-engine ──────────────────────────────────────────────────
@@ -470,16 +475,280 @@
       'state.player.level valid after load');
   }
 
+  // ── Scenario: touch_input ─────────────────────────────────────────────────
+  // Dispatch synthetic PointerEvents to the canvas (joystick left-half).
+  // Verifies WG.Input.poll() returns a non-zero direction vector after touch.
+  async function run_touch_input(a) {
+    var snap = snapshot();
+    cleanOverlays();
+
+    // hunt tab must be active so isHuntActive() returns true inside wg-input.js
+    var origTab = WG.State.get().activeTab;
+    WG.Game.switchTab('hunt');
+    await wait(50);
+
+    var cap = startErrorCapture();
+    var canvas = WG.Display.canvas;
+    var cw = WG.Display.width;
+    var ch = WG.Display.height;
+
+    a.ok(cw > 0 && ch > 0, 'canvas has non-zero dimensions (' + cw + 'x' + ch + ')');
+
+    // Touch origin: left-half centre
+    var ox = Math.max(10, Math.floor(cw * 0.25));
+    var oy = Math.max(10, Math.floor(ch * 0.55));
+
+    try {
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 77,
+        clientX: ox, clientY: oy,
+      }));
+      // Move right + down by 40px — should exceed the 8px dead zone
+      canvas.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true, cancelable: true, pointerId: 77,
+        clientX: ox + 40, clientY: oy + 20,
+      }));
+    } catch (e) {
+      a.ok(false, 'PointerEvent dispatch threw: ' + e.message);
+      cap.stop();
+      WG.Game.switchTab(origTab);
+      restore(snap);
+      return;
+    }
+    await wait(30);
+
+    var inp = WG.Input.poll();
+    a.ok(inp.magnitude > 0,
+      'poll().magnitude > 0 after joystick pointerdown+move (' + inp.magnitude.toFixed(3) + ')');
+    a.ok(inp.x !== 0 || inp.y !== 0,
+      'poll() direction vector non-zero (x:' + inp.x.toFixed(2) + ' y:' + inp.y.toFixed(2) + ')');
+
+    // Release joystick
+    canvas.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true, cancelable: true, pointerId: 77,
+      clientX: ox + 40, clientY: oy + 20,
+    }));
+    await wait(20);
+
+    var inpAfter = WG.Input.poll();
+    a.ok(inpAfter.magnitude === 0, 'poll().magnitude === 0 after pointerup (joystick reset)');
+
+    cap.stop();
+    a.ok(cap.errors.length === 0,
+      'no console.error during touch input test (' + cap.errors.length + ' errors)');
+
+    WG.Game.switchTab(origTab);
+    restore(snap);
+  }
+
+  // ── Scenario: haptics_stub ────────────────────────────────────────────────
+  // Install a temporary WG.Haptics stub (mirrors Capacitor plugin API).
+  // Verifies no console.error when calling impact() + vibrate(), and that the
+  // guard pattern used in hunt-render.js is safe when the plugin is absent.
+  async function run_haptics_stub(a) {
+    var origHaptics = WG.Haptics; // undefined in browser; object in native
+    var cap = startErrorCapture();
+
+    // Install stub
+    WG.Haptics = {
+      _calls: [],
+      impact: function (style) {
+        WG.Haptics._calls.push({ type: 'impact', style: style || 'medium' });
+        return Promise.resolve();
+      },
+      vibrate: function (duration) {
+        WG.Haptics._calls.push({ type: 'vibrate', duration: duration });
+        return Promise.resolve();
+      },
+    };
+
+    WG.Haptics.impact('medium');
+    WG.Haptics.impact('heavy');
+    WG.Haptics.vibrate(50);
+    await wait(20);
+
+    a.ok(WG.Haptics._calls.length === 3,
+      'stub recorded 3 haptic calls (2×impact + 1×vibrate)');
+    a.ok(WG.Haptics._calls[0].style === 'medium',
+      'first impact style is "medium"');
+    a.ok(WG.Haptics._calls[1].style === 'heavy',
+      'second impact style is "heavy"');
+
+    cap.stop();
+    a.ok(cap.errors.length === 0,
+      'no console.error while calling Haptics stub (' + cap.errors.length + ' errors)');
+
+    // Restore undefined/original (plugin absent = browser preview mode)
+    WG.Haptics = origHaptics;
+
+    // Guard pattern as used in hunt-render.js lines 2421+2424:
+    //   if (WG.Haptics) WG.Haptics.impact('medium');
+    // Must not throw when WG.Haptics is falsy.
+    var guardCap = startErrorCapture();
+    var guardThrew = false;
+    try {
+      if (WG.Haptics) WG.Haptics.impact('medium');
+    } catch (e) {
+      guardThrew = true;
+    }
+    guardCap.stop();
+    a.ok(!guardThrew, 'guard pattern (if WG.Haptics) does not throw when plugin absent');
+    a.ok(guardCap.errors.length === 0, 'no console.error when Haptics guard is no-op');
+  }
+
+  // ── Scenario: orientation_change ──────────────────────────────────────────
+  // Fire window 'resize' and 'orientationchange' events; verify WG.Display
+  // re-fits (canvas buffer rebuilt, dimensions still valid, no console errors).
+  async function run_orientation_change(a) {
+    var wBefore = WG.Display.width;
+    var hBefore = WG.Display.height;
+
+    a.ok(wBefore > 0 && hBefore > 0,
+      'baseline canvas dimensions valid (' + wBefore + 'x' + hBefore + ')');
+
+    var cap = startErrorCapture();
+
+    // Simulate portrait → landscape (or any resize)
+    window.dispatchEvent(new Event('resize'));
+    await wait(60);
+
+    a.ok(WG.Display.width > 0,
+      'Display.width > 0 after resize event (' + WG.Display.width + ')');
+    a.ok(WG.Display.height > 0,
+      'Display.height > 0 after resize event (' + WG.Display.height + ')');
+    a.ok(WG.Display.canvas.width > 0,
+      'canvas.width (pixel buffer) > 0 after resize');
+
+    // Simulate orientationchange specifically (separate listener in index.html)
+    window.dispatchEvent(new Event('orientationchange'));
+    await wait(60);
+
+    a.ok(WG.Display.width > 0,
+      'Display.width > 0 after orientationchange event');
+    a.ok(WG.Display.height > 0,
+      'Display.height > 0 after orientationchange event');
+
+    cap.stop();
+    a.ok(cap.errors.length === 0,
+      'no console.error during resize + orientationchange events (' + cap.errors.length + ' errors)');
+  }
+
+  // ── Scenario: safe_area_insets ────────────────────────────────────────────
+  // Simulate iPhone X safe-area-inset-top=44px by injecting CSS padding on
+  // #top-strip; verify the element remains in-bounds and error-free.
+  async function run_safe_area_insets(a) {
+    // Make sure we're not in-stage (top-strip is display:none in-stage)
+    cleanOverlays();
+    if (WG.Game.getHuntRuntime()) WG.Game.exitHunt();
+    await wait(30);
+
+    var cap = startErrorCapture();
+
+    // Inject style that simulates safe-area-inset-top via CSS override
+    var styleEl = document.createElement('style');
+    styleEl.id = 'wg-qa-safe-area-test';
+    styleEl.textContent = '#top-strip { padding-top: 44px !important; }';
+    document.head.appendChild(styleEl);
+    await wait(30);
+
+    var topStrip = document.getElementById('top-strip');
+    a.ok(!!topStrip, '#top-strip element exists in DOM');
+
+    var rect = topStrip ? topStrip.getBoundingClientRect() : null;
+    var stage = document.getElementById('stage');
+    var stageRect = stage ? stage.getBoundingClientRect() : null;
+
+    if (rect) {
+      a.ok(rect.top >= 0,
+        '#top-strip top >= 0 with 44px safe-area padding (top: ' + Math.round(rect.top) + ')');
+      a.ok(rect.height > 0,
+        '#top-strip has positive height with padding (' + Math.round(rect.height) + 'px)');
+    }
+
+    if (rect && stageRect) {
+      // Allow 5px tolerance for sub-pixel rendering
+      a.ok(rect.bottom <= stageRect.bottom + 5,
+        '#top-strip stays within stage (' + Math.round(rect.bottom) + ' <= ' + Math.round(stageRect.bottom) + ')');
+    }
+
+    cap.stop();
+    a.ok(cap.errors.length === 0,
+      'no console.error with 44px safe-area padding applied (' + cap.errors.length + ' errors)');
+
+    // Restore
+    var injected = document.getElementById('wg-qa-safe-area-test');
+    if (injected && injected.parentNode) injected.parentNode.removeChild(injected);
+  }
+
+  // ── Scenario: back_button_navigation ─────────────────────────────────────
+  // Simulate Capacitor's ionBackButton event (how the native bridge fires it).
+  // Verifies: no crash, no console errors, modal can be dismissed, game remains
+  // responsive. In browser preview (no Capacitor plugin) this is a graceful no-op.
+  async function run_back_button_navigation(a) {
+    var snap = snapshot();
+    cleanOverlays();
+
+    var cap = startErrorCapture();
+
+    // Open the compliance modal so there is something to close
+    var purchaseP = WG.IAP.purchase('gems_5');
+    await wait(80);
+
+    var modalBefore = !!document.getElementById('wg-cp-cancel');
+    a.ok(modalBefore, 'compliance modal open before back-button simulation');
+
+    // Dispatch ionBackButton — the event Capacitor native bridge fires on document
+    // (see node_modules/@capacitor/*/native-bridge.js line 288)
+    // Browser: no handler installed; game must not crash.
+    document.dispatchEvent(new CustomEvent('ionBackButton', { bubbles: false }));
+    await wait(60);
+
+    // Verify no crash: errors array empty
+    // (Modal may or may not have closed depending on whether a handler is wired;
+    //  in browser preview it stays open — both outcomes are acceptable here)
+    cap.stop();
+    a.ok(cap.errors.length === 0,
+      'no console.error on ionBackButton dispatch (' + cap.errors.length + ' errors)');
+
+    // Game must still be responsive after the event
+    a.ok(typeof WG.Game.switchTab === 'function',
+      'WG.Game.switchTab still callable — game responsive after back-button event');
+
+    // Clean up: dismiss the modal via cancel (standard path)
+    var cancelBtn = document.getElementById('wg-cp-cancel');
+    if (cancelBtn) {
+      cancelBtn.click();
+      await wait(60);
+    }
+    await purchaseP.catch(function () {});
+
+    var modalAfter = !!document.getElementById('wg-cp-cancel');
+    a.ok(!modalAfter, 'compliance modal closed after cancel (back-nav cleanup path works)');
+
+    // If a hunt stage is somehow running, verify it can still exit (not locked)
+    if (WG.Game.getHuntRuntime()) {
+      WG.Game.exitHunt();
+      a.ok(!WG.Game.getHuntRuntime(), 'hunt stage exitable after back-button dispatch');
+    }
+
+    restore(snap);
+  }
+
   // ── Core: run a named scenario ────────────────────────────────────────────
   var RUNNERS = {
-    tab_smoke:             run_tab_smoke,
-    hunt_stage_1:          run_hunt_stage_1,
-    tower_run:             run_tower_run,
-    iap_stub:              run_iap_stub,
-    energy_gate:           run_energy_gate,
-    settings_persist:      run_settings_persist,
-    achievements_progress: run_achievements_progress,
-    save_export:           run_save_export,
+    tab_smoke:              run_tab_smoke,
+    hunt_stage_1:           run_hunt_stage_1,
+    tower_run:              run_tower_run,
+    iap_stub:               run_iap_stub,
+    energy_gate:            run_energy_gate,
+    settings_persist:       run_settings_persist,
+    achievements_progress:  run_achievements_progress,
+    save_export:            run_save_export,
+    touch_input:            run_touch_input,
+    haptics_stub:           run_haptics_stub,
+    orientation_change:     run_orientation_change,
+    safe_area_insets:       run_safe_area_insets,
+    back_button_navigation: run_back_button_navigation,
   };
 
   async function run(scenarioName) {

@@ -54,6 +54,15 @@
     // spawnOne — when this type is picked, four spawn in a 30-unit jittered
     // cluster (POLISH MANDATE: feel like a CHARGE, not overlapping pile).
     skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:0.8, size:12, color:'#e8e0d0', accent:'#3a2010', xp:2,  mode:'both',  ai:'walker', swarmSize:4 },
+
+    // ─── Ascended-tier enemies (stages 19-24) ────────────────────────────────
+    // sigil_drone: small flying entity that fires glowing sigil projectiles.
+    // `mode:'both'` so it spawns in day and nightmare ascended runs.
+    sigil_drone:     { name: 'Sigil Drone',    hp:25, speed:50, damage:7,  cooldown:1.2, size:13, color:'#3a1058', accent:'#c060ff', xp:5,  mode:'both',  ranged:true, projectileSpeed:155, projectileRange:280 },
+
+    // memory_husk: slow shambling walker. 80 HP. On death, splits into 2 lurkers.
+    // Split logic is in wg-game.js enemy:killed handler (needs runtime access).
+    memory_husk:     { name: 'Memory Husk',    hp:80, speed:16, damage:14, cooldown:1.7, size:22, color:'#5a3870', accent:'#a880c8', xp:10, mode:'both',  ai:'walker' },
   };
 
   let nextId = 1;

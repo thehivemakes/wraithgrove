@@ -274,7 +274,7 @@
       <div class="tab-panel" id="tab-ascend"></div>
       <div class="tab-panel active" id="tab-hunt">
         <div id="hunt-hud">
-          <div class="back-btn" id="hunt-back-btn">← MENU</div>
+          <div class="back-btn" id="hunt-back-btn" data-i18n="hunt.back_btn">← MENU</div>
           <div class="stage-banner" id="hunt-stage-banner">stage —</div>
           <div class="menu-btn" id="hunt-menu-btn">⚙</div>
           <div class="skill-btn" id="hunt-skill-btn">✦</div>
@@ -289,23 +289,23 @@
   <nav id="nav-bar">
     <div class="nav-tab" data-tab="duel">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l6-6M21 3l-6 6M9 3l12 12M3 9l12 12"/></svg>
-      <span class="label">Duel</span>
+      <span class="label" data-i18n="nav.duel">Duel</span>
     </div>
     <div class="nav-tab" data-tab="ascend">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M12 5l-6 8h12z"/></svg>
-      <span class="label">Ascend</span>
+      <span class="label" data-i18n="nav.ascend">Ascend</span>
     </div>
     <div class="nav-tab active" data-tab="hunt">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l4 4 8 8 2 2-2 2-2-2-8-8-4-4z"/><circle cx="6" cy="18" r="2"/></svg>
-      <span class="label">Hunt</span>
+      <span class="label" data-i18n="nav.hunt">Hunt</span>
     </div>
     <div class="nav-tab" data-tab="forge">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>
-      <span class="label">Forge</span>
+      <span class="label" data-i18n="nav.forge">Forge</span>
     </div>
     <div class="nav-tab" data-tab="relics">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/></svg>
-      <span class="label">Relics</span>
+      <span class="label" data-i18n="nav.relics">Relics</span>
     </div>
   </nav>
 </div>
@@ -313,10 +313,10 @@
 <div id="modal-root"></div>
 
 <div id="boot-overlay">
-  <div id="boot-title">WRAITHGROVE</div>
-  <div id="boot-sub">survive alone</div>
-  <div id="boot-status">awakening...</div>
-  <div id="boot-tap">tap to begin</div>
+  <div id="boot-title" data-i18n="boot.title">WRAITHGROVE</div>
+  <div id="boot-sub" data-i18n="boot.sub">survive alone</div>
+  <div id="boot-status" data-i18n="boot.status.awakening">awakening...</div>
+  <div id="boot-tap" data-i18n="boot.tap">tap to begin</div>
 </div>
 
 <div id="err-overlay" class="err-overlay">
@@ -325,7 +325,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.26.0-launch-extended-1778005363', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.27.0-fully-loaded-1778012216', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -380,6 +380,7 @@
 
   WG.Loader = (function () {
     const MODULES = [
+      'js/core/wg-i18n.js',
       'js/core/wg-engine.js',
       'js/core/wg-state.js',
       'js/core/wg-display.js',
@@ -404,6 +405,7 @@
       'js/meta/meta-onboarding.js',
       'js/meta/meta-achievements.js',
       'js/meta/meta-daily-rewards.js',
+      'js/meta/meta-ltd-events.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
       'js/hunt/hunt-enemies.js',
@@ -417,8 +419,10 @@
       'js/hunt/hunt-fx.js',
       'js/hunt/hunt-turret.js',
       'js/hunt/hunt-tutorial.js',
+      'js/hunt/hunt-tutorial-ext.js',
       'js/hunt/hunt-tower-buffs.js',
       'js/hunt/hunt-tower.js',
+      'js/hunt/hunt-tower-render.js',
       'js/ascend/ascend-character.js',
       'js/ascend/ascend-skins.js',
       'js/ascend/ascend-equipment.js',
@@ -483,6 +487,14 @@
       await WG.Loader.loadAll();
       WG.Boot.setStatus('initializing...');
       if (!WG.Game || typeof WG.Game.init !== 'function') throw new Error('WG.Game.init missing');
+      // Init i18n before game so t() is ready when modules render UI
+      if (WG.i18n) {
+        try {
+          const _savedLang = JSON.parse(localStorage.getItem('wg_settings_v1') || '{}').language || 'en';
+          await WG.i18n.init(_savedLang);
+          WG.i18n.refreshDOM();
+        } catch(e) { console.warn('[i18n] init failed', e); }
+      }
       await WG.Game.init();
       WG.Boot.ready();
     } catch (err) {

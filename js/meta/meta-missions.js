@@ -23,6 +23,9 @@
     DAILY_PICK_COUNT: 5,
   });
 
+  // Dynamic event missions — populated by WG.LtdEvents via setEventMissions()
+  var EVENT_MISSIONS = [];
+
   // ─── Concern B: Weekly missions catalog ───────────────────────────────────
   const WEEKLY_MISSIONS = [
     { id: 'wk_kill_500',        desc: 'Kill 500 enemies this week', target: 500,  reward: { coins: 2000, diamonds: 50 } },
@@ -75,14 +78,16 @@
   function ensureState() {
     const s = WG.State.get();
     if (!s.missions) {
-      s.missions = { date: '', daily: {}, weekStart: '', weekly: {} };
+      s.missions = { date: '', daily: {}, weekStart: '', weekly: {}, event: {} };
     }
+    if (!s.missions.event) s.missions.event = {};
   }
 
   function _grantReward(reward) {
     if (!reward) return;
     if (reward.coins)    WG.State.grant('coins', reward.coins);
     if (reward.diamonds) WG.State.grant('diamonds', reward.diamonds);
+    if (reward.gems)     WG.State.grant('gems', reward.gems);
     if (reward.energy && WG.State.grantEnergy) WG.State.grantEnergy(reward.energy, 'mission-reward');
     if (reward.frags) {
       const s = WG.State.get();
@@ -139,6 +144,7 @@
     };
     tryUpdate(ms.daily[id], DAILY_MISSIONS);
     tryUpdate(ms.weekly[id], WEEKLY_MISSIONS);
+    tryUpdate(ms.event[id], EVENT_MISSIONS);
   }
 
   function claim(id) {
@@ -153,7 +159,18 @@
       tracker = ms.weekly[id];
       isWeekly = true;
     }
-    if (!mDef || !tracker) return false;
+    if (!mDef || !tracker) {
+      // Check event missions last
+      mDef    = EVENT_MISSIONS.find(function(m) { return m.id === id; });
+      tracker = ms.event[id];
+      if (!mDef || !tracker) return false;
+      if (tracker.claimed) return false;
+      if (tracker.progress < mDef.target) return false;
+      tracker.claimed = true;
+      _grantReward(mDef.reward);
+      WG.Engine.emit('mission:claimed', { id, type: 'event', reward: mDef.reward, bpXP: 0 });
+      return true;
+    }
     if (tracker.claimed) return false;
     if (tracker.progress < mDef.target) return false;
     tracker.claimed = true;
@@ -178,7 +195,12 @@
       return { id: m.id, desc: m.desc, target: m.target, reward: m.reward,
                progress: t.progress, claimed: t.claimed };
     });
-    return { daily: daily, weekly: weekly };
+    const event = EVENT_MISSIONS.map(function(m) {
+      const t = ms.event[m.id] || { progress: 0, claimed: false };
+      return { id: m.id, desc: m.desc, target: m.target, reward: m.reward,
+               progress: t.progress, claimed: t.claimed, eventName: m.eventName };
+    });
+    return { daily: daily, weekly: weekly, event: event };
   }
 
   // ─── Concern F: Event dispatcher ──────────────────────────────────────────
@@ -292,10 +314,25 @@
     var parts = [];
     if (reward.coins)    parts.push('+' + reward.coins + '🪙');
     if (reward.diamonds) parts.push('+' + reward.diamonds + '💎');
+    if (reward.gems)     parts.push('+' + reward.gems + '💎');
     if (reward.energy)   parts.push('+' + reward.energy + '⚡');
     if (reward.frags)    parts.push('+' + reward.frags + '🔷');
     if (reward.rareMat)  parts.push('+' + reward.rareMat + '⭐');
     return parts.join('  ');
+  }
+
+  // Register event missions dynamically (called by WG.LtdEvents on init + hourly)
+  function setEventMissions(defs) {
+    EVENT_MISSIONS = defs || [];
+    ensureState();
+    const ms = WG.State.get().missions;
+    EVENT_MISSIONS.forEach(function(m) {
+      if (!ms.event[m.id]) ms.event[m.id] = { progress: 0, claimed: false };
+    });
+  }
+
+  function clearEventMissions() {
+    EVENT_MISSIONS = [];
   }
 
   function _injectPulseStyle() {
@@ -306,7 +343,7 @@
     document.head.appendChild(s);
   }
 
-  function openModal() {
+  function openModal(initialTab) {
     _injectPulseStyle();
     var existing = document.getElementById('wg-missions-modal');
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
@@ -316,7 +353,7 @@
     overlay.className = 'modal-overlay show';
     overlay.style.cssText = 'z-index:120;';
 
-    var activeTab = 'daily';
+    var activeTab = initialTab || 'daily';
 
     function render() {
       overlay.innerHTML = '';
@@ -335,12 +372,19 @@
 
       var pills = document.createElement('div');
       pills.style.cssText = 'display:flex;gap:6px;';
-      ['DAILY', 'WEEKLY'].forEach(function(tab) {
+      var tabList = ['DAILY', 'WEEKLY'];
+      if (getActive().event && getActive().event.length) tabList.push('EVENT');
+      tabList.forEach(function(tab) {
         var pill = document.createElement('button');
         pill.textContent = tab;
         var isAct = (activeTab === tab.toLowerCase());
+        var isEvt = tab === 'EVENT';
         pill.style.cssText = 'flex:1;padding:7px 0;border-radius:16px;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;border:none;' +
-          (isAct ? 'background:linear-gradient(to bottom,#806020,#5a3c0a);color:#fff0c8;' : 'background:rgba(255,255,255,0.07);color:#a08858;');
+          (isAct
+            ? (isEvt ? 'background:linear-gradient(to bottom,#6010a0,#3a0860);color:#d8b0ff;'
+                     : 'background:linear-gradient(to bottom,#806020,#5a3c0a);color:#fff0c8;')
+            : (isEvt ? 'background:rgba(160,64,224,0.12);color:#9060c8;'
+                     : 'background:rgba(255,255,255,0.07);color:#a08858;'));
         pill.addEventListener('click', function() { activeTab = tab.toLowerCase(); render(); });
         pills.appendChild(pill);
       });
@@ -352,7 +396,9 @@
       list.style.cssText = 'flex:1;overflow-y:auto;padding:0 12px 4px 12px;';
 
       var active = getActive();
-      var missions = activeTab === 'daily' ? active.daily : active.weekly;
+      var missions = activeTab === 'daily' ? active.daily
+                   : activeTab === 'event' ? (active.event || [])
+                   : active.weekly;
 
       missions.forEach(function(m) {
         var pct = Math.min(1, m.progress / m.target);
@@ -432,6 +478,8 @@
         countdown = 'Resets in ' + String(Math.floor(secs / 3600)).padStart(2,'0') + ':' +
                     String(Math.floor((secs % 3600) / 60)).padStart(2,'0') + ':' +
                     String(secs % 60).padStart(2,'0');
+      } else if (activeTab === 'event') {
+        countdown = 'Event missions active';
       } else {
         var monday = new Date(now);
         var diff = (1 - monday.getDay() + 7) % 7 || 7;
@@ -480,6 +528,7 @@
   window.WG.Missions = {
     init, checkAndRefresh, refreshDaily, refreshWeekly,
     increment, claim, getActive, openModal,
+    setEventMissions, clearEventMissions,
     DAILY_MISSIONS, WEEKLY_MISSIONS, TUNABLES,
   };
 })();

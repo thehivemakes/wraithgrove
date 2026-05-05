@@ -1,12 +1,35 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-05 by W-Daily-Reward-Streak-UI
+**Last updated:** 2026-05-05 by W-i18n-Scaffolding (Loom)
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### i18n Scaffolding (W-i18n-Scaffolding 2026-05-05)
+- **`js/core/wg-i18n.js`** — `WG.i18n`: `init(code)`, `t(key, params)`, `setLocale(code)`, `refreshDOM()`, `getLocale()`, `isReady()`.
+- **`locales/en.json`** — English baseline locale, 248 keys. Covers: nav tabs, boot screen, menu buttons + side icons, stage names 1-24, boss names, character names, ascension tiers, settings modal (all sections + buttons), results screen, achievements, missions, shop, energy modal, daily rewards, onboarding, gacha, compliance, toast messages.
+- **`docs/I18N.md`** — Translator contributor guide + developer wrapping guide + key naming conventions.
+- **Concern A — Module** — `wg-i18n.js` IIFE on `window.WG.i18n`. `init()` reads `localStorage.wg_locale_<code>` cache first, then `fetch('locales/<code>.json')`, falls back to `en`. Template interpolation via `{param}` pattern. `setLocale()` persists to `wg_settings_v1.language`.
+- **Concern B — Locale** — 248 keys in `locales/en.json`. Aiming for ~200-300; in range.
+- **Concern C — Wrapping** — Top-level UI strings wrapped: nav tab labels (`data-i18n` in `index.html`), boot screen text (`data-i18n`), back button (`data-i18n`), BATTLE/GAUNTLET/LOCKED buttons in `wg-game.js`, NORMAL/NIGHTMARE MODE pills, all 7 side icon labels (TASKS/SHOP/FEATS/SETTINGS/PASS/DAILY/7-DAYS). Internal messages (debug logs, data ids) untouched.
+- **Concern D — Locale picker** — Settings modal LANGUAGE section now shows `English` (active) + `Spanish (coming soon)` + `Japanese (coming soon)` (both `disabled`). `langEl` change handler calls `WG.i18n.setLocale()`.
+- **Concern E — Docs** — `docs/I18N.md` with key naming table, translator workflow (copy → translate → enable option → PR), developer wrapping patterns, cache invalidation.
+- **Module loading** — `js/core/wg-i18n.js` added as first entry in `WG.Loader.MODULES` in `index.html`. `WG.i18n.init()` called in boot sequence after `loadAll()`, before `WG.Game.init()`. `refreshDOM()` called after init so `data-i18n` attributes resolve immediately.
+- **Syntax checks** — `node --check` passes on `wg-i18n.js` and `wg-game.js`.
+- **Fallback** — `t(key)` returns the key itself on miss; all `WG.i18n ?` guards in `wg-game.js` ensure no crash if module absent.
+
+### Tower Art — Procedural Backgrounds (W-Tower-Art-Procedural 2026-05-05)
+- **`js/hunt/hunt-tower-render.js`** — `WG.HuntTowerRender`: `paintTowerInterior(ctx, w, h, t, floor)`.
+- **Concern A — Tower interior painter** — stone temple interior: ceiling band + 3 crossbeams, far-wall tile grid (faint), central wall sigil glyph (slow-rotating), 4 massive columns with gradient bodies + edge-light bleed + stone seam lines, 2 torch sconces per column (flicker + glow + flame-tip), 1 sigil ring per sconce (pulse + cross), foreground floor with tile grid + 4 sigil engravings, 22 floating ash motes drifting upward.
+- **Concern B — Floor-tier color shifts** — `_tierPalette(floor)`: floors 1-4 warm orange `[255,130,36]`, floors 5-9 gold-amber `[255,195,70]`, floors 10-14 pale blue `[160,210,255]`, floors 15-19 deep violet `[120,0,200]`, floors 20+ black-violet `[60,0,100]`. Torch RGB + sigil RGB + ambient hex all shift per tier.
+- **Concern C — Wired into Tower run** — `hunt-render.js` `drawFrame()` guard changed: `if (!runtime) return;` + `if (runtime.mode === 'tower') { _drawFrameTower(); return; }` before the former `!runtime.stage` guard. `_drawFrameTower()` paints tower background (screen-space) → trauma shake → ZOOM-scale entities (drops, pickups, creatures, projectiles, player, particles, FX) → screen-space HUD.
+- **Tower HUD** — `drawTowerHud(ctx)` in `hunt-render.js`: floor badge centered at top, HP bar + Lv. lower-left, active buff pills top-right. Replaces wave-dot row (which was meaningless in tower mode).
+- `index.html` — `js/hunt/hunt-tower-render.js` added after `hunt-tower.js`, before ascend modules.
+- **Syntax check** — `node --check` passes on both modified files.
+- **rAF lifecycle** — no own rAF loop. Painter is driven by main game rAF via `drawFrame`. Cancels automatically when `exitHunt()` nulls `huntRuntime` (stops `drawFrame` call path).
 
 ### Daily Reward Streak UI (W-Daily-Reward-Streak-UI 2026-05-05)
 - **`meta-daily-rewards.js`** — `WG.DailyRewards`: `WEEK_REWARDS` catalog (7 entries, Object.freeze), `openModal()`, `hasUnclaimed()`, `refreshBadge()`, `setBadgeEl()`, `init()`.
@@ -51,6 +74,17 @@
 - `CLAUDE.md` — project protocol (this file's sibling)
 - `BUILD_PLAN.md` — phase queue (worker tasks)
 - `STATE_OF_BUILD.md` — this file
+
+### Limited-Time Events (W-Event-System-Scaffold 2026-05-05)
+- **`meta-ltd-events.js`** — `WG.LtdEvents`: `CATALOG` (Object.freeze, 3 events), `activeEvents()`, `applyBuffs()`, `getBuff(key, default)`, `renderBanner(el)`, `openEventModal(evt)`, `init()`.
+- **Namespace note** — `WG.Events` was already taken by the analytics reporter (`meta-events.js`); limited-time events use `WG.LtdEvents`.
+- **Concern A — Catalog** — 3 events: `wraith_moon` (Oct 25 – Nov 2 2026, banshee_spawn_mult 2×, Moon Sigil drop), `lunar_new_year` (Feb 9–17 2026, login_bonus_mult 2×, red envelope drop), `tower_anniversary` (May 5–12 2027, tower_continue_discount 50%). All dates hardcoded (server scheduling = Phase 4).
+- **Concern B — Scheduler + buff stack** — `activeEvents()` filters CATALOG by `_todayStr()`. `applyBuffs()` merges active event buffs into `WG.State.get().eventBuffs`; emits `event:buffs-applied`. `getBuff(key, default)` is the read API for other systems (e.g. `hunt-waves.js` can call `WG.LtdEvents.getBuff('banshee_spawn_mult', 1.0)` when banshee enemy type ships). Polled every 1h via `setInterval` in `init()`.
+- **Concern C — Hunt banner** — `renderBanner(el)` receives the banner slot container from `showHuntStageList()`; paints a purple gradient strip with EVENT badge + event name + countdown. Tap → `openEventModal()`. Slot hidden when no active events. Re-evaluated on hourly poll. Event detail modal: LIMITED EVENT badge, date range + countdown, event effects (buffs), event missions with progress bars + reward, cosmetic preview. "TRACK IN MISSIONS" button opens Missions modal on EVENT tab.
+- **Concern D — Mission injection** — `WG.Missions.setEventMissions(defs)` / `clearEventMissions()` added. `WG.LtdEvents.init()` calls `setEventMissions` for all active event missions; hourly poll re-evaluates. `WG.Missions.increment()` and `claim()` now handle event mission ids. `getActive()` returns `{ daily, weekly, event }`. `openModal(initialTab)` now accepts an optional initial tab arg + shows EVENT pill when event missions are present (purple styling). Event mission claims do not grant BP XP. `_grantReward()` extended to handle `gems` currency.
+- **Buff stack** — `WG.State.get().eventBuffs` (plain object). Other systems read via `WG.LtdEvents.getBuff(key, defaultVal)`. Not persisted to localStorage (recomputed on init from CATALOG + today's date).
+- `index.html` — `meta-ltd-events.js` added after `meta-daily-rewards.js`.
+- `wg-game.js` — `evtBannerSlot` div inserted above hero tile in `showHuntStageList()`; `LtdEvents.init()` in init chain after `DailyRewards.init()`.
 
 ### Missions + Battle Pass (W-Monetization-V2-Missions-Pass 2026-05-05)
 - **Daily missions** — 13-mission catalog; 5 picked deterministically per day (date+userId seed). Progress tracked per session + persisted. Claim button grants reward + +50 BP XP. TASKS side icon → live modal.
@@ -128,6 +162,7 @@
 - `meta-battle-pass.js` — season battle pass engine + 60-level grid UI.
 - `meta-achievements.js` — WG.Achievements: 21-entry permanent catalog, event-wired tracker, claim flow, modal UI. 🏆 FEATS side icon in Hunt lobby.
 - `meta-daily-rewards.js` — WG.DailyRewards: 7-entry WEEK_REWARDS catalog, 7-tile streak grid modal, claim flow with fly animations, red dot badge. 🎁 DAILY side icon in Hunt lobby.
+- `meta-ltd-events.js` — WG.LtdEvents: limited-time event catalog (3 events), scheduler, buff stack, Hunt banner, event detail modal, mission injection hook.
 
 ### Hunt (`js/hunt/` — 9 modules)
 - `hunt-stage.js` — 18 stages × 6 biomes (forest_summer / cold_stone / forest_autumn / temple / cave / eldritch). Each stage: id, name, biome, durationSec, enemyMix, bossId, weaponPickups list.

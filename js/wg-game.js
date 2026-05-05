@@ -153,11 +153,15 @@
         }
         if (hit) {
           if (hit === huntRuntime.boss) {
-            hit.hp -= p.damage;
-            WG.Engine.emit('boss:damaged', { boss: hit, amount: p.damage });
-            if (hit.hp <= 0) {
-              WG.Engine.emit('boss:defeated', { boss: hit });
-              huntRuntime.bossDefeated = true;
+            // Fragment-split immunity: echo_throne_keeper is invulnerable to projectiles
+            // while any boss fragments (_isBossFragment) are still alive.
+            if (!(hit._fragmentsAlive > 0)) {
+              hit.hp -= p.damage;
+              WG.Engine.emit('boss:damaged', { boss: hit, amount: p.damage });
+              if (hit.hp <= 0) {
+                WG.Engine.emit('boss:defeated', { boss: hit });
+                huntRuntime.bossDefeated = true;
+              }
             }
           } else {
             WG.HuntEnemies.damage(hit, p.damage, p.sourceType ? { type: p.sourceType } : null);
@@ -408,6 +412,7 @@
     temple:        { sky: '#3a1818', floor: '#5a2818', accent: '#f0c060', silhouette: '#1a0808' },
     cave:          { sky: '#0a0612', floor: '#180c20', accent: '#a878d8', silhouette: '#000000' },
     eldritch:      { sky: '#1a0a2a', floor: '#2a0a3a', accent: '#c060ff', silhouette: '#000000' },
+    ascended:      { sky: '#04010e', floor: '#0a0418', accent: '#c060ff', silhouette: '#000000' },
   };
 
   // ART SLOTS: Set BIOME_ART[id] / CHARACTER_PORTRAITS[id] to a URL when
@@ -422,6 +427,7 @@
     temple:        'images/biomes/temple.png',
     cave:          'images/biomes/cave.png',
     eldritch:      'images/biomes/eldritch.png',
+    ascended:      'images/biomes/ascended.png',
   };
   const CHARACTER_PORTRAITS = {
     lantern_acolyte: 'images/portraits/lantern_acolyte.png',
@@ -442,8 +448,10 @@
     frozen_crone:   'images/bosses/frozen_crone.png',
     autumn_lord:    'images/bosses/autumn_lord.png',
     temple_warden:  'images/bosses/temple_warden.png',
-    cave_mother:    'images/bosses/cave_mother.png',
-    wraith_father:  'images/bosses/wraith_father.png',
+    cave_mother:         'images/bosses/cave_mother.png',
+    wraith_father:       'images/bosses/wraith_father.png',
+    echo_throne_keeper:  'images/bosses/echo_throne_keeper.png',
+    wraith_father_echo:  'images/bosses/wraith_father_echo.png',
   };
   // RIFT biomes are future cross-IP intrusion stages — when stage.biome is in
   // this set the menu hero gains a violet drop-shadow + intermittent glitch
@@ -768,6 +776,57 @@
     }
   }
 
+  function paintBiome_ascended(ctx, w, h, t, isNight, pal) {
+    // Deep void sky — darker than eldritch, no warm undertone
+    const sg = ctx.createLinearGradient(0, 0, 0, h * 0.7);
+    sg.addColorStop(0, '#02000a'); sg.addColorStop(0.55, '#06021a'); sg.addColorStop(1, '#04011a');
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h * 0.7);
+    // Sigil fragments — slowly rotating angular shards (denser than eldritch)
+    for (let i = 0; i < 9; i++) {
+      const sx = _hash(i + 70) * w;
+      const sy = _hash(i + 80) * h * 0.55;
+      const pulse = 0.12 + Math.sin(t * 0.8 + i * 0.9) * 0.12;
+      ctx.fillStyle = `rgba(192,96,255,${pulse})`;
+      ctx.save(); ctx.translate(sx, sy);
+      ctx.rotate(t * 0.2 + i * 0.7);
+      const sz = 3 + _hash(i + 90) * 4;
+      ctx.fillRect(-sz, -1, sz * 2, 2); ctx.fillRect(-1, -sz, 2, sz * 2);
+      ctx.restore();
+    }
+    // Faint ascending glyph pillars on the horizon
+    ctx.fillStyle = '#060118';
+    for (let i = 0; i < 5; i++) {
+      const px = (i + 0.5) * (w / 5) + (_hash(i + 50) - 0.5) * 12;
+      const ph = h * (0.18 + _hash(i + 55) * 0.12);
+      const py = h * 0.7;
+      const pw = 6 + _hash(i + 60) * 8;
+      ctx.fillRect(px - pw / 2, py - ph, pw, ph);
+      // crossbar
+      ctx.fillRect(px - pw, py - ph * 0.55, pw * 2, 3);
+    }
+    // Floor — void stone, deep indigo
+    const fg = ctx.createLinearGradient(0, h * 0.7, 0, h);
+    fg.addColorStop(0, '#0c0428'); fg.addColorStop(1, '#02000a');
+    ctx.fillStyle = fg; ctx.fillRect(0, h * 0.7, w, h * 0.3);
+    // Pulsing sigil ring on floor — denser and brighter than eldritch
+    for (let i = 0; i < 6; i++) {
+      const gx = w * (0.12 + i * 0.16);
+      const gy = h * (0.82 + (i % 3) * 0.04);
+      const pulse = 0.5 + Math.sin(t * 3.0 + i * 1.1) * 0.5;
+      const r = 14 + Math.sin(t * 3.0 + i * 1.1) * 3;
+      ctx.strokeStyle = `rgba(192,96,255,${pulse * 0.9})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(gx, gy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(192,96,255,${pulse * 0.5})`;
+      ctx.save(); ctx.translate(gx, gy); ctx.rotate(t * 0.5 + i);
+      ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+      ctx.moveTo(0, -r); ctx.lineTo(0, r);
+      ctx.moveTo(-r * 0.7, -r * 0.7); ctx.lineTo(r * 0.7, r * 0.7);
+      ctx.moveTo(r * 0.7, -r * 0.7); ctx.lineTo(-r * 0.7, r * 0.7);
+      ctx.stroke(); ctx.restore();
+    }
+  }
+
   const BIOME_PAINTERS = {
     forest_summer: paintBiome_forest_summer,
     forest_autumn: paintBiome_forest_autumn,
@@ -775,6 +834,7 @@
     temple:        paintBiome_temple,
     cave:          paintBiome_cave,
     eldritch:      paintBiome_eldritch,
+    ascended:      paintBiome_ascended,
   };
 
   // Menu-scale character sprite. Mirrors hunt-render.js drawAnimeGirl body
@@ -865,6 +925,12 @@
     // Clamp selection to a valid stage on (re)open.
     if (selectedStageIdx < 0 || selectedStageIdx >= stages.length) selectedStageIdx = 0;
 
+    // W-Event-System-Scaffold — banner slot: shown when a limited-time event is active
+    const evtBannerSlot = document.createElement('div');
+    evtBannerSlot.style.cssText = 'flex:0 0 auto;margin-bottom:8px;';
+    select.appendChild(evtBannerSlot);
+    if (WG.LtdEvents && WG.LtdEvents.renderBanner) WG.LtdEvents.renderBanner(evtBannerSlot);
+
     // ─── Hero tile ──────────────────────────────────────────────────────────
     const hero = document.createElement('div');
     hero.style.cssText = 'position:relative;flex:1 1 auto;min-height:260px;border-radius:14px;overflow:hidden;border:2px solid #3a2818;box-shadow:0 4px 14px rgba(0,0,0,0.6);margin-bottom:10px;';
@@ -885,25 +951,26 @@
     const leftCol = document.createElement('div');
     leftCol.style.cssText = 'position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
     // W-Monetization-V2-Missions-Pass — TASKS opens live missions modal; PASS opens battle pass modal
-    leftCol.appendChild(sideIcon({glyph:'📋',label:'TASKS',onClick:()=>{ if (WG.Missions && WG.Missions.openModal) WG.Missions.openModal(); else openInfoModal('Tasks','Loading...'); }}));
+    const _ti = WG.i18n ? WG.i18n.t.bind(WG.i18n) : function(k) { return k; };
+    leftCol.appendChild(sideIcon({glyph:'📋',label:_ti('menu.tasks'),onClick:()=>{ if (WG.Missions && WG.Missions.openModal) WG.Missions.openModal(); else openInfoModal('Tasks','Loading...'); }}));
     // W-Monetization-V2-Whale-Ladder §D — OFFERS renamed SHOP; Offers is sub-section inside Shop modal.
-    leftCol.appendChild(sideIcon({glyph:'🛒',label:'SHOP',border:'#c080ff',onClick:()=>WG.Shop && WG.Shop.open()}));
+    leftCol.appendChild(sideIcon({glyph:'🛒',label:_ti('menu.shop'),border:'#c080ff',onClick:()=>WG.Shop && WG.Shop.open()}));
     // W-Achievements-UI — long-term achievement track
-    leftCol.appendChild(sideIcon({glyph:'🏆',label:'FEATS',border:'#c8a030',onClick:()=>{ if (WG.Achievements && WG.Achievements.openModal) WG.Achievements.openModal(); else openInfoModal('Achievements','Loading...'); }}));
+    leftCol.appendChild(sideIcon({glyph:'🏆',label:_ti('menu.feats'),border:'#c8a030',onClick:()=>{ if (WG.Achievements && WG.Achievements.openModal) WG.Achievements.openModal(); else openInfoModal('Achievements','Loading...'); }}));
     hero.appendChild(leftCol);
 
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
-    rightCol.appendChild(sideIcon({glyph:'⚙',label:'SETTINGS',onClick:()=>openSettingsModal()}));
-    rightCol.appendChild(sideIcon({glyph:'🎟',label:'PASS',border:'#5030a0',onClick:()=>{ if (WG.BattlePass && WG.BattlePass.openModal) WG.BattlePass.openModal(); else openInfoModal('Battle Pass','Loading...'); }}));
+    rightCol.appendChild(sideIcon({glyph:'⚙',label:_ti('menu.settings'),onClick:()=>openSettingsModal()}));
+    rightCol.appendChild(sideIcon({glyph:'🎟',label:_ti('menu.pass'),border:'#5030a0',onClick:()=>{ if (WG.BattlePass && WG.BattlePass.openModal) WG.BattlePass.openModal(); else openInfoModal('Battle Pass','Loading...'); }}));
     // W-Daily-Reward-Streak-UI — live 7-day streak grid modal + red dot badge
-    const _drIcon = sideIcon({glyph:'🎁',label:'DAILY',onClick:()=>{ if (WG.DailyRewards && WG.DailyRewards.openModal) WG.DailyRewards.openModal(); }});
+    const _drIcon = sideIcon({glyph:'🎁',label:_ti('menu.daily'),onClick:()=>{ if (WG.DailyRewards && WG.DailyRewards.openModal) WG.DailyRewards.openModal(); }});
     const _drDot = document.createElement('span');
     _drDot.style.cssText = 'position:absolute;top:-3px;right:-3px;width:9px;height:9px;background:#e02828;border-radius:50%;border:1.5px solid #200808;pointer-events:none;display:' + (WG.DailyRewards && WG.DailyRewards.hasUnclaimed() ? 'block' : 'none') + ';';
     _drIcon.appendChild(_drDot);
     if (WG.DailyRewards && WG.DailyRewards.setBadgeEl) WG.DailyRewards.setBadgeEl(_drDot);
     rightCol.appendChild(_drIcon);
-    rightCol.appendChild(sideIcon({glyph:'📅',label:'7-DAYS',badge:'!',onClick:()=>openInfoModal('7-Day Login','Day-of streak rewards — preview.')}));
+    rightCol.appendChild(sideIcon({glyph:'📅',label:_ti('menu.7days'),badge:'!',onClick:()=>openInfoModal('7-Day Login','Day-of streak rewards — preview.')}));
     hero.appendChild(rightCol);
 
     // Carousel arrows
@@ -948,9 +1015,10 @@
       return p;
     }
     function rebuildPills() {
+      const _t = WG.i18n ? WG.i18n.t.bind(WG.i18n) : function(k) { return k; };
       modeBar.innerHTML = '';
-      modeBar.appendChild(modePill('☀ NORMAL MODE', 'day'));
-      modeBar.appendChild(modePill('☾ NIGHTMARE MODE', 'night'));
+      modeBar.appendChild(modePill(_t('menu.normal_mode'), 'day'));
+      modeBar.appendChild(modePill(_t('menu.nightmare_mode'), 'night'));
     }
     rebuildPills();
 
@@ -961,7 +1029,7 @@
 
     const battleBtn = document.createElement('button');
     battleBtn.style.cssText = 'min-width:200px;padding:14px 36px;border-radius:32px;border:2px solid #f8a030;background:linear-gradient(to bottom,#e85020,#a02810);color:#fff8e0;font-size:18px;letter-spacing:3px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(232,80,32,0.45),0 0 0 1px rgba(255,200,120,0.35) inset;text-shadow:0 1px 2px rgba(0,0,0,0.6);transition:transform 80ms ease;';
-    battleBtn.textContent = 'BATTLE';
+    battleBtn.textContent = WG.i18n ? WG.i18n.t('menu.battle') : 'BATTLE';
     battleBtn.addEventListener('pointerdown',()=>{battleBtn.style.transform='scale(0.96)';});
     battleBtn.addEventListener('pointerup',()=>{battleBtn.style.transform='scale(1)';});
     battleBtn.addEventListener('pointerleave',()=>{battleBtn.style.transform='scale(1)';});
@@ -985,7 +1053,7 @@
     const gauntletBtn = document.createElement('button');
     gauntletBtn.id = 'wg-gauntlet-btn';
     gauntletBtn.style.cssText = 'min-width:200px;padding:11px 28px;border-radius:28px;border:2px solid #5030a0;background:linear-gradient(to bottom,#3a1a90,#1a0850);color:#c0a8f0;font-size:14px;letter-spacing:3px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(80,48,160,0.4);transition:transform 80ms ease;';
-    gauntletBtn.textContent = '🏰 GAUNTLET';
+    gauntletBtn.textContent = WG.i18n ? WG.i18n.t('menu.gauntlet') : '🏰 GAUNTLET';
     gauntletBtn.addEventListener('pointerdown', () => { gauntletBtn.style.transform = 'scale(0.96)'; });
     gauntletBtn.addEventListener('pointerup',   () => { gauntletBtn.style.transform = 'scale(1)'; });
     gauntletBtn.addEventListener('pointerleave',() => { gauntletBtn.style.transform = 'scale(1)'; });
@@ -1140,17 +1208,17 @@
         lock.innerHTML = `
           <div style="font-size:48px;line-height:1;">🔒</div>
           <div style="font-size:14px;color:#f0d890;margin-top:10px;font-weight:700;letter-spacing:1px;">LOCKED</div>
-          <div style="font-size:11px;color:#a89878;margin-top:6px;line-height:1.4;">Beat Stage ${stage.id - 1} to unlock</div>
+          <div style="font-size:11px;color:#a89878;margin-top:6px;line-height:1.4;">${stage.biome === 'ascended' ? 'Defeat the Wraith Father to ascend.' : 'Beat Stage ' + (stage.id - 1) + ' to unlock'}</div>
         `;
         heroContent.appendChild(lock);
         battleBtn.style.opacity = '0.45';
         battleBtn.style.cursor = 'not-allowed';
-        battleBtn.textContent = '🔒  LOCKED';
+        battleBtn.textContent = WG.i18n ? WG.i18n.t('menu.locked') : '🔒  LOCKED';
         battleBtn.style.animation = '';
       } else {
         battleBtn.style.opacity = '1';
         battleBtn.style.cursor = 'pointer';
-        battleBtn.textContent = 'BATTLE';
+        battleBtn.textContent = WG.i18n ? WG.i18n.t('menu.battle') : 'BATTLE';
         battleBtn.style.animation = 'battlePulse 2s ease-in-out infinite';
       }
 
@@ -1256,6 +1324,8 @@
       '<div style="'+ROW+'">' +
         '<select id="cfg-lang" style="background:#1a1208;border:1.5px solid #5a4028;color:#f0d890;font-size:11px;padding:5px 8px;border-radius:7px;cursor:pointer;font-weight:700;">' +
           '<option value="en"'+(cfg.language==='en'?' selected':'')+'>English</option>' +
+          '<option value="es" disabled>Spanish (coming soon)</option>' +
+          '<option value="ja" disabled>Japanese (coming soon)</option>' +
         '</select>' +
         '<span style="font-size:9px;color:#5a4028;margin-left:8px;letter-spacing:0.5px;">MORE v0.25</span>' +
       '</div>' +
@@ -1277,6 +1347,10 @@
         '<a href="privacy.html" target="_blank" style="flex:1;text-align:center;padding:7px;border-radius:8px;border:1.5px solid #5a4028;background:#1a1208;color:#d4a040;font-size:10px;font-weight:700;letter-spacing:1px;text-decoration:none;">PRIVACY POLICY</a>' +
         '<a href="terms.html" target="_blank" style="flex:1;text-align:center;padding:7px;border-radius:8px;border:1.5px solid #5a4028;background:#1a1208;color:#d4a040;font-size:10px;font-weight:700;letter-spacing:1px;text-decoration:none;">TERMS OF SERVICE</a>' +
       '</div>' +
+
+      '<div style="'+SL+'">TUTORIAL</div>' +
+      '<button id="cfg-reset-tutorial" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a4828;background:#0a1208;color:#a8d878;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;">RESET TUTORIAL</button>' +
+      '<div id="cfg-reset-tutorial-msg" style="display:none;font-size:10px;text-align:center;padding:4px 0;color:#a8d878;letter-spacing:0.5px;">Tutorial reset. Play again to see all hints.</div>' +
 
       '<div style="'+SL+'">SAVE DATA</div>' +
       '<button id="cfg-delete-save" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #8a2020;background:#1a0808;color:#e06060;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;">DELETE SAVE</button>' +
@@ -1331,10 +1405,25 @@
     });
 
     const langEl = overlay.querySelector('#cfg-lang');
-    if (langEl) langEl.addEventListener('change', (e) => { cfg.language = e.target.value; saveS(cfg); });
+    if (langEl) langEl.addEventListener('change', (e) => {
+      cfg.language = e.target.value;
+      saveS(cfg);
+      if (WG.i18n) WG.i18n.setLocale(e.target.value);
+    });
 
     const remEl = overlay.querySelector('#cfg-reminder');
     if (remEl) remEl.addEventListener('change', (e) => { cfg.reminderTime = e.target.value; saveS(cfg); });
+
+    const resetTutBtn = overlay.querySelector('#cfg-reset-tutorial');
+    const resetTutMsg = overlay.querySelector('#cfg-reset-tutorial-msg');
+    if (resetTutBtn) {
+      resetTutBtn.addEventListener('click', () => {
+        if (WG.HuntTutorialExt && WG.HuntTutorialExt.resetAll) WG.HuntTutorialExt.resetAll();
+        if (resetTutMsg) resetTutMsg.style.display = 'block';
+        resetTutBtn.textContent = 'RESET DONE';
+        resetTutBtn.disabled = true;
+      });
+    }
 
     const delBtn  = overlay.querySelector('#cfg-delete-save');
     const delConf = overlay.querySelector('#cfg-delete-confirm');
@@ -1344,7 +1433,7 @@
     if (delNo)  delNo.addEventListener('click',  () => { delConf.style.display='none';  delBtn.style.display='block'; });
     if (delYes) delYes.addEventListener('click', () => {
       const _cleanup = () => {
-        try { ['wg_save_v2','wg_audio_v1',SKEY].forEach(k => localStorage.removeItem(k)); } catch(e) {}
+        try { ['wg_save_v2','wg_audio_v1','wg_compliance_v1',SKEY].forEach(k => localStorage.removeItem(k)); } catch(e) {}
         overlay.remove();
         window.location.reload();
       };
@@ -1491,6 +1580,7 @@
     WG.HuntResults.init();
     WG.HuntRender.init();
     WG.HuntTutorial.init();
+    if (WG.HuntTutorialExt && WG.HuntTutorialExt.init) WG.HuntTutorialExt.init();
     if (WG.Onboarding && WG.Onboarding.init) WG.Onboarding.init();
     if (WG.HuntTowerBuffs && WG.HuntTowerBuffs.init) WG.HuntTowerBuffs.init();
     if (WG.HuntTower && WG.HuntTower.init) WG.HuntTower.init();
@@ -1521,6 +1611,8 @@
     // MetaDailyReset.init() subscribes Royal Pass daily-bonus (pre-existing missing call fixed here)
     if (WG.MetaDailyReset && WG.MetaDailyReset.init) WG.MetaDailyReset.init();
     if (WG.DailyRewards && WG.DailyRewards.init) WG.DailyRewards.init();
+    // W-Event-System-Scaffold — apply event buffs + register active missions
+    if (WG.LtdEvents && WG.LtdEvents.init) WG.LtdEvents.init();
     // Fire daily:reset now — state is loaded + all listeners registered
     if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
 
@@ -1613,6 +1705,29 @@
   function initBossIntro() {
     if (!WG.Engine || !WG.Engine.on) return;
     WG.Engine.on('boss:spawned', ({ boss }) => { if (boss) showBossIntro(boss); });
+
+    // memory_husk: splits into 2 lurkers on death (needs runtime for spawn).
+    // Boss fragments: decrement _fragmentsAlive; when 0 the boss's immunity drops
+    // and it is finished via a direct hp=0 + boss:defeated emit.
+    WG.Engine.on('enemy:killed', ({ creature }) => {
+      if (!huntRuntime) return;
+      if (creature.type === 'memory_husk') {
+        for (let i = 0; i < 2; i++) {
+          const ang = Math.PI * 2 * (i / 2) + Math.random() * 0.5;
+          const e = WG.HuntEnemies.spawn('lurker', creature.x + Math.cos(ang) * 24, creature.y + Math.sin(ang) * 24);
+          if (e) huntRuntime.creatures.push(e);
+        }
+      }
+      if (creature._isBossFragment && creature._bossRef) {
+        const boss = creature._bossRef;
+        boss._fragmentsAlive = Math.max(0, (boss._fragmentsAlive || 1) - 1);
+        if (boss._fragmentsAlive === 0 && boss.hp > 0) {
+          boss.hp = 0;
+          WG.Engine.emit('boss:defeated', { boss });
+          huntRuntime.bossDefeated = true;
+        }
+      }
+    });
   }
 
   function start() {

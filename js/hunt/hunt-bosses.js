@@ -26,6 +26,26 @@
       patterns:['triple_phase','soul_volley','area_drain'],
       shardCount:12, shardSpeed:200, shardCd:4.5, areaR:160, areaCd:10.0, summonType:'caller', summonCount:3, summonInterval:12.0,
     },
+
+    // ─── Post-launch ascended tier bosses ────────────────────────────────────
+    // echo_throne_keeper — sigil-shaped entity, splits into 3 fragments at 50% HP.
+    // All 3 fragments must die before the boss can be killed (see wg-game.js
+    // enemy:killed handler + projectile immunity guard).
+    echo_throne_keeper: {
+      id:'echo_throne_keeper', name:'Echo Throne Keeper', hp:1800, speed:18, damage:45, contactCd:1.8, size:52, color:'#2a0850', accent:'#c060ff', xp:400,
+      patterns:['fragment_split','sigil_burst'],
+      shardCount:10, shardSpeed:175, shardCd:4.0,
+      areaCd:8.0, areaR:130,
+      splitThreshold:0.5, splitType:'sigil_drone', splitCount:3,
+    },
+    // wraith_father_echo — faded memory of the Wraith Father. Diminished HP/speed/damage
+    // but visually the same silhouette washed pale. Summons memory_husks instead of callers.
+    wraith_father_echo: {
+      id:'wraith_father_echo', name:'Wraith Father Echo', hp:2000, speed:22, damage:42, contactCd:1.6, size:60, color:'#2a1040', accent:'#8040c0', xp:480,
+      patterns:['soul_volley','area_drain','echo_summon'],
+      shardCount:10, shardSpeed:180, shardCd:5.0,
+      areaR:150, areaCd:9.0, summonType:'memory_husk', summonCount:2, summonInterval:14.0,
+    },
   };
 
   function get(id) { return BOSSES[id]; }
@@ -110,6 +130,26 @@
         WG.Engine.emit('boss:shard', { boss: b, count });
       }
     }
+    // Fragment split — one-time trigger at splitThreshold (default 50% HP).
+    // Spawns splitCount creatures tagged as boss fragments; boss becomes immune
+    // to projectile damage (enforced in wg-game.js) until all fragments die.
+    // Fragment death + boss kill are handled by the enemy:killed listener in wg-game.js.
+    if (td.splitThreshold && !b._splitDone && (b.hp / b.maxHp) <= td.splitThreshold) {
+      b._splitDone = true;
+      b._fragmentsAlive = td.splitCount;
+      for (let i = 0; i < td.splitCount; i++) {
+        const ang = Math.PI * 2 * (i / td.splitCount);
+        const fe = WG.HuntEnemies.spawn(td.splitType, b.x + Math.cos(ang)*70, b.y + Math.sin(ang)*70);
+        if (fe) {
+          fe._isBossFragment = true;
+          fe._bossRef = b;
+          fe.hp = fe.maxHp = 120; // hardened fragment HP
+          runtime.creatures.push(fe);
+        }
+      }
+      WG.Engine.emit('boss:split', { boss: b, count: td.splitCount });
+    }
+
     if (td.areaCd || td.areaFreezeCd || td.shockwaveCd || td.darknessCd) {
       const cd = td.areaCd || td.areaFreezeCd || td.shockwaveCd || td.darknessCd;
       b._patternTimers.area = (b._patternTimers.area||0) - dt;

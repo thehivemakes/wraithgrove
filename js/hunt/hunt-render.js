@@ -1792,6 +1792,196 @@
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.7, Math.max(18, sz+4), c.hp, c.maxHp);
   }
 
+  // echo_throne_keeper — sigil-shaped boss. Geometric body: outer ring of bone-white
+  // sigil arms radiating from a dark-violet core disc. Rotates the arm array slowly.
+  // At split phase (_splitDone), the core dims to signal immunity.
+  function drawBoss_echo_throne_keeper(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
+    const sz = b.size;
+    const immune = b._fragmentsAlive > 0;
+    drawBossAura(ctx, sx, sy, sz, `rgba(192, 96, 255, ${immune ? 0.15 : 0.38})`, t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Outer ring — pulsing bone-white sigil halo
+    const ringPulse = 0.5 + Math.sin(t * 2.2) * 0.3;
+    ctx.strokeStyle = `rgba(220, 200, 255, ${ringPulse * (immune ? 0.3 : 0.7)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, sy, sz * 0.62, 0, Math.PI * 2); ctx.stroke();
+    // Eight angular arms radiating outward — slowly rotating sigil structure
+    const baseAng = t * 0.45;
+    ctx.strokeStyle = `rgba(192, 96, 255, ${immune ? 0.25 : 0.75})`;
+    ctx.lineWidth = 1.8;
+    for (let i = 0; i < 8; i++) {
+      const a = baseAng + i * Math.PI / 4;
+      const innerR = sz * 0.22;
+      const outerR = sz * 0.58 + Math.sin(t * 3 + i) * sz * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(sx + Math.cos(a) * innerR, sy + Math.sin(a) * innerR);
+      ctx.lineTo(sx + Math.cos(a) * outerR, sy + Math.sin(a) * outerR);
+      ctx.stroke();
+    }
+    // Core disc — deep violet; dims to near-black while immune
+    ctx.fillStyle = immune ? '#0a0414' : b._typeData.color;
+    ctx.beginPath(); ctx.arc(sx, sy, sz * 0.36, 0, Math.PI * 2); ctx.fill();
+    // Inner sigil cross — counter-rotates
+    const cAng = -t * 0.7;
+    ctx.strokeStyle = `rgba(200, 128, 255, ${immune ? 0.20 : (0.7 + Math.sin(t * 2) * 0.3)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx + Math.cos(cAng) * sz * 0.28, sy + Math.sin(cAng) * sz * 0.28);
+    ctx.lineTo(sx - Math.cos(cAng) * sz * 0.28, sy - Math.sin(cAng) * sz * 0.28);
+    ctx.moveTo(sx + Math.cos(cAng + Math.PI*0.5) * sz * 0.20, sy + Math.sin(cAng + Math.PI*0.5) * sz * 0.20);
+    ctx.lineTo(sx - Math.cos(cAng + Math.PI*0.5) * sz * 0.20, sy - Math.sin(cAng + Math.PI*0.5) * sz * 0.20);
+    ctx.stroke();
+    // Immune overlay — bone-white ring with "SPLIT" visual cue
+    if (immune) {
+      ctx.strokeStyle = 'rgba(240, 220, 255, 0.45)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.arc(sx, sy, sz * 0.44, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    _bossFlash(ctx, sx, sy, sz, fx);
+  }
+
+  // wraith_father_echo — faded memory of the Wraith Father. Same silhouette as
+  // the original but washed pale: color is #2a1040 (dim purple), accent #8040c0.
+  // Eyes glow faint blue-white instead of vivid purple. Aura is thinner.
+  function drawBoss_wraith_father_echo(ctx, sx, sy, b, t) {
+    const fx = _bossHitFx(b); sx += fx.wobble;
+    const sz = b.size;
+    // Faded layered aura — thinner than the original
+    for (let i = 2; i > 0; i--) {
+      ctx.fillStyle = `rgba(40, 16, 70, ${0.10 + Math.sin(t*1.5 + i)*0.04})`;
+      ctx.beginPath(); ctx.arc(sx, sy, sz*0.5 + i*3, 0, Math.PI*2); ctx.fill();
+    }
+    drawBossAura(ctx, sx, sy, sz, 'rgba(100, 60, 180, 0.22)', t);
+    _bossDropShadow(ctx, sx, sy, sz);
+    // Void cloak — dim purple-black (faded from original #180828)
+    ctx.fillStyle = '#120820';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.34, sy - sz*0.18);
+    ctx.lineTo(sx + sz*0.34, sy - sz*0.18);
+    ctx.lineTo(sx + sz*0.58, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.58, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Inner robe — very dim purple
+    ctx.fillStyle = '#22103a';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.22, sy - sz*0.12);
+    ctx.lineTo(sx + sz*0.22, sy - sz*0.12);
+    ctx.lineTo(sx + sz*0.36, sy + sz*0.55);
+    ctx.lineTo(sx - sz*0.36, sy + sz*0.55);
+    ctx.closePath(); ctx.fill();
+    // Bone clasps — same pattern, slightly faded
+    ctx.fillStyle = '#a09888';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.arc(sx, sy + i * sz*0.10, 1.4, 0, Math.PI*2); ctx.fill();
+    }
+    // Arms
+    ctx.fillStyle = '#120820';
+    ctx.fillRect(sx - sz*0.46, sy - sz*0.08, sz*0.16, sz*0.40);
+    ctx.fillRect(sx + sz*0.30, sy - sz*0.08, sz*0.16, sz*0.40);
+    ctx.fillStyle = '#a09888';
+    ctx.beginPath(); ctx.arc(sx - sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
+    // Face — paler than original, more translucent
+    ctx.fillStyle = '#9080a0';
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.32, sz*0.16, sz*0.22, 0, 0, Math.PI*2); ctx.fill();
+    // Eyes — blue-white fade (not vivid purple) — the "echo" quality
+    ctx.fillStyle = '#0a0818';
+    ctx.fillRect(sx - sz*0.10, sy - sz*0.34, sz*0.07, sz*0.06);
+    ctx.fillRect(sx + sz*0.03, sy - sz*0.34, sz*0.07, sz*0.06);
+    ctx.fillStyle = `rgba(180, 200, 255, ${0.4 + Math.sin(t * 2.2) * 0.25})`;
+    ctx.beginPath(); ctx.arc(sx - sz*0.07, sy - sz*0.31, 1.0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz*0.07, sy - sz*0.31, 1.0, 0, Math.PI*2); ctx.fill();
+    // Crown thorns — same but dimmer
+    ctx.strokeStyle = '#120820'; ctx.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) {
+      const ax = sx + i * sz*0.12;
+      ctx.beginPath();
+      ctx.moveTo(ax, sy - sz*0.48);
+      ctx.lineTo(ax + i * 2, sy - sz*0.62 - Math.abs(i));
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#120820';
+    ctx.fillRect(sx - sz*0.30, sy - sz*0.50, sz*0.60, 3);
+    // Crown gem — faded blue-white instead of vivid purple
+    ctx.fillStyle = `rgba(140, 160, 220, ${0.45 + Math.sin(t * 1.8) * 0.25})`;
+    ctx.beginPath(); ctx.arc(sx, sy - sz*0.56, 1.8, 0, Math.PI*2); ctx.fill();
+    _bossFlash(ctx, sx, sy, sz, fx);
+  }
+
+  // sigil_drone — small flying ascended entity. Ink-silhouette ring with pulsing
+  // inner sigil cross. No feet — floats. Paper-charm register (faint + angular).
+  function drawSigilDrone(ctx, sx, sy, c) {
+    const t = performance.now() / 1000;
+    const sz = c.size;
+    const pulse = 0.6 + Math.sin(t * 3.5 + c.x * 0.015) * 0.4;
+    // Faint outer ring — bone-white
+    ctx.strokeStyle = `rgba(220, 200, 255, ${pulse * 0.5})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(sx, sy, sz * 0.55, 0, Math.PI * 2); ctx.stroke();
+    // Body — dark violet disc
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath(); ctx.arc(sx, sy, sz * 0.42, 0, Math.PI * 2); ctx.fill();
+    // Sigil cross — rotates slowly
+    const ang = t * 0.8;
+    ctx.strokeStyle = `rgba(192, 96, 255, ${pulse})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx + Math.cos(ang) * sz * 0.32, sy + Math.sin(ang) * sz * 0.32);
+    ctx.lineTo(sx - Math.cos(ang) * sz * 0.32, sy - Math.sin(ang) * sz * 0.32);
+    ctx.moveTo(sx + Math.cos(ang + Math.PI*0.5) * sz * 0.22, sy + Math.sin(ang + Math.PI*0.5) * sz * 0.22);
+    ctx.lineTo(sx - Math.cos(ang + Math.PI*0.5) * sz * 0.22, sy - Math.sin(ang + Math.PI*0.5) * sz * 0.22);
+    ctx.stroke();
+    // Accent eye — bone-white dot at center
+    ctx.fillStyle = c._typeData.accent;
+    ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 0.7, Math.max(18, sz + 4), c.hp, c.maxHp);
+  }
+
+  // memory_husk — slow shambling walker. Wide hunched body, faded violet.
+  // Ink-line silhouette: broad torso, stubby limbs, hollow eye sockets.
+  // On death it splits into 2 lurkers (handled in wg-game.js).
+  function drawMemoryHusk(ctx, sx, sy, c) {
+    const sz = c.size;
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(sx, sy + sz*0.52, sz*0.5, sz*0.15, 0, 0, Math.PI*2); ctx.fill();
+    // Legs — stubby, wide apart
+    ctx.fillStyle = '#2a1a38';
+    ctx.fillRect(sx - sz*0.32, sy + sz*0.18, sz*0.2, sz*0.38);
+    ctx.fillRect(sx + sz*0.12, sy + sz*0.18, sz*0.2, sz*0.38);
+    // Body — hunched trapezoid
+    ctx.fillStyle = c._typeData.color;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.44, sy + sz*0.18);
+    ctx.lineTo(sx + sz*0.44, sy + sz*0.18);
+    ctx.lineTo(sx + sz*0.36, sy - sz*0.30);
+    ctx.lineTo(sx - sz*0.36, sy - sz*0.30);
+    ctx.closePath(); ctx.fill();
+    // Arms hanging at sides
+    ctx.fillStyle = '#3a2048';
+    ctx.fillRect(sx - sz*0.52, sy - sz*0.22, sz*0.14, sz*0.38);
+    ctx.fillRect(sx + sz*0.38, sy - sz*0.22, sz*0.14, sz*0.38);
+    // Head — slightly too large, forward lean
+    ctx.fillStyle = '#6a4880';
+    ctx.beginPath(); ctx.ellipse(sx - sz*0.06, sy - sz*0.46, sz*0.26, sz*0.22, 0.15, 0, Math.PI*2); ctx.fill();
+    // Hollow eye sockets — no pupils, just voids
+    ctx.fillStyle = '#000';
+    ctx.fillRect(sx - sz*0.20, sy - sz*0.50, sz*0.10, sz*0.08);
+    ctx.fillRect(sx + sz*0.02, sy - sz*0.50, sz*0.10, sz*0.08);
+    // Accent glow — faint outline on body
+    const glow = 0.2 + Math.sin(performance.now() / 900 + c.x * 0.01) * 0.15;
+    ctx.strokeStyle = `rgba(168, 128, 200, ${glow})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz*0.44, sy + sz*0.18); ctx.lineTo(sx + sz*0.44, sy + sz*0.18);
+    ctx.lineTo(sx + sz*0.36, sy - sz*0.30); ctx.lineTo(sx - sz*0.36, sy - sz*0.30);
+    ctx.closePath(); ctx.stroke();
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.8, Math.max(22, sz+4), c.hp, c.maxHp);
+  }
+
   function drawCreatures(ctx) {
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
@@ -1803,6 +1993,8 @@
         case 'banshee':         drawBanshee(ctx, s.x, s.y, c);   break;
         case 'wraith_fast':     drawWraithFast(ctx, s.x, s.y, c); break;
         case 'skull_swarmer':   drawSkullImp(ctx, s.x, s.y, c);  break;
+        case 'sigil_drone':     drawSigilDrone(ctx, s.x, s.y, c); break;
+        case 'memory_husk':     drawMemoryHusk(ctx, s.x, s.y, c); break;
         default:                drawZombie(ctx, s.x, s.y, c);  // red_zombie + classic five
       }
     }
@@ -1816,7 +2008,9 @@
         case 'autumn_lord':   drawBoss_autumn_lord(ctx, s.x, s.y, b, t); break;
         case 'temple_warden': drawBoss_temple_warden(ctx, s.x, s.y, b, t); break;
         case 'cave_mother':   drawBoss_cave_mother(ctx, s.x, s.y, b, t); break;
-        case 'wraith_father': drawBoss_wraith_father(ctx, s.x, s.y, b, t); break;
+        case 'wraith_father':       drawBoss_wraith_father(ctx, s.x, s.y, b, t); break;
+        case 'echo_throne_keeper':  drawBoss_echo_throne_keeper(ctx, s.x, s.y, b, t); break;
+        case 'wraith_father_echo':  drawBoss_wraith_father_echo(ctx, s.x, s.y, b, t); break;
         default:
           ctx.fillStyle = b._typeData.color;
           ctx.beginPath(); ctx.arc(s.x, s.y, b.size/2, 0, Math.PI*2); ctx.fill();
@@ -2283,8 +2477,122 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // Frame composition.
   // ─────────────────────────────────────────────────────────────────────────────
+  // ── Tower Gauntlet HUD ──────────────────────────────────────────────────
+  // Shown instead of wave-dot row when mode === 'tower'.
+  // Floor badge top-center, HP bar + level lower-left, buff pills top-right.
+  function drawTowerHud(ctx) {
+    const p = runtime.player;
+    if (!p) return;
+    const w = D().width;
+    const floor = runtime.floor || 1;
+
+    // Floor badge — centered at top (matches _showFloorBanner placement)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(w/2 - 56, 72, 112, 24);
+    ctx.font = 'bold 13px system-ui';
+    ctx.fillStyle = '#e0d8f8';
+    ctx.textAlign = 'center';
+    ctx.fillText('FLOOR  ' + floor, w/2, 88);
+    ctx.textAlign = 'left';
+
+    // HP + level (bottom-left of HUD strip)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(8, 76, 78, 38);
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillStyle = '#f0d890';
+    ctx.fillText('Lv.' + p.level, 16, 91);
+    ctx.fillStyle = '#a02020';
+    ctx.fillRect(16, 96, 62, 6);
+    ctx.fillStyle = '#e04040';
+    ctx.fillRect(16, 96, 62 * (p.hp / p.maxHp), 6);
+    ctx.font = '9px system-ui';
+    ctx.fillStyle = '#f0d890';
+    ctx.fillText(Math.ceil(p.hp) + '/' + p.maxHp, 16, 110);
+
+    // Active buff pills — top-right (same as drawHud)
+    if (window.WG && WG.Buffs && WG.Buffs.list) {
+      const buffs = WG.Buffs.list();
+      const padX = 8, padY = 4, bh = 18, gap = 4;
+      let y = 76;
+      ctx.font = 'bold 11px system-ui';
+      for (const b of buffs) {
+        const remTxt = (b.remainingMs === null) ? '★' : Math.ceil(b.remainingMs / 1000) + 's';
+        const text = b.short + ' ' + remTxt;
+        const tw = ctx.measureText(text).width + padX * 2;
+        const x = w - tw - 8;
+        ctx.fillStyle = 'rgba(60,38,8,0.85)';
+        ctx.fillRect(x, y, tw, bh);
+        ctx.strokeStyle = '#f0c060'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(x + 0.5, y + 0.5, tw - 1, bh - 1);
+        ctx.fillStyle = '#ffe0a0';
+        ctx.fillText(text, x + padX, y + bh - padY - 1);
+        y += bh + gap;
+      }
+    }
+  }
+
+  // ── Tower Gauntlet frame render ─────────────────────────────────────────
+  // Called from drawFrame() when runtime.mode === 'tower'.
+  // Background: procedural tower interior (screen-space, fixed parallax).
+  // Entities: drops, pickups, creatures, projectiles, player, particles — same
+  // as Hunt but without biome tiles, props, or night overlay.
+  function _drawFrameTower() {
+    const ctx = D().ctx;
+    const nowMs = performance.now();
+    const fxDt = _lastFrameMs ? Math.min(0.1, (nowMs - _lastFrameMs) / 1000) : 0;
+    _lastFrameMs = nowMs;
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.tick(fxDt);
+    if (window.WG.HuntFX) WG.HuntFX.tick(fxDt);
+
+    updateCamera();
+
+    // Tower interior background — procedural painter (screen-space)
+    const t = nowMs / 1000;
+    const W = D().width, H = D().height;
+    if (window.WG.HuntTowerRender) {
+      WG.HuntTowerRender.paintTowerInterior(ctx, W, H, t, runtime.floor || 1);
+    } else {
+      WG.Render.clear(ctx, '#06020c');
+    }
+
+    // Trauma-based screen shake
+    _trauma = Math.max(0, _trauma - 1.4 * (nowMs - _shakeLastMs) / 1000);
+    _shakeLastMs = nowMs;
+    ctx.save();
+    if (_trauma > 0) {
+      const shake = _trauma * _trauma;
+      const offX = (Math.random() * 2 - 1) * shake * 18;
+      const offY = (Math.random() * 2 - 1) * shake * 18;
+      const rot  = (Math.random() * 2 - 1) * shake * 0.04;
+      ctx.translate(offX + W/2, offY + H/2);
+      ctx.rotate(rot);
+      ctx.translate(-W/2, -H/2);
+    }
+
+    // World entities — ZOOM-scaled (same pipeline as Hunt)
+    ctx.save();
+    ctx.scale(ZOOM, ZOOM);
+    drawDrops(ctx);
+    if (window.WG.HuntPickups) WG.HuntPickups.draw(ctx, w2s, runtime);
+    drawCreatures(ctx);
+    drawProjectiles(ctx);
+    drawPlayer(ctx);
+    WG.Render.drawParticles(ctx, w2s);
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.draw(ctx, w2s);
+    if (window.WG.HuntFX) WG.HuntFX.draw(ctx, w2s);
+    ctx.restore();
+    ctx.restore(); // pair with outer trauma save
+
+    drawEdgePulse(ctx);
+    drawTowerHud(ctx);
+    drawLevelUpModal(ctx);
+  }
+
   function drawFrame() {
-    if (!runtime || !runtime.stage) return;
+    if (!runtime) return;
+    // Tower Gauntlet — own render path (runtime.stage is null in tower mode)
+    if (runtime.mode === 'tower') { _drawFrameTower(); return; }
+    if (!runtime.stage) return;
     const ctx = D().ctx;
     const biome = WG.HuntStage.getBiome(runtime.stage.biome);
     updateCamera();

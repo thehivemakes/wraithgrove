@@ -73,6 +73,7 @@
       if (data.forge) {
         if (Array.isArray(data.forge.buildings)) s.forge.buildings = data.forge.buildings;
         s.forge.craftFragments = data.forge.craftFragments || s.forge.craftFragments;
+        s.forge.rareMaterials = data.forge.rareMaterials || s.forge.rareMaterials || 0;  // audit polish gap — was unrestored, breaking achievement/mission rare-mat rewards across reload
         s.forge.lastDailyChestMs = data.forge.lastDailyChestMs || 0;
       }
       if (data.relics) Object.assign(s.relics, data.relics);

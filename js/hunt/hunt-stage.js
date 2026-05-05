@@ -57,6 +57,17 @@
       lightFog: 0.22,
       decoration:'sigils',
     },
+    // Post-launch endgame tier — beyond the rift, where the Wraith Father came from.
+    // Visual register: deep space-violet + bone-white sigil marks + bleeding starlight.
+    ascended: {
+      ground:   '#0a0418',
+      groundAlt:'#06021a',
+      tree:     '#1a0a30',
+      treeBark: '#0c0620',
+      ambient:  '#06021a',
+      lightFog: 0.32,
+      decoration:'sigils-ascended',
+    },
   };
 
   // Difficulty curve — 18 stages across 6 biome clusters of 3.
@@ -96,6 +107,18 @@
     { id:16, name:'Veil Tear',        biome:'eldritch',      durationSec:300, enemyMix:['caller','sprite','walker','samurai_grunt','pumpkin_lantern','jiangshi','skull_swarmer','wraith_fast'],              bossId:null,             weaponPickups:['willow_charm','ember_lash'],                    notes:'Eldritch opener: sigil-fog atmosphere. Caller + sprite harassment sets late-game tempo.' },
     { id:17, name:'Hollow Throne',    biome:'eldritch',      durationSec:340, enemyMix:['walker','brute_small','caller','sprite','samurai_grunt','pumpkin_lantern','jiangshi','skull_swarmer','wraith_fast'],bossId:null,             weaponPickups:['willow_charm','sutra_blade','ember_lash'],      notes:'Near-maximal mix — everything except lurker; gauntlet before final boss.' },
     { id:18, name:'The Wraith Father',biome:'eldritch',      durationSec:420, enemyMix:['caller','sprite','walker','brute_small','lurker','samurai_grunt','pumpkin_lantern','jiangshi','skull_swarmer','wraith_fast'],bossId:'wraith_father',weaponPickups:['willow_charm','sutra_blade','ember_lash'],notes:'Endgame. Full roster + Wraith Father triple-phase + 7-minute marathon. Power-gated wall.' },
+
+    // ─── Post-launch ascended tier (stages 19-24) ────────────────────────────
+    // Locked until stage 18 cleared (isStageUnlocked checks bestWaves[18] > 0).
+    // Biome: ascended — deep space-violet + bone-white sigils + bleeding starlight.
+    // New enemy types: sigil_drone (ranged, 25 HP) + memory_husk (80 HP, splits on death).
+    // New bosses: echo_throne_keeper (stage 21) + wraith_father_echo (stage 24).
+    { id:19, name:'Hollow Above',         biome:'ascended', durationSec:420, enemyMix:['sigil_drone','memory_husk','caller','lurker','sprite'],                                    bossId:null,                  weaponPickups:['ember_lash','willow_charm'],             notes:'Ascended opener. Sigil drones introduce long-range harassment; memory husks teach the split.' },
+    { id:20, name:'Boneworm Sky',         biome:'ascended', durationSec:420, enemyMix:['sigil_drone','memory_husk','brute_small','walker','caller'],                               bossId:null,                  weaponPickups:['willow_charm','sutra_blade'],            notes:'Memory husks + brutes: split-on-death flooding the arena while slow tanks punish tunnel-vision.' },
+    { id:21, name:"First Sigil's Throne", biome:'ascended', durationSec:420, enemyMix:['sigil_drone','memory_husk','caller','sprite','walker'],                                    bossId:'echo_throne_keeper',  weaponPickups:['sutra_blade','ember_lash'],              notes:'Boss-stage. Echo Throne Keeper splits into 3 fragments; all three must fall before the throne breaks.' },
+    { id:22, name:'Echo Tear',            biome:'ascended', durationSec:420, enemyMix:['sigil_drone','memory_husk','sprite','walker','caller','lurker'],                           bossId:null,                  weaponPickups:['ember_lash','willow_charm'],             notes:'The rift widens. Broadest ascended mix; no boss but sigil drones + husk floods at maximum tempo.' },
+    { id:23, name:'Memory Husk',          biome:'ascended', durationSec:420, enemyMix:['memory_husk','brute_small','sigil_drone','lurker','caller','walker'],                      bossId:null,                  weaponPickups:['willow_charm','sutra_blade'],            notes:'Named for the dominant threat. Dense memory-husk waves — split cascades push the player back constantly.' },
+    { id:24, name:'The Quiet Beyond',     biome:'ascended', durationSec:480, enemyMix:['sigil_drone','memory_husk','caller','sprite','walker','brute_small','lurker'],              bossId:'wraith_father_echo',  weaponPickups:['willow_charm','sutra_blade','ember_lash'],notes:'Final expansion stage. The Wraith Father as a faded memory-echo: diminished but still the abyss. 8-minute marathon.' },
   ];
 
   // SPEC §0 difficulty mandate (W-Hard-Tuning-And-Monetization).
@@ -136,6 +159,9 @@
     s.waveDurationSec = waveDurationFor(s.id);
     s.durationSec     = s.waveCount * s.waveDurationSec;
   }
+  // Stage 24 override — 8-minute final boss marathon (8 waves × 60s).
+  const _s24 = STAGES.find(s => s.id === 24);
+  if (_s24) { _s24.waveCount = 8; _s24.durationSec = _s24.waveCount * _s24.waveDurationSec; }
 
   function get(id) { return STAGES.find(s => s.id === id); }
   function getBiome(name) { return BIOMES[name]; }
