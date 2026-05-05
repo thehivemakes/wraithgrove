@@ -18,6 +18,17 @@
   // compute additive chance / multiplicative modifier deltas, not replace them.
   const CRIT_TUNABLES = Object.freeze({ chance: 0.12, multiplier: 1.6 });
 
+  // W-FX-P2-Polish §A — hit-stop durations per damage tier. Frozen so render and
+  // future relic/buff code can read without risk of accidental mutation.
+  // Elite threshold: enemy _typeData.size >= 24 (brute_small=24, banshee=36).
+  const HITSTOP_TIERS = Object.freeze({
+    normal:       0,
+    crit:         60,
+    elite:        100,
+    bossDamaged:  140,
+    bossDefeated: 280,
+  });
+
   let runtime = null;
 
   function place(x, y, rt) {
@@ -159,6 +170,9 @@
       // Auto-fire: hit ALL enemies in radius (Vampire-Survivors-style aoe melee swing)
       let hits = 0;
       const r = w.range;
+      // W-FX-P2-Polish §A — track highest hit-stop tier across all enemies this swing;
+      // fire a single hitPause at the end so crowd-hits don't stack 10× pause calls.
+      let swingPause = 0;
       for (const c of runtime.creatures) {
         if (c.hp <= 0) continue;
         const dx = c.x - p.x, dy = c.y - p.y;
@@ -170,14 +184,20 @@
             WG.Engine.emit('enemy:crit', { x: c.x, y: c.y, amount: dmg });
           }
           if (WG.HuntEnemies.damage(c, dmg, { type:'player-melee', crit: isCrit })) onEnemyKill(c);
+          const tier = isCrit ? HITSTOP_TIERS.crit
+                     : (c._typeData && c._typeData.size >= 24) ? HITSTOP_TIERS.elite
+                     : HITSTOP_TIERS.normal;
+          if (tier > swingPause) swingPause = tier;
           hits++;
         }
       }
+      if (swingPause > 0) WG.Engine.hitPause(swingPause);
       if (runtime.boss && runtime.boss.hp > 0) {
         const dx = runtime.boss.x - p.x, dy = runtime.boss.y - p.y;
         if (dx*dx + dy*dy < r * r) {
           runtime.boss.hp -= baseDamage(w);
           WG.Engine.emit('boss:damaged', { boss: runtime.boss, amount: baseDamage(w) });
+          WG.Engine.hitPause(HITSTOP_TIERS.bossDamaged);
           if (runtime.boss.hp <= 0) onBossKill();
           hits++;
         }
@@ -385,6 +405,7 @@
     if (p.xp >= p.xpToNext) levelUp();
     runtime.bossDefeated = true;
     WG.Engine.emit('boss:defeated', { boss: runtime.boss });
+    WG.Engine.hitPause(HITSTOP_TIERS.bossDefeated);
   }
 
   function levelUp() {
@@ -691,6 +712,6 @@
   function init() {}
   window.WG.HuntPlayer = {
     init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice,
-    REPAIR_TUNABLES, CRIT_TUNABLES,
+    REPAIR_TUNABLES, CRIT_TUNABLES, HITSTOP_TIERS,
   };
 })();

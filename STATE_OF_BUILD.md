@@ -1,12 +1,28 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-05 by W-Monetization-V2-Whale-Ladder
+**Last updated:** 2026-05-05 by W-Onboarding-Flow
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### Onboarding Flow (W-Onboarding-Flow 2026-05-05)
+- **First-launch gate** — `WG.State.get().firstLaunch` (default `true`; `wg-cache.js` sets to `false` for existing saves). `WG.Onboarding.maybeShow()` called after `showHuntStageList()` in init; fires overlay only on first install.
+- **3-screen overlay** — Screen 1: "WRAITHGROVE" / "Where the boundary tears." — 2s fade-in, auto-advances (or tap). Screen 2: 4 lore lines staggered, TAP TO CONTINUE. Screen 3: 3 starter character cards (lantern_acolyte, sigil_student, horned_oni). Tap picks, unlocks free, sets active, flashes "WELCOME, [NAME]".
+- **Bridge callout** — After pick, pulsing arrow hint at ~24% bottom of `#app` → "Tap BATTLE to begin Stage 1". Dismisses on `hunt:stage-start` or 8s auto.
+- **Re-entry guard** — `WG.State.get().firstLaunchStep` (0–4) persisted via `WG.Cache`. Cold-load resumes at saved step.
+- **Skip intro** — "SKIP INTRO" button on screens 1+2; skips to character pick; logs `onboarding:skip` to `WG.Events`.
+- `meta-onboarding.js` — `WG.Onboarding`: `init()`, `maybeShow()`. All styles self-contained with `wg-ob-` prefix.
+- `wg-state.js` — `firstLaunch: true`, `firstLaunchStep: 0` added to state defaults.
+- `wg-cache.js` — `load()` restores both fields; `firstLaunch` defaults to `false` if absent from existing saves.
+- `wg-game.js` — `Onboarding.init()` in init chain (after `HuntTutorial.init()`); `Onboarding.maybeShow()` after `showHuntStageList()`.
+- `index.html` — `meta-onboarding.js` added to module loader (after `meta-battle-pass.js`).
+- `hunt-tutorial.js` — **unchanged**. Inline hints still fire via `HuntTutorial.maybeStart()` once Stage 1 starts.
+- **Smoke test checklist:** `WORKER_OUTPUT/w-onboarding-flow/READY_FOR_AUDIT.md`. One open flag: bridge callout vertical position (24% bottom) needs browser verification.
+
+
 
 ### Top-level
 - `index.html` — boot scaffold + sequential script loader + canvas + tab navigation + top currency strip + boot overlay
@@ -59,12 +75,20 @@
 - **Shop modal** — `meta-shop.js` (WG.Shop): 5 sections (Gem Packs / Bundles / Royal Pass / Summon / Offers). Entry: gems chip + SHOP side icon in Hunt lobby. Royal Pass landing: benefit comparison + full subscription disclosure per Apple §3.1.2 + FTC 2024. Summon: pull ×1/×10, rate disclosure `<details>`, pity display, locked rift_guests pool.
 - **VIP flex** — Royal purple portrait frame in Ascend, 👑 ROYAL badge in Duel rank row, "👑 ROYAL PASS · 2× REWARDS" banner in Hunt results when multiplier active.
 
-### Meta (`js/meta/` — 8 modules)
+### Leaderboard (W-Leaderboard-Backend-Stub 2026-05-05)
+- **Contract doc** — `docs/LEADERBOARD_API.md`: 4 endpoints (submit / top / me / around/:userId), auth shape, anti-cheat validation, rate limits, Phase 4 integration notes.
+- **`meta-leaderboard.js`** — `WG.MetaLeaderboard`: `submit(peakFloor, runDuration, charactersUsed)` / `top(limit)` / `meAndAround()`. All stubs: log "Phase 4 server swap", return cached fake data. Real fetch paths written and fail-gracefully. Activates when `WG.Config.SERVER_BASE_URL` is set.
+- **Tower run summary** — `hunt-tower.js#showRunSummary`: leaderboard section now calls `WG.MetaLeaderboard.meAndAround()` async, fills rows on resolve, hides on reject (graceful degradation). Removed hard-coded fake array.
+- **Submit hook** — `hunt-tower.js#endRun`: calls `WG.MetaLeaderboard.submit(rt.floor, rt.totalElapsed, [skinId])` on every run end (death or exit), before summary overlay.
+- `WG.Config` initialized as `{}` if absent (safe default in stub mode, swapped for real config in Phase 4).
+
+### Meta (`js/meta/` — 9 modules)
 - `meta-iap.js` — 30+ IAP SKUs ($0.99 to $99.99); gem packs, bundles, Royal Pass, energy refills. `isAvailable()` + `bundleResetIn()` for timed gating. **STUB** — production needs Apple StoreKit + Google Play Billing wiring.
 - `meta-ads.js` — rewarded video + interstitial placeholder modals; daily 50-RV cap; ad-removal entitlement check. **STUB** — production needs AdMob via Capacitor plugin.
 - `meta-gacha.js` — WG.Gacha: standard pool (open) + rift_guests pool (locked/empty). pull() / pullTiered() / getRates() / getPityDisplay(). Pity in state.
 - `meta-shop.js` — WG.Shop: fullscreen Shop modal. 5 sections. Royal Pass landing with legal disclosure. Gacha pull UI with rate disclosure.
 - `meta-account.js` — anonymous device-ID; optional email upgrade stub. **STUB** — production needs server endpoint.
+- `meta-leaderboard.js` — WG.MetaLeaderboard: submit + top + meAndAround. **STUB** — Phase 4 server swap via `WG.Config.SERVER_BASE_URL`.
 - `meta-events.js` — analytics event reporter. **STUB** — production needs server POST.
 - `meta-missions.js` — daily + weekly missions catalog, tracker, UI, event dispatcher.
 - `meta-battle-pass.js` — season battle pass engine + 60-level grid UI.
@@ -116,7 +140,7 @@
 |---|---|---|
 | Real IAP (Apple StoreKit + Google Play Billing) | `meta-iap.js` | Phase 4 native wrap |
 | Real ad SDK (AdMob via Capacitor) | `meta-ads.js` | Phase 4 + §0 Rule 5 SDK lockdown |
-| Server endpoints (Cloudflare Worker) | `meta-account.js`, `meta-events.js` | Phase 4 |
+| Server endpoints (Cloudflare Worker) | `meta-account.js`, `meta-events.js`, `meta-leaderboard.js` | Phase 4 |
 | Cross-device save sync | `wg-cache.js` | Phase 4 server endpoint |
 | Async PvP server-side opponent storage | `duel-match.js` | Phase 4 |
 | `applyLevelChoice` cooldown plumbing | `hunt-player.js` | ✓ Fixed 2026-04-27 (Worker D) |
@@ -166,7 +190,7 @@
 
 ## Reference: file count
 
-- 41 JS modules + 1 index.html = 42 files
+- 42 JS modules + 1 index.html = 43 files
 - ~4,500 lines of vanilla JS
 - 0 frameworks
 - 0 third-party SDKs

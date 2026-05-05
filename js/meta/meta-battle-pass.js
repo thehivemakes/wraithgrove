@@ -48,6 +48,8 @@
     }
   };
 
+  Object.freeze(SEASONS.wraithgrove_s1);
+
   var ACTIVE_SEASON_ID = 'wraithgrove_s1';
 
   function getSeason() { return SEASONS[ACTIVE_SEASON_ID]; }

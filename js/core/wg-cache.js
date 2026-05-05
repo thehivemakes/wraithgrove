@@ -80,6 +80,9 @@
       if (data.iap) Object.assign(s.iap, data.iap);
       if (data.settings) Object.assign(s.settings, data.settings);
       if (data.meta) Object.assign(s.meta, data.meta);
+      // firstLaunch: explicit false if missing = existing save predates onboarding feature
+      s.firstLaunch = (data.firstLaunch !== undefined) ? data.firstLaunch : false;
+      if (data.firstLaunchStep !== undefined) s.firstLaunchStep = data.firstLaunchStep;
       return true;
     } catch (e) { console.warn('[cache] load failed', e); return false; }
   }

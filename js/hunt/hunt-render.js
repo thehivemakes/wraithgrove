@@ -2456,11 +2456,11 @@
       }
     });
 
-    // Hit-pause triggers (DOPAMINE_DESIGN §9). NOT wired on stump:hit / stump:chopped
-    // — would kill chop-flow at 5/sec (explicit DOPAMINE_DESIGN constraint).
-    WG.Engine.on('enemy:killed',   () => WG.Engine.hitPause(30));
-    WG.Engine.on('boss:damaged',   () => WG.Engine.hitPause(40));
-    WG.Engine.on('boss:defeated',  () => WG.Engine.hitPause(220));
+    // Hit-pause (DOPAMINE_DESIGN §9) — tiered durations moved to WG.HuntPlayer.HITSTOP_TIERS
+    // and wired directly in the damage path (W-FX-P2-Polish §A). enemy:killed (0ms),
+    // boss:damaged (140ms), boss:defeated (280ms) all fire from hunt-player.js now.
+    // stump:hit / stump:chopped excluded unchanged — chop-flow constraint preserved.
+    // player:damaged stays here: damage receipt is render-observable, not player-owned.
     WG.Engine.on('player:damaged', ({ amount }) => { if ((amount || 0) > 20) WG.Engine.hitPause(60); });
 
     // Sprite-juice state — track damage timestamps for hit-flash + swing for squash.

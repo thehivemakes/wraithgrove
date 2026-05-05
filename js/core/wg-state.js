@@ -16,6 +16,8 @@
   const state = {
     version: 2,
     activeTab: 'hunt',
+    firstLaunch: true,      // cleared to false after onboarding character pick
+    firstLaunchStep: 0,     // 0=unstarted 1=welcome 2=lore 3=char-pick 4=complete
     currencies: { coins: 100, diamonds: 5, cards: 0, gems: 0 },
     energy: { current: ENERGY_TUNABLES.MAX, max: ENERGY_TUNABLES.MAX, lastRegenAt: 0 },
     player: {

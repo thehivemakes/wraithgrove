@@ -57,11 +57,11 @@
     { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
     // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
     { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
-    // W-Audio-Sourcing-CC0 — new real samples wired to events (events stubbed; engine emits to activate)
-    { event: 'boss:intro',            id: 'boss_intro_drone', bus: 'sfx', throttleMs: 0,   vol: 1.0 },
-    { event: 'dialog:open',           id: 'dialog_pop',    bus: 'ui',  throttleMs: 100, vol: 0.6 },
-    { event: 'ui:reveal',             id: 'reveal_woosh',  bus: 'ui',  throttleMs: 200, vol: 0.7 },
-    { event: 'torch:active',          id: 'torch_flicker', bus: 'sfx', throttleMs: 5000, vol: 0.4 },
+    // W-Audio-Sourcing-CC0 — new real samples wired to events (ENGINE-PENDING: engine does not yet emit these 4 events; audio is inert until emitters are added)
+    { event: 'boss:intro',            id: 'boss_intro_drone', bus: 'sfx', throttleMs: 0,   vol: 1.0 }, // ENGINE-PENDING
+    { event: 'dialog:open',           id: 'dialog_pop',    bus: 'ui',  throttleMs: 100, vol: 0.6 }, // ENGINE-PENDING
+    { event: 'ui:reveal',             id: 'reveal_woosh',  bus: 'ui',  throttleMs: 200, vol: 0.7 }, // ENGINE-PENDING
+    { event: 'torch:active',          id: 'torch_flicker', bus: 'sfx', throttleMs: 5000, vol: 0.4 }, // ENGINE-PENDING
     // W-Polish-Gaps-1-5 §B — real banshee shriek replaces the boss_die placeholder.
     // Source: "Monster / Banshee Scream" by SypherZent on freesound.org
     //   https://freesound.org/people/SypherZent/sounds/420682/
@@ -303,6 +303,7 @@
     play,
     ambient,
     setVolume,
+    setBus: setVolume,   // alias used by settings modal sliders
     setMuted,
     getSettings,
     // For debugging in console:

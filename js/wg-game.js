@@ -233,7 +233,7 @@
     const baseDia  = cleared ? (stageId % 3 === 0 ? 5 : 2) : 0;
     const baseFrag = cleared ? 2 : 0;
     // W-Monetization-V2-Whale-Ladder §B — Royal Pass 2× stage-clear multiplier
-    const vipMul = (cleared && WG.State.isRoyalPassActive && WG.State.isRoyalPassActive()) ? 2 : 1;
+    const vipMul = (cleared && WG.State.isRoyalPassActive?.()) ? 2 : 1;
     const rewards = { coins: (baseCoin + huntRuntime.kills * 2) * vipMul, diamonds: baseDia * vipMul, fragments: baseFrag * vipMul, riftSigils: 0, energyRefund: 0, firstClearBonus: 0, vipMul };
     if (cleared) WG.State.grant('coins', rewards.coins); else WG.State.grant('coins', rewards.coins);
     if (rewards.diamonds) WG.State.grant('diamonds', rewards.diamonds);
@@ -892,7 +892,7 @@
 
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
-    rightCol.appendChild(sideIcon({glyph:'⚙',label:'SETTINGS',onClick:()=>openInfoModal('Settings','Audio, vibration, language — wiring next pass.')}));
+    rightCol.appendChild(sideIcon({glyph:'⚙',label:'SETTINGS',onClick:()=>openSettingsModal()}));
     rightCol.appendChild(sideIcon({glyph:'🎟',label:'PASS',border:'#5030a0',onClick:()=>{ if (WG.BattlePass && WG.BattlePass.openModal) WG.BattlePass.openModal(); else openInfoModal('Battle Pass','Loading...'); }}));
     rightCol.appendChild(sideIcon({glyph:'🎁',label:'DAILY',timer:'01:58',onClick:()=>openInfoModal('Daily Reward','Today\'s claim + 7-day streak grid — preview, full wiring v0.20.')}));
     rightCol.appendChild(sideIcon({glyph:'📅',label:'7-DAYS',badge:'!',onClick:()=>openInfoModal('7-Day Login','Day-of streak rewards — preview.')}));
@@ -1186,6 +1186,156 @@
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   }
 
+  // W-Settings-Modal-Wiring — full settings panel replacing the info-stub.
+  function openSettingsModal() {
+    const SKEY = 'wg_settings_v1';
+    const DFLT = {master:0.8,sfx:1.0,ambient:0.6,ui:0.7,muted:false,haptics:true,language:'en',reminderTime:'20:00'};
+    function loadS() {
+      try { return Object.assign({},DFLT,JSON.parse(localStorage.getItem(SKEY)||'{}')); } catch(e) { return Object.assign({},DFLT); }
+    }
+    function saveS(c) { try { localStorage.setItem(SKEY,JSON.stringify(c)); } catch(e) {} }
+
+    const audioS = WG.Audio ? WG.Audio.getSettings() : {master:0.8,sfx:1.0,ambient:0.6,ui:0.7,muted:false};
+    const cfg = loadS();
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+
+    const SL  = 'font-size:9px;color:#a8d878;letter-spacing:2px;font-weight:700;margin:14px 0 6px;border-bottom:1px solid #3a2818;padding-bottom:4px;';
+    const ROW = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+    const LBL = 'font-size:11px;color:#a89878;font-weight:700;letter-spacing:0.5px;';
+    const VAL = 'font-size:10px;color:#f0d890;font-weight:700;min-width:30px;text-align:right;';
+
+    function slHtml(id, v) {
+      return '<input id="'+id+'" type="range" min="0" max="100" value="'+Math.round(v*100)+'" style="flex:1;margin:0 8px;height:4px;accent-color:#a8d878;cursor:pointer;">';
+    }
+    function togHtml(id, on) {
+      const left = on ? '22px' : '2px';
+      const bg   = on ? '#2a4a1a' : '#1a1208';
+      const kb   = on ? '#a8d878' : '#5a4028';
+      return '<button id="'+id+'" data-on="'+(on?1:0)+'" style="width:44px;height:24px;border-radius:12px;border:1.5px solid #5a4028;background:'+bg+';position:relative;cursor:pointer;"><span id="'+id+'-knob" style="position:absolute;top:3px;left:'+left+';width:16px;height:16px;border-radius:50%;background:'+kb+';transition:left 150ms;display:block;"></span></button>';
+    }
+    function wireToggle(id, cb) {
+      const btn = overlay.querySelector('#'+id);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const was = btn.dataset.on === '1';
+        const now = !was;
+        btn.dataset.on = now ? '1' : '0';
+        btn.style.background = now ? '#2a4a1a' : '#1a1208';
+        const knob = overlay.querySelector('#'+id+'-knob');
+        if (knob) { knob.style.background = now ? '#a8d878' : '#5a4028'; knob.style.left = now ? '22px' : '2px'; }
+        cb(now);
+      });
+    }
+
+    const html =
+      '<div style="width:100%;max-width:340px;background:linear-gradient(to bottom,#1a1208,#0a0604);border:2px solid #5a4028;border-radius:14px;padding:18px 16px 20px;position:relative;margin:auto;">' +
+      '<button id="cfg-close" style="position:absolute;top:10px;right:12px;background:none;border:none;color:#a89878;font-size:18px;cursor:pointer;line-height:1;">&#x2715;</button>' +
+      '<div style="font-size:14px;color:#f0d890;font-weight:700;letter-spacing:2px;text-align:center;margin-bottom:4px;">SETTINGS</div>' +
+
+      '<div style="'+SL+'">AUDIO</div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">MASTER</span>'+slHtml('cfg-sl-master',audioS.master)+'<span id="cfg-v-master" style="'+VAL+'">'+Math.round(audioS.master*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">SFX</span>'+slHtml('cfg-sl-sfx',audioS.sfx)+'<span id="cfg-v-sfx" style="'+VAL+'">'+Math.round(audioS.sfx*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">AMBIENT</span>'+slHtml('cfg-sl-ambient',audioS.ambient)+'<span id="cfg-v-ambient" style="'+VAL+'">'+Math.round(audioS.ambient*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">UI</span>'+slHtml('cfg-sl-ui',audioS.ui)+'<span id="cfg-v-ui" style="'+VAL+'">'+Math.round(audioS.ui*100)+'</span></div>' +
+      '<div style="'+ROW+';margin-top:4px;"><span style="'+LBL+'">MUTE ALL</span>'+togHtml('cfg-mute',audioS.muted)+'</div>' +
+
+      '<div style="'+SL+'">HAPTICS</div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">VIBRATION</span>'+togHtml('cfg-haptics',cfg.haptics)+'</div>' +
+
+      '<div style="'+SL+'">LANGUAGE</div>' +
+      '<div style="'+ROW+'">' +
+        '<select id="cfg-lang" style="background:#1a1208;border:1.5px solid #5a4028;color:#f0d890;font-size:11px;padding:5px 8px;border-radius:7px;cursor:pointer;font-weight:700;">' +
+          '<option value="en"'+(cfg.language==='en'?' selected':'')+'>English</option>' +
+        '</select>' +
+        '<span style="font-size:9px;color:#5a4028;margin-left:8px;letter-spacing:0.5px;">MORE v0.25</span>' +
+      '</div>' +
+
+      '<div style="'+SL+'">DAILY REWARD REMINDER</div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">REMINDER TIME</span>' +
+        '<input id="cfg-reminder" type="time" value="'+cfg.reminderTime+'" style="background:#1a1208;border:1.5px solid #5a4028;color:#f0d890;font-size:11px;padding:5px 8px;border-radius:7px;font-weight:700;">' +
+      '</div>' +
+
+      '<div style="'+SL+'">ABOUT</div>' +
+      '<div style="font-size:11px;color:#a89878;line-height:1.7;padding:2px 0;">' +
+        '<div>Wraithgrove v0.25 · Build 2026-05-05</div>' +
+        '<div>Made by <span style="color:#d4a040;">The Hive Makes</span></div>' +
+      '</div>' +
+
+      '<div style="'+SL+'">LINKS</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:4px;">' +
+        '<a href="privacy.html" target="_blank" style="flex:1;text-align:center;padding:7px;border-radius:8px;border:1.5px solid #5a4028;background:#1a1208;color:#d4a040;font-size:10px;font-weight:700;letter-spacing:1px;text-decoration:none;">PRIVACY POLICY</a>' +
+        '<a href="terms.html" target="_blank" style="flex:1;text-align:center;padding:7px;border-radius:8px;border:1.5px solid #5a4028;background:#1a1208;color:#d4a040;font-size:10px;font-weight:700;letter-spacing:1px;text-decoration:none;">TERMS OF SERVICE</a>' +
+      '</div>' +
+
+      '<div style="'+SL+'">SAVE DATA</div>' +
+      '<button id="cfg-delete-save" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #8a2020;background:#1a0808;color:#e06060;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;">DELETE SAVE</button>' +
+      '<div id="cfg-delete-confirm" style="display:none;font-size:10px;color:#e06060;padding:6px 0;">' +
+        '<div style="text-align:center;margin-bottom:6px;">All progress will be lost. Are you sure?</div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button id="cfg-delete-yes" style="flex:1;padding:7px;border-radius:7px;border:1.5px solid #8a2020;background:#3a0808;color:#e06060;font-size:10px;font-weight:700;cursor:pointer;">YES, DELETE</button>' +
+          '<button id="cfg-delete-no" style="flex:1;padding:7px;border-radius:7px;border:1.5px solid #5a4028;background:#1a1208;color:#a89878;font-size:10px;font-weight:700;cursor:pointer;">CANCEL</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="'+SL+'">ACCOUNT</div>' +
+      '<button disabled style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a2818;background:#1a1208;color:#5a4028;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:not-allowed;opacity:0.5;">LOG OUT</button>' +
+      '<div style="font-size:9px;color:#5a4028;text-align:center;margin-top:4px;letter-spacing:0.5px;">Account system — Phase 4</div>' +
+      '</div>';
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#cfg-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Audio sliders — update in real-time, persist to both wg_audio_v1 (via setBus) and wg_settings_v1.
+    ['master','sfx','ambient','ui'].forEach(bus => {
+      const sl = overlay.querySelector('#cfg-sl-'+bus);
+      const vl = overlay.querySelector('#cfg-v-'+bus);
+      if (!sl || !vl) return;
+      sl.addEventListener('input', () => {
+        const v = sl.value / 100;
+        vl.textContent = sl.value;
+        if (WG.Audio) WG.Audio.setBus(bus, v);
+        cfg[bus] = v;
+        saveS(cfg);
+      });
+    });
+
+    wireToggle('cfg-mute', (on) => {
+      if (WG.Audio) WG.Audio.setMuted(on);
+      cfg.muted = on;
+      saveS(cfg);
+    });
+
+    wireToggle('cfg-haptics', (on) => {
+      cfg.haptics = on;
+      saveS(cfg);
+      if (on && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics) {
+        try { window.Capacitor.Plugins.Haptics.impact({style:'light'}); } catch(e) {}
+      }
+    });
+
+    const langEl = overlay.querySelector('#cfg-lang');
+    if (langEl) langEl.addEventListener('change', (e) => { cfg.language = e.target.value; saveS(cfg); });
+
+    const remEl = overlay.querySelector('#cfg-reminder');
+    if (remEl) remEl.addEventListener('change', (e) => { cfg.reminderTime = e.target.value; saveS(cfg); });
+
+    const delBtn  = overlay.querySelector('#cfg-delete-save');
+    const delConf = overlay.querySelector('#cfg-delete-confirm');
+    const delNo   = overlay.querySelector('#cfg-delete-no');
+    const delYes  = overlay.querySelector('#cfg-delete-yes');
+    if (delBtn) delBtn.addEventListener('click', () => { delConf.style.display='block'; delBtn.style.display='none'; });
+    if (delNo)  delNo.addEventListener('click',  () => { delConf.style.display='none';  delBtn.style.display='block'; });
+    if (delYes) delYes.addEventListener('click', () => {
+      try { ['wg_save_v2','wg_audio_v1',SKEY].forEach(k => localStorage.removeItem(k)); } catch(e) {}
+      overlay.remove();
+      window.location.reload();
+    });
+  }
+
   function syncTopStrip() {
     const c = WG.State.get().currencies;
     document.querySelectorAll('[data-bind="coins"]').forEach(el => el.textContent = String(c.coins));
@@ -1266,6 +1416,17 @@
     if (WG.Shop && WG.Shop.init) WG.Shop.init();
     if (WG.Buffs && WG.Buffs.init) WG.Buffs.init();
     if (WG.Audio && WG.Audio.init) WG.Audio.init();
+    // W-Settings-Modal-Wiring §C — apply wg_settings_v1 on cold-load.
+    // wg_audio_v1 is already restored by WG.Audio.init(); this re-applies if settings ever diverge
+    // (e.g. settings modal last run, then audio module resets). Belt-and-suspenders.
+    try {
+      const _raw = localStorage.getItem('wg_settings_v1');
+      if (_raw && WG.Audio) {
+        const _cfg = JSON.parse(_raw);
+        ['master','sfx','ambient','ui'].forEach(b => { if (typeof _cfg[b] === 'number') WG.Audio.setBus(b, _cfg[b]); });
+        if (typeof _cfg.muted === 'boolean') WG.Audio.setMuted(_cfg.muted);
+      }
+    } catch (e) {}
     WG.Input.init();
     WG.Render.init();
     WG.HuntStage.init();
@@ -1278,6 +1439,7 @@
     WG.HuntResults.init();
     WG.HuntRender.init();
     WG.HuntTutorial.init();
+    if (WG.Onboarding && WG.Onboarding.init) WG.Onboarding.init();
     if (WG.HuntTowerBuffs && WG.HuntTowerBuffs.init) WG.HuntTowerBuffs.init();
     if (WG.HuntTower && WG.HuntTower.init) WG.HuntTower.init();
     WG.AscendCharacter.init();
@@ -1305,6 +1467,7 @@
     setupNav();
     syncTopStrip();
     showHuntStageList();
+    if (WG.Onboarding) WG.Onboarding.maybeShow();
     initBossIntro();
   }
 
@@ -1319,20 +1482,30 @@
     if (!document.getElementById('wg-boss-intro-style')) {
       const css = document.createElement('style');
       css.id = 'wg-boss-intro-style';
+      // W-FX-P2-Polish §C — extended boss intro: pre-darken → reveal → hold → exit.
+      // pre-darken: background opacity:1 but card hidden (opacity:0).
+      // show: card fades + slides in (300ms). Both classes removed together on exit.
       css.textContent = `
         .wg-boss-intro{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
           background:radial-gradient(ellipse at center,rgba(20,8,12,0.78) 0%,rgba(4,2,6,0.96) 70%);
           opacity:0;pointer-events:none;transition:opacity 300ms ease-out;}
+        .wg-boss-intro.pre-darken{opacity:1;}
         .wg-boss-intro.show{opacity:1;}
         .wg-boss-intro .wg-bi-card{display:flex;flex-direction:column;align-items:center;gap:12px;
-          transform:translateY(24px) scale(0.96);transition:transform 320ms cubic-bezier(.2,.8,.2,1);}
-        .wg-boss-intro.show .wg-bi-card{transform:translateY(0) scale(1);}
+          opacity:0;transform:translateY(24px) scale(0.96);
+          transition:opacity 300ms ease-out,transform 300ms cubic-bezier(.2,.8,.2,1);}
+        .wg-boss-intro.pre-darken .wg-bi-card{opacity:0;}
+        .wg-boss-intro.show .wg-bi-card{opacity:1;transform:translateY(0) scale(1);}
         .wg-boss-intro .wg-bi-img{width:min(72vw,420px);height:min(72vw,420px);object-fit:cover;
           border:1px solid rgba(220,180,120,0.35);box-shadow:0 0 32px rgba(120,40,60,0.45),0 0 96px rgba(40,8,16,0.6);
           background:#0a0608;}
         .wg-boss-intro .wg-bi-name{font-family:Georgia,serif;font-size:28px;letter-spacing:0.08em;
           color:#f0d8a8;text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 4px rgba(180,80,60,0.35);
           text-transform:uppercase;}
+        @keyframes wg-bi-pulse{
+          0%,100%{text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 4px rgba(180,80,60,0.35);opacity:1;}
+          50%{text-shadow:0 2px 20px rgba(0,0,0,0.9),0 0 18px rgba(220,100,60,0.75);opacity:0.82;}}
+        .wg-boss-intro .wg-bi-name.pulsing{animation:wg-bi-pulse 0.6s ease-in-out infinite;}
       `;
       document.head.appendChild(css);
     }
@@ -1343,23 +1516,39 @@
     _bossIntroEl = el;
     return el;
   }
+  // W-FX-P2-Polish §C — extended boss intro sequence (total 1600ms hitPause):
+  //   t=0    pre-darken: background fades in (300ms CSS), card hidden.
+  //   t=200  show: card fades in (300ms) + name slide-up + trauma(0.4) + boss:intro audio.
+  //   t=500  hold: name pulsing begins (800ms).
+  //   t=1300 exit: remove show + pre-darken simultaneously → both fade out (300ms).
+  //   t=1600 hitPause expires; overlay fully gone.
   function showBossIntro(boss) {
     const url = BOSS_PORTRAITS[boss.type];
     if (!url) return;
     const el = ensureBossIntroDom();
     const img = el.querySelector('.wg-bi-img');
-    const name = el.querySelector('.wg-bi-name');
+    const nameEl = el.querySelector('.wg-bi-name');
     img.src = url;
     img.onerror = () => { hideBossIntro(); };
-    name.textContent = (boss._typeData && boss._typeData.name) || boss.type || '';
-    if (WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(1500);
-    requestAnimationFrame(() => el.classList.add('show'));
+    nameEl.textContent = (boss._typeData && boss._typeData.name) || boss.type || '';
+    nameEl.classList.remove('pulsing');
     if (_bossIntroTimer) clearTimeout(_bossIntroTimer);
-    _bossIntroTimer = setTimeout(hideBossIntro, 1200);
+    if (WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(1600);
+    if (WG.Engine) WG.Engine.emit('boss:intro', { boss });
+    requestAnimationFrame(() => el.classList.add('pre-darken'));
+    setTimeout(() => {
+      el.classList.add('show');
+      if (window.WG && WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.4);
+    }, 200);
+    setTimeout(() => nameEl.classList.add('pulsing'), 500);
+    _bossIntroTimer = setTimeout(hideBossIntro, 1300);
   }
   function hideBossIntro() {
     if (!_bossIntroEl) return;
+    const nameEl = _bossIntroEl.querySelector('.wg-bi-name');
+    if (nameEl) nameEl.classList.remove('pulsing');
     _bossIntroEl.classList.remove('show');
+    _bossIntroEl.classList.remove('pre-darken');
   }
   function initBossIntro() {
     if (!WG.Engine || !WG.Engine.on) return;

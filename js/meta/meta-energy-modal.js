@@ -33,11 +33,14 @@
     if (!_modalEl) return;
     _modalEl.remove();
     _modalEl = null;
+    clearInterval(_refreshTimer);
+    _refreshTimer = 0;
   }
 
   function open(opts){
     opts = opts || {};
     if (_modalEl) { refresh(); return; }
+    startTick();
     const e = WG.State.getEnergy();
     const root = document.getElementById('modal-root');
     const wrap = document.createElement('div');

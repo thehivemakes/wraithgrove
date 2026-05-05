@@ -19,7 +19,9 @@
     { id: 'buff_ad_watch',  desc: 'Watch 1 buff ad',           target: 1,   reward: { diamonds: 5 } },
   ];
 
-  const DAILY_PICK_COUNT = 5;
+  const TUNABLES = Object.freeze({
+    DAILY_PICK_COUNT: 5,
+  });
 
   // ─── Concern B: Weekly missions catalog ───────────────────────────────────
   const WEEKLY_MISSIONS = [
@@ -52,7 +54,7 @@
     const rng = _seededRng(seed);
     const pool = DAILY_MISSIONS.slice();
     const picks = [];
-    for (let i = 0; i < DAILY_PICK_COUNT; i++) {
+    for (let i = 0; i < TUNABLES.DAILY_PICK_COUNT; i++) {
       const j = i + Math.floor(rng() * (pool.length - i));
       const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
       picks.push(pool[i].id);
@@ -478,6 +480,6 @@
   window.WG.Missions = {
     init, checkAndRefresh, refreshDaily, refreshWeekly,
     increment, claim, getActive, openModal,
-    DAILY_MISSIONS, WEEKLY_MISSIONS,
+    DAILY_MISSIONS, WEEKLY_MISSIONS, TUNABLES,
   };
 })();

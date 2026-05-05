@@ -26,6 +26,8 @@
     CONTINUE_COST_LOW:     1,
     CONTINUE_COST_MID:     3,
     CONTINUE_COST_HIGH:    5,
+    ENEMY_PROJ_HIT_RADIUS: 14,
+    CONTINUE_REVIVE_HP_PCT: 0.5,
   });
 
   // ─── Concern A: Tower runtime shape ──────────────────────────────────────
@@ -273,7 +275,7 @@
       if (p.lifetime <= 0) { rt.enemyProjectiles.splice(i, 1); continue; }
       const pl = rt.player;
       const dx = pl.x - p.x, dy = pl.y - p.y;
-      if (dx*dx + dy*dy < 14*14) {
+      if (dx*dx + dy*dy < TUNABLES.ENEMY_PROJ_HIT_RADIUS * TUNABLES.ENEMY_PROJ_HIT_RADIUS) {
         WG.HuntPlayer.takeDamage(p.damage, { type: 'enemy-proj' });
         rt.enemyProjectiles.splice(i, 1);
       }
@@ -519,7 +521,7 @@
     if (rt._towerRevives > 0) {
       rt._towerRevives--;
       const p = rt.player;
-      if (p) p.hp = Math.floor(p.maxHp * 0.5);
+      if (p) p.hp = Math.floor(p.maxHp * TUNABLES.CONTINUE_REVIVE_HP_PCT);
       WG.Engine.emit('tower:revive', { floor: rt.floor });
       return;
     }
@@ -573,7 +575,7 @@
         rt.continueCount++;
         rt.pendingDeath = false;
         const p = rt.player;
-        if (p) p.hp = Math.floor(p.maxHp * 0.5);
+        if (p) p.hp = Math.floor(p.maxHp * TUNABLES.CONTINUE_REVIVE_HP_PCT);
         rt.creatures = []; rt.projectiles = []; rt.enemyProjectiles = [];
         rt.boss = null; rt.bossDefeated = false; rt.floorCleared = false;
         rt.miniBossSpawned = false; rt.spawnAccum = 0; rt.floorElapsed = 0;
@@ -596,6 +598,11 @@
     if (rt.fragsEarned > 0) s.forge.craftFragments += rt.fragsEarned;
     if (rt.floor >= 5) WG.State.grantEnergy(WG.State.ENERGY_TUNABLES.WIN_REFUND, 'tower-run');
     WG.Engine.emit('tower:run-end', { floor: rt.floor, reason, isNewRecord });
+    // Submit run to leaderboard (stub in Phase 4).
+    if (window.WG.MetaLeaderboard) {
+      const skinId = (s.ascend && s.ascend.equippedSkin) ? s.ascend.equippedSkin : 'default';
+      WG.MetaLeaderboard.submit(rt.floor, Math.round(rt.totalElapsed), [skinId]);
+    }
     towerRuntime = null;
     setTimeout(() => showRunSummary(rt, isNewRecord), 200);
   }
@@ -641,7 +648,11 @@
         <div style="font-size:11px;color:#8880a8;margin-bottom:4px;text-align:left;">BUFFS COLLECTED</div>
         <div style="background:#0c0820;border-radius:8px;padding:8px;margin-bottom:16px;
           min-height:28px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${buffsHtml}</div>
-        ${_buildLeaderboardHTML(rt.floor)}
+        <div id="wg-lb-section" style="margin-bottom:4px;">
+          <div style="font-size:11px;color:#8880a8;margin-bottom:4px;text-align:left;">LEADERBOARD</div>
+          <div id="wg-lb-rows" style="background:#0c0820;border-radius:8px;padding:6px;margin-bottom:4px;
+            min-height:28px;font-size:11px;color:#554;text-align:center;line-height:28px;">loading…</div>
+        </div>
         <div style="display:flex;gap:10px;margin-top:18px;">
           <button id="wg-summary-again" style="flex:1;padding:12px 0;border-radius:24px;
             border:2px solid #5030a0;background:linear-gradient(to bottom,#3820a0,#200c60);
@@ -653,6 +664,20 @@
       </div>`;
     document.body.appendChild(overlay);
 
+    // Fill leaderboard rows async; on failure leave section with empty state (graceful).
+    if (window.WG.MetaLeaderboard) {
+      WG.MetaLeaderboard.meAndAround().then(function(rows) {
+        const el = document.getElementById('wg-lb-rows');
+        if (el) el.innerHTML = rows.length ? _leaderboardRowsHTML(rows) : '';
+      }).catch(function() {
+        const el = document.getElementById('wg-lb-rows');
+        if (el) el.innerHTML = '';
+      });
+    } else {
+      const el = document.getElementById('wg-lb-rows');
+      if (el) el.innerHTML = '';
+    }
+
     document.getElementById('wg-summary-again').addEventListener('click', () => {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       if (WG.Game && typeof WG.Game.startTowerRun === 'function') WG.Game.startTowerRun();
@@ -663,30 +688,28 @@
     });
   }
 
-  // ─── Concern G: leaderboard stub — TODO: Phase 4 server sync ─────────────
-  function _buildLeaderboardHTML(playerFloor) {
-    const stub = [
-      { name:'Wraithwalker', floor:47 },
-      { name:'DuskReaper',   floor:38 },
-      { name:'VoidBound',    floor:31 },
-      { name:'YOU',          floor:playerFloor, isPlayer:true },
-      { name:'Ashcaller',    floor:22 },
-    ].sort((a,b) => b.floor - a.floor).slice(0,5);
-
-    const rows = stub.map((e,i) => {
-      const medal = i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : `${i+1}.`;
+  // ─── Concern G: leaderboard — MetaLeaderboard.meAndAround() / Phase 4 server sync ──
+  function _leaderboardRowsHTML(rows) {
+    return rows.map(function(e, i) {
+      const medal = i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : (i+1)+'.';
       const hi = e.isPlayer ? 'background:#1a0830;' : '';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;${hi}">
-        <span style="width:20px;font-size:12px;text-align:center;">${medal}</span>
-        <span style="flex:1;font-size:11px;color:${e.isPlayer?'#c0a8f0':'#a090b8'};font-weight:${e.isPlayer?700:400};">${e.name}</span>
-        <span style="font-size:11px;color:${e.isPlayer?'#e0d8ff':'#9080a8'};font-weight:700;">Fl.${e.floor}</span>
-      </div>`;
+      const nc = e.isPlayer ? '#c0a8f0' : '#a090b8';
+      const fc = e.isPlayer ? '#e0d8ff' : '#9080a8';
+      const fw = e.isPlayer ? 700 : 400;
+      const name = e.displayName || e.name || '???';
+      const floor = e.peakFloor != null ? e.peakFloor : (e.floor || 0);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;'+hi+'">' +
+        '<span style="width:20px;font-size:12px;text-align:center;">'+medal+'</span>' +
+        '<span style="flex:1;font-size:11px;color:'+nc+';font-weight:'+fw+';">'+name+'</span>' +
+        '<span style="font-size:11px;color:'+fc+';font-weight:700;">Fl.'+floor+'</span>' +
+        '</div>';
     }).join('');
+  }
 
-    return `
-      <div style="font-size:11px;color:#8880a8;margin-bottom:4px;text-align:left;">
-        LEADERBOARD <span style="color:#554;font-size:10px;">— TODO: Phase 4 server sync</span></div>
-      <div style="background:#0c0820;border-radius:8px;padding:6px;margin-bottom:4px;">${rows}</div>`;
+  function _leaderboardSectionHTML(innerRows) {
+    return '<div style="font-size:11px;color:#8880a8;margin-bottom:4px;text-align:left;">LEADERBOARD</div>' +
+      '<div id="wg-lb-rows" style="background:#0c0820;border-radius:8px;padding:6px;margin-bottom:4px;">' +
+      innerRows + '</div>';
   }
 
   // ─── Concern A: helpers ───────────────────────────────────────────────────

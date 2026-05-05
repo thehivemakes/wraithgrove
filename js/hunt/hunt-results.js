@@ -24,6 +24,34 @@
     requestAnimationFrame(step);
   }
 
+  // W-FX-P2-Polish §B — icon fly-in: spawns a fixed emoji at (x0,y0) and lerps
+  // it to the centre of targetEl over ~380ms, then fades and calls onArrive.
+  // Uses rAF (not CSS keyframes) because target position is only known at runtime.
+  function flyIcon(char, x0, y0, targetEl, onArrive) {
+    if (!targetEl) { if (onArrive) onArrive(); return; }
+    const rect = targetEl.getBoundingClientRect();
+    const destX = rect.left + rect.width / 2;
+    const destY = rect.top  + rect.height / 2;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;z-index:9500;pointer-events:none;font-size:22px;' +
+      'line-height:1;left:' + x0 + 'px;top:' + y0 + 'px;transform:translate(-50%,-50%);';
+    el.textContent = char;
+    document.body.appendChild(el);
+    const startMs = performance.now();
+    const dur = 380;
+    function step(now) {
+      const t   = Math.min(1, (now - startMs) / dur);
+      const ease = 1 - Math.pow(1 - t, 2);
+      el.style.left      = (x0 + (destX - x0) * ease) + 'px';
+      el.style.top       = (y0 + (destY - y0) * ease) + 'px';
+      el.style.transform = 'translate(-50%,-50%) scale(' + (1.5 - 0.5 * ease).toFixed(2) + ')';
+      el.style.opacity   = t > 0.8 ? String((1 - t) / 0.2) : '1';
+      if (t < 1) requestAnimationFrame(step);
+      else { el.remove(); if (onArrive) onArrive(); }
+    }
+    requestAnimationFrame(step);
+  }
+
   function comboTierColor(n) {
     if (n >= 20) return '#ff4040';
     if (n >= 10) return '#ff8c00';
@@ -68,12 +96,12 @@
           ` : ''}
           <div style="display:flex;justify-content:space-around;margin-bottom:8px;">
             <div><div style="font-size:11px;color:#a89878;">SURVIVED</div><div style="font-size:18px;color:#f0d890;">${(opts.mins||0).toFixed(1)}m</div></div>
-            <div><div style="font-size:11px;color:#a89878;">KILLS</div><div id="hr-kills" style="font-size:18px;color:#f0d890;">0</div></div>
+            <div id="hr-kills-row"><div style="font-size:11px;color:#a89878;">KILLS</div><div id="hr-kills" style="font-size:18px;color:#f0d890;">0</div></div>
           </div>
           <div style="font-size:11px;color:#a89878;text-align:center;margin-bottom:6px;">REWARDS</div>
           <div style="display:flex;justify-content:center;gap:14px;font-size:13px;flex-wrap:wrap;">
-            ${r.coins?`<div>🪙 <span id="hr-coins">0</span></div>`:''}
-            ${r.diamonds?`<div>💎 ${r.diamonds}</div>`:''}
+            ${r.coins?`<div id="hr-coins-row">🪙 <span id="hr-coins">0</span></div>`:''}
+            ${r.diamonds?`<div id="hr-diamonds-row">💎 <span id="hr-diamonds">0</span></div>`:''}
             ${r.cards?`<div>🎴 ${r.cards}</div>`:''}
             ${r.fragments?`<div>✦ ${r.fragments}</div>`:''}
             ${r.energyRefund?`<div style="color:#f0c060;">⚡ +${r.energyRefund}</div>`:''}
@@ -107,10 +135,25 @@
     }
     root.appendChild(wrap);
 
-    // W-Dopamine-P1 §C — kick off count-up tweens (800ms each, staggered 80ms)
-    setTimeout(() => tweenCounter(wrap.querySelector('#hr-kills'),     opts.kills || 0, 800), 80);
-    setTimeout(() => tweenCounter(wrap.querySelector('#hr-coins'),     r.coins    || 0, 800), 80);
-    setTimeout(() => tweenCounter(wrap.querySelector('#hr-peak-combo'),opts.peakCombo || 0, 800), 80);
+    // W-FX-P2-Polish §B — currency icons fly from screen corners into their rows,
+    // then count-up begins on arrival. Stagger: coin t=0, gem t=200ms, kills t=400ms.
+    // peak-combo has no currency icon; fires on its own fixed delay as before.
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (r.coins) {
+      flyIcon('🪙', 0, vh, wrap.querySelector('#hr-coins-row'),
+        () => tweenCounter(wrap.querySelector('#hr-coins'), r.coins, 800));
+    }
+    setTimeout(() => {
+      if (r.diamonds) {
+        flyIcon('💎', vw, vh, wrap.querySelector('#hr-diamonds-row'),
+          () => tweenCounter(wrap.querySelector('#hr-diamonds'), r.diamonds, 800));
+      }
+    }, 200);
+    setTimeout(() => {
+      flyIcon('⭐', vw / 2, 0, wrap.querySelector('#hr-kills-row'),
+        () => tweenCounter(wrap.querySelector('#hr-kills'), opts.kills || 0, 800));
+    }, 400);
+    setTimeout(() => tweenCounter(wrap.querySelector('#hr-peak-combo'), opts.peakCombo || 0, 800), 480);
 
     function close() { wrap.remove(); }
 
