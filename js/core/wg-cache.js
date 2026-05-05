@@ -67,6 +67,7 @@
       const s = WG.State.get();
       // Shallow-merge top-level keys
       Object.assign(s.currencies, data.currencies || {});
+      if (data.energy) Object.assign(s.energy, data.energy);
       if (data.player) Object.assign(s.player, data.player);
       if (data.huntProgress) Object.assign(s.huntProgress, data.huntProgress);
       if (data.forge) {
@@ -97,6 +98,7 @@
 
   function init() {
     WG.Engine.on('currency:change', markDirty);
+    WG.Engine.on('energy:change',   markDirty);
     WG.Engine.on('player:level',    markDirty);
     WG.Engine.on('hunt:stage-cleared', markDirty);
     WG.Engine.on('forge:upgrade',   markDirty);

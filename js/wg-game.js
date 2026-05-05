@@ -43,6 +43,14 @@
   }
 
   function startHunt(stageId, mode) {
+    // W-Monetization-V2-Energy §C — energy gate. If insufficient, open the
+    // Energy Modal (refund SKUs + watch-ad) instead of silently failing.
+    const cost = WG.State.ENERGY_TUNABLES ? WG.State.ENERGY_TUNABLES.STAGE_COST : 0;
+    if (cost > 0 && WG.State.getEnergy && WG.State.getEnergy().current < cost) {
+      if (WG.EnergyModal && WG.EnergyModal.open) WG.EnergyModal.open({ reason: 'out-of-energy' });
+      return;
+    }
+    if (cost > 0 && WG.State.spendEnergy) WG.State.spendEnergy(cost);
     buildHuntRuntime(stageId, mode);
     WG.State.get().huntProgress.currentStage = stageId;
     // Remove the stage select overlay if present
@@ -58,7 +66,28 @@
 
   function getHuntRuntime() { return huntRuntime; }
 
+  function startTowerRun() {
+    const cost = WG.State.ENERGY_TUNABLES ? WG.State.ENERGY_TUNABLES.STAGE_COST : 5;
+    if (WG.State.getEnergy().current < cost) {
+      if (WG.EnergyModal && WG.EnergyModal.open) WG.EnergyModal.open({ reason: 'out-of-energy' });
+      return;
+    }
+    WG.State.spendEnergy(cost);
+    cancelMenuLoop();
+    const rt = WG.HuntTower.startTower();
+    huntRuntime = rt;
+    WG.HuntRender.setRuntime(rt);
+    switchTab('hunt');
+    document.body.classList.add('in-stage');
+    WG.Engine.emit('tower:run-start', { floor: 1 });
+  }
+
   function exitHunt() {
+    // Clean up tower overlays if returning from a Tower run
+    ['wg-buff-picker','wg-milestone-chest','wg-tower-death','wg-run-summary'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
     huntRuntime = null;
     WG.HuntRender.setRuntime(null);
     // SPEC §0 — tabs+top-strip restored on lobby return
@@ -85,7 +114,11 @@
     // Hunt-specific runtime update only when on Hunt tab AND in a stage.
     // Hit-pause (DOPAMINE_DESIGN §9) freezes world sim but lets render continue
     // — runtime.elapsed must NOT advance during the pause window.
-    if (WG.State.get().activeTab === 'hunt' && huntRuntime && huntRuntime.player && huntRuntime.player.hp > 0 && !huntRuntime.pendingLevelUp) {
+    if (WG.State.get().activeTab === 'hunt' && huntRuntime) {
+      // Tower Gauntlet branch — its own tick handles all combat + floor logic
+      if (huntRuntime.mode === 'tower') {
+        WG.HuntTower.tickFloor(dt);
+      } else if (huntRuntime.player && huntRuntime.player.hp > 0 && !huntRuntime.pendingLevelUp) {
       if (!huntRuntime._tutorialPaused && !WG.Engine.isHitPaused()) {
       huntRuntime.elapsed += dt;
       // Player movement from input
@@ -174,6 +207,7 @@
         finishHunt(true);
       }
       } // end !_tutorialPaused && !isHitPaused guard
+      } // end else (Hunt mode)
     }
 
     // Always render appropriate canvas content
@@ -198,10 +232,27 @@
     const baseCoin = cleared ? (60 + stageId * 25) : (15 + stageId * 5);
     const baseDia  = cleared ? (stageId % 3 === 0 ? 5 : 2) : 0;
     const baseFrag = cleared ? 2 : 0;
-    const rewards = { coins: baseCoin + huntRuntime.kills * 2, diamonds: baseDia, fragments: baseFrag, riftSigils: 0 };
+    // W-Monetization-V2-Whale-Ladder §B — Royal Pass 2× stage-clear multiplier
+    const vipMul = (cleared && WG.State.isRoyalPassActive && WG.State.isRoyalPassActive()) ? 2 : 1;
+    const rewards = { coins: (baseCoin + huntRuntime.kills * 2) * vipMul, diamonds: baseDia * vipMul, fragments: baseFrag * vipMul, riftSigils: 0, energyRefund: 0, firstClearBonus: 0, vipMul };
     if (cleared) WG.State.grant('coins', rewards.coins); else WG.State.grant('coins', rewards.coins);
     if (rewards.diamonds) WG.State.grant('diamonds', rewards.diamonds);
     if (rewards.fragments) WG.State.get().forge.craftFragments += rewards.fragments;
+    // W-Monetization-V2-Energy §C/G — win/loss refund + first-clear bonus.
+    // wasFirstClear must be sampled BEFORE the bestWaves update below; the
+    // existence check (not >0) makes the bonus fire exactly once per stage.
+    const wasFirstClear = cleared && typeof WG.State.get().huntProgress.bestWaves[stageId] === 'undefined';
+    if (WG.State.ENERGY_TUNABLES && WG.State.grantEnergy) {
+      const refund = cleared ? WG.State.ENERGY_TUNABLES.WIN_REFUND : WG.State.ENERGY_TUNABLES.LOSS_REFUND;
+      if (refund > 0) {
+        rewards.energyRefund = WG.State.grantEnergy(refund, cleared ? 'win-refund' : 'loss-refund');
+      }
+      if (wasFirstClear) {
+        const granted = WG.State.grantEnergy(WG.State.ENERGY_TUNABLES.FIRST_CLEAR_BONUS, 'first-clear');
+        rewards.firstClearBonus = granted;
+        WG.Engine.emit('hunt:first-clear', { stageId, bonus: granted });
+      }
+    }
     // Rift sigil drops — eldritch tier only; zero cost on earlier stages.
     if (cleared && WG.HuntPickups && WG.HuntPickups.rollSigilDrop) {
       const sigils = WG.HuntPickups.rollSigilDrop(stageId, huntRuntime.bossDefeated);
@@ -372,7 +423,28 @@
     cave:          'images/biomes/cave.png',
     eldritch:      'images/biomes/eldritch.png',
   };
-  const CHARACTER_PORTRAITS = {};
+  const CHARACTER_PORTRAITS = {
+    lantern_acolyte: 'images/portraits/lantern_acolyte.png',
+    sigil_student:   'images/portraits/sigil_student.png',
+    horned_oni:      'images/portraits/horned_oni.png',
+    paper_priest:    'images/portraits/paper_priest.png',
+    silent_seer:     'images/portraits/silent_seer.png',
+    scythe_widow:    'images/portraits/scythe_widow.png',
+    ash_brawler:     'images/portraits/ash_brawler.png',
+    fox_kabuki:      'images/portraits/fox_kabuki.png',
+    cap_apprentice:  'images/portraits/cap_apprentice.png',
+  };
+  // W-Boss-Portraits — 1024×1024 ukiyo-e portraits shown during boss-intro reveal.
+  // Same style register as BIOME_ART + CHARACTER_PORTRAITS. Null id falls through
+  // to no overlay so future bosses can ship gameplay-first then art.
+  const BOSS_PORTRAITS = {
+    pale_bride:     'images/bosses/pale_bride.png',
+    frozen_crone:   'images/bosses/frozen_crone.png',
+    autumn_lord:    'images/bosses/autumn_lord.png',
+    temple_warden:  'images/bosses/temple_warden.png',
+    cave_mother:    'images/bosses/cave_mother.png',
+    wraith_father:  'images/bosses/wraith_father.png',
+  };
   // RIFT biomes are future cross-IP intrusion stages — when stage.biome is in
   // this set the menu hero gains a violet drop-shadow + intermittent glitch
   // (per index.html `.wg-rift-intrude` rule). Empty until rift content ships.
@@ -812,13 +884,16 @@
 
     const leftCol = document.createElement('div');
     leftCol.style.cssText = 'position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
-    leftCol.appendChild(sideIcon({glyph:'📋',label:'TASKS',onClick:()=>openInfoModal('Tasks','Daily quest tracker — ship in v0.20.')}));
-    leftCol.appendChild(sideIcon({glyph:'🎒',label:'OFFERS',border:'#f0c060',badge:'AD',onClick:openOffersModal}));
+    // W-Monetization-V2-Missions-Pass — TASKS opens live missions modal; PASS opens battle pass modal
+    leftCol.appendChild(sideIcon({glyph:'📋',label:'TASKS',onClick:()=>{ if (WG.Missions && WG.Missions.openModal) WG.Missions.openModal(); else openInfoModal('Tasks','Loading...'); }}));
+    // W-Monetization-V2-Whale-Ladder §D — OFFERS renamed SHOP; Offers is sub-section inside Shop modal.
+    leftCol.appendChild(sideIcon({glyph:'🛒',label:'SHOP',border:'#c080ff',onClick:()=>WG.Shop && WG.Shop.open()}));
     hero.appendChild(leftCol);
 
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
     rightCol.appendChild(sideIcon({glyph:'⚙',label:'SETTINGS',onClick:()=>openInfoModal('Settings','Audio, vibration, language — wiring next pass.')}));
+    rightCol.appendChild(sideIcon({glyph:'🎟',label:'PASS',border:'#5030a0',onClick:()=>{ if (WG.BattlePass && WG.BattlePass.openModal) WG.BattlePass.openModal(); else openInfoModal('Battle Pass','Loading...'); }}));
     rightCol.appendChild(sideIcon({glyph:'🎁',label:'DAILY',timer:'01:58',onClick:()=>openInfoModal('Daily Reward','Today\'s claim + 7-day streak grid — preview, full wiring v0.20.')}));
     rightCol.appendChild(sideIcon({glyph:'📅',label:'7-DAYS',badge:'!',onClick:()=>openInfoModal('7-Day Login','Day-of streak rewards — preview.')}));
     hero.appendChild(rightCol);
@@ -893,6 +968,24 @@
       startHunt(stage.id, currentLevelMode);
     });
     battleWrap.appendChild(battleBtn);
+
+    // ─── GAUNTLET button (Tower Gauntlet mode #2) ───────────────────────────
+    const gauntletWrap = document.createElement('div');
+    gauntletWrap.style.cssText = 'display:flex;justify-content:center;margin-top:10px;';
+    select.appendChild(gauntletWrap);
+
+    const gauntletBtn = document.createElement('button');
+    gauntletBtn.id = 'wg-gauntlet-btn';
+    gauntletBtn.style.cssText = 'min-width:200px;padding:11px 28px;border-radius:28px;border:2px solid #5030a0;background:linear-gradient(to bottom,#3a1a90,#1a0850);color:#c0a8f0;font-size:14px;letter-spacing:3px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(80,48,160,0.4);transition:transform 80ms ease;';
+    gauntletBtn.textContent = '🏰 GAUNTLET';
+    gauntletBtn.addEventListener('pointerdown', () => { gauntletBtn.style.transform = 'scale(0.96)'; });
+    gauntletBtn.addEventListener('pointerup',   () => { gauntletBtn.style.transform = 'scale(1)'; });
+    gauntletBtn.addEventListener('pointerleave',() => { gauntletBtn.style.transform = 'scale(1)'; });
+    gauntletBtn.addEventListener('click', () => {
+      if (select.parentNode) select.parentNode.removeChild(select);
+      startTowerRun();
+    });
+    gauntletWrap.appendChild(gauntletBtn);
 
     // ─── Hero render (called on stage change / mode change) ─────────────────
     function renderHero() {
@@ -1098,7 +1191,29 @@
     document.querySelectorAll('[data-bind="coins"]').forEach(el => el.textContent = String(c.coins));
     document.querySelectorAll('[data-bind="diamonds"]').forEach(el => el.textContent = String(c.diamonds));
     document.querySelectorAll('[data-bind="cards"]').forEach(el => el.textContent = String(c.cards));
+    // W-Monetization-V2-Whale-Ladder §D — sync gems chip
+    document.querySelectorAll('[data-bind="gems"]').forEach(el => el.textContent = String(c.gems || 0));
     document.querySelectorAll('[data-bind="power"]').forEach(el => el.textContent = String(WG.State.recomputePower()));
+    // W-Monetization-V2-Energy §B — energy + countdown
+    if (WG.State.getEnergy) {
+      const e = WG.State.getEnergy();
+      document.querySelectorAll('[data-bind="energy-current"]').forEach(el => el.textContent = String(e.current));
+      document.querySelectorAll('[data-bind="energy-max"]').forEach(el => el.textContent = String(e.max));
+      const chip = document.getElementById('energy-chip');
+      if (chip) chip.classList.toggle('full', e.current >= e.max);
+      const cdEl = document.querySelector('[data-bind="energy-cd"]');
+      if (cdEl) {
+        if (e.current >= e.max) {
+          cdEl.textContent = 'FULL';
+        } else {
+          const ms = WG.State.nextRegenMs(Date.now());
+          const totalSec = Math.max(0, Math.ceil(ms / 1000));
+          const m = Math.floor(totalSec / 60);
+          const s = totalSec % 60;
+          cdEl.textContent = '+1 in ' + (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+        }
+      }
+    }
     // hide power on hunt tab
     const showOn = WG.State.get().activeTab;
     document.querySelectorAll('[data-show-on]').forEach(el => {
@@ -1122,18 +1237,33 @@
     if (backBtn) backBtn.addEventListener('click', () => {
       if (huntRuntime) exitHunt();
     });
+    // W-Monetization-V2-Energy §B — tap energy chip → open Energy Modal
+    const energyChip = document.getElementById('energy-chip');
+    if (energyChip) energyChip.addEventListener('click', () => {
+      if (WG.EnergyModal && WG.EnergyModal.open) WG.EnergyModal.open();
+    });
+    // W-Monetization-V2-Whale-Ladder §D — tap gems chip → open Shop at Gem Packs
+    const gemsChip = document.getElementById('gems-chip');
+    if (gemsChip) gemsChip.addEventListener('click', () => {
+      if (WG.Shop && WG.Shop.open) WG.Shop.open({ section: 'gems' });
+    });
   }
 
   async function init() {
     if (!WG.Engine || !WG.State || !WG.Display) throw new Error('core modules missing');
     // Init cycle
     WG.State.init();
+    // W-Monetization-V2-Sub-Blockers §D — fire daily:reset if date advanced since last session.
+    if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
     WG.Cache.init();
     WG.Cache.load();
     WG.Account.init();
     WG.Events.init();
     WG.IAP.init();
     WG.Ads.init();
+    if (WG.EnergyModal && WG.EnergyModal.init) WG.EnergyModal.init();
+    if (WG.Gacha && WG.Gacha.init) WG.Gacha.init();
+    if (WG.Shop && WG.Shop.init) WG.Shop.init();
     if (WG.Buffs && WG.Buffs.init) WG.Buffs.init();
     if (WG.Audio && WG.Audio.init) WG.Audio.init();
     WG.Input.init();
@@ -1148,6 +1278,8 @@
     WG.HuntResults.init();
     WG.HuntRender.init();
     WG.HuntTutorial.init();
+    if (WG.HuntTowerBuffs && WG.HuntTowerBuffs.init) WG.HuntTowerBuffs.init();
+    if (WG.HuntTower && WG.HuntTower.init) WG.HuntTower.init();
     WG.AscendCharacter.init();
     WG.AscendSkins.init();
     WG.AscendEquipment.init();
@@ -1166,10 +1298,72 @@
     WG.DuelRank.init();
     WG.DuelMatch.init();
     WG.DuelRender.init();
+    // W-Monetization-V2-Missions-Pass — after cache load so saved progress is restored
+    if (WG.Missions && WG.Missions.init) WG.Missions.init();
+    if (WG.BattlePass && WG.BattlePass.init) WG.BattlePass.init();
 
     setupNav();
     syncTopStrip();
     showHuntStageList();
+    initBossIntro();
+  }
+
+  // W-Boss-Portraits — boss-intro reveal: 1.5s overlay on boss:spawned event.
+  // Dark gradient + portrait fade-in (300ms) + name display + slide-out (300ms).
+  // World-sim paused during reveal via WG.Engine.hitPause. Falls through (no
+  // overlay) when BOSS_PORTRAITS[bossType] is null/missing or image errors.
+  let _bossIntroEl = null;
+  let _bossIntroTimer = 0;
+  function ensureBossIntroDom() {
+    if (_bossIntroEl) return _bossIntroEl;
+    if (!document.getElementById('wg-boss-intro-style')) {
+      const css = document.createElement('style');
+      css.id = 'wg-boss-intro-style';
+      css.textContent = `
+        .wg-boss-intro{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+          background:radial-gradient(ellipse at center,rgba(20,8,12,0.78) 0%,rgba(4,2,6,0.96) 70%);
+          opacity:0;pointer-events:none;transition:opacity 300ms ease-out;}
+        .wg-boss-intro.show{opacity:1;}
+        .wg-boss-intro .wg-bi-card{display:flex;flex-direction:column;align-items:center;gap:12px;
+          transform:translateY(24px) scale(0.96);transition:transform 320ms cubic-bezier(.2,.8,.2,1);}
+        .wg-boss-intro.show .wg-bi-card{transform:translateY(0) scale(1);}
+        .wg-boss-intro .wg-bi-img{width:min(72vw,420px);height:min(72vw,420px);object-fit:cover;
+          border:1px solid rgba(220,180,120,0.35);box-shadow:0 0 32px rgba(120,40,60,0.45),0 0 96px rgba(40,8,16,0.6);
+          background:#0a0608;}
+        .wg-boss-intro .wg-bi-name{font-family:Georgia,serif;font-size:28px;letter-spacing:0.08em;
+          color:#f0d8a8;text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 4px rgba(180,80,60,0.35);
+          text-transform:uppercase;}
+      `;
+      document.head.appendChild(css);
+    }
+    const el = document.createElement('div');
+    el.className = 'wg-boss-intro';
+    el.innerHTML = '<div class="wg-bi-card"><img class="wg-bi-img" alt=""><div class="wg-bi-name"></div></div>';
+    document.body.appendChild(el);
+    _bossIntroEl = el;
+    return el;
+  }
+  function showBossIntro(boss) {
+    const url = BOSS_PORTRAITS[boss.type];
+    if (!url) return;
+    const el = ensureBossIntroDom();
+    const img = el.querySelector('.wg-bi-img');
+    const name = el.querySelector('.wg-bi-name');
+    img.src = url;
+    img.onerror = () => { hideBossIntro(); };
+    name.textContent = (boss._typeData && boss._typeData.name) || boss.type || '';
+    if (WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(1500);
+    requestAnimationFrame(() => el.classList.add('show'));
+    if (_bossIntroTimer) clearTimeout(_bossIntroTimer);
+    _bossIntroTimer = setTimeout(hideBossIntro, 1200);
+  }
+  function hideBossIntro() {
+    if (!_bossIntroEl) return;
+    _bossIntroEl.classList.remove('show');
+  }
+  function initBossIntro() {
+    if (!WG.Engine || !WG.Engine.on) return;
+    WG.Engine.on('boss:spawned', ({ boss }) => { if (boss) showBossIntro(boss); });
   }
 
   function start() {
@@ -1185,5 +1379,5 @@
     rafId = 0;
   }
 
-  window.WG.Game = { init, start, stop, switchTab, startHunt, exitHunt, syncTopStrip, getHuntRuntime, flashScreen };
+  window.WG.Game = { init, start, stop, switchTab, startHunt, startTowerRun, exitHunt, syncTopStrip, getHuntRuntime, flashScreen };
 })();

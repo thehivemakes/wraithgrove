@@ -43,9 +43,14 @@
     const rt = WG.Game.getHuntRuntime && WG.Game.getHuntRuntime();
     const reviveAvailable = !opts.cleared && rt && (rt.reviveCount || 0) < REVIVE_LIMIT_PER_RUN;
 
+    // W-Monetization-V2-Whale-Ladder §F — Royal Pass badge in results header
+    const vipBadge = (opts.rewards && opts.rewards.vipMul && opts.rewards.vipMul > 1 && WG.State.isRoyalPassActive && WG.State.isRoyalPassActive())
+      ? `<div style="text-align:center;margin:4px 0 8px 0;"><span style="display:inline-block;background:linear-gradient(135deg,#6a20b0,#3a0870);border:1.5px solid #c080ff;border-radius:12px;padding:3px 12px;font-size:10px;letter-spacing:2px;color:#e0b8ff;font-weight:700;">👑 ROYAL PASS · 2× REWARDS</span></div>`
+      : '';
     wrap.innerHTML = `
       <div class="modal-card" style="min-width: 320px;">
         <div class="modal-title" style="color:${opts.cleared ? '#a8d878' : '#d88060'};">${title}</div>
+        ${vipBadge}
         <div class="modal-body">
           ${reviveAvailable ? `
             <div id="hr-revive-panel" style="background:linear-gradient(135deg,#3a0a0a,#1a0202);border:2px solid #ff5040;border-radius:6px;padding:10px;margin-bottom:10px;text-align:center;">
@@ -66,11 +71,13 @@
             <div><div style="font-size:11px;color:#a89878;">KILLS</div><div id="hr-kills" style="font-size:18px;color:#f0d890;">0</div></div>
           </div>
           <div style="font-size:11px;color:#a89878;text-align:center;margin-bottom:6px;">REWARDS</div>
-          <div style="display:flex;justify-content:center;gap:14px;font-size:13px;">
+          <div style="display:flex;justify-content:center;gap:14px;font-size:13px;flex-wrap:wrap;">
             ${r.coins?`<div>🪙 <span id="hr-coins">0</span></div>`:''}
             ${r.diamonds?`<div>💎 ${r.diamonds}</div>`:''}
             ${r.cards?`<div>🎴 ${r.cards}</div>`:''}
             ${r.fragments?`<div>✦ ${r.fragments}</div>`:''}
+            ${r.energyRefund?`<div style="color:#f0c060;">⚡ +${r.energyRefund}</div>`:''}
+            ${r.firstClearBonus?`<div style="color:#ffe080;font-weight:700;">⚡ +${r.firstClearBonus} First Clear!</div>`:''}
             ${r.riftSigils?`<div style="color:#c080ff;">🔮 ×${r.riftSigils} Rift Sigil</div>`:''}
           </div>
           ${(opts.peakCombo > 0) ? `

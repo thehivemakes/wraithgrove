@@ -15,6 +15,18 @@
   const DIAMOND_BYPASS_COST = 200;
   const AD_REWARD_AVAILABLE = true;
 
+  // W-Monetization-V2-Sub-Blockers §C — wood + stone resource tunables.
+  const TUNABLES = Object.freeze({
+    WOOD_CAP:          500,
+    WOOD_REGEN_MS:     30000,   // 1 wood per 30 seconds
+    STONE_CAP:         200,
+    STONE_REGEN_MS:    60000,   // 1 stone per 60 seconds
+    WOOD_REFILL_GEMS:  25,      // 25💎 → 200 wood
+    WOOD_REFILL_AMT:   200,
+    STONE_REFILL_GEMS: 25,      // 25💎 → 100 stone
+    STONE_REFILL_AMT:  100,
+  });
+
   const DEFS = {
     cave:     { name:'Cave',     icon:'⛰', desc:'Idle coin trickle',     unlockGS:0,     unlockCost:{coins:0},     baseGen:0.6 },
     forge:    { name:'Forge',    icon:'🔨', desc:'Craft relics',          unlockGS:0,     unlockCost:{coins:0},     baseGen:0   },
@@ -98,6 +110,81 @@
     return { ok: true };
   }
 
+  // --- Wood + Stone offline regen ---
+
+  function _processRegen(resource, regenKey, cap, regenMs, now) {
+    const f = WG.State.get().forge;
+    if (f[resource] >= cap) { f[regenKey] = now; return 0; }
+    if (!f[regenKey]) { f[regenKey] = now; return 0; }
+    const elapsed = now - f[regenKey];
+    if (elapsed < regenMs) return 0;
+    const granted = Math.floor(elapsed / regenMs);
+    const before = f[resource];
+    f[resource] = Math.min(cap, f[resource] + granted);
+    f[regenKey] += granted * regenMs;
+    if (f[resource] >= cap) f[regenKey] = now;
+    const actual = f[resource] - before;
+    if (actual > 0) WG.Engine.emit('forge:resources-change', { wood: f.wood, stone: f.stone });
+    return actual;
+  }
+
+  function processResourceRegen(now) {
+    now = now || Date.now();
+    _processRegen('wood', 'woodLastRegenAt', TUNABLES.WOOD_CAP, TUNABLES.WOOD_REGEN_MS, now);
+    _processRegen('stone', 'stoneLastRegenAt', TUNABLES.STONE_CAP, TUNABLES.STONE_REGEN_MS, now);
+  }
+
+  function nextWoodRegenMs(now) {
+    now = now || Date.now();
+    const f = WG.State.get().forge;
+    if (f.wood >= TUNABLES.WOOD_CAP) return 0;
+    if (!f.woodLastRegenAt) return TUNABLES.WOOD_REGEN_MS;
+    return Math.max(0, TUNABLES.WOOD_REGEN_MS - (now - f.woodLastRegenAt));
+  }
+  function nextStoneRegenMs(now) {
+    now = now || Date.now();
+    const f = WG.State.get().forge;
+    if (f.stone >= TUNABLES.STONE_CAP) return 0;
+    if (!f.stoneLastRegenAt) return TUNABLES.STONE_REGEN_MS;
+    return Math.max(0, TUNABLES.STONE_REGEN_MS - (now - f.stoneLastRegenAt));
+  }
+
+  function getResources() {
+    const f = WG.State.get().forge;
+    return { wood: f.wood, stone: f.stone };
+  }
+
+  function refillWood() {
+    if (!WG.State.spend('diamonds', TUNABLES.WOOD_REFILL_GEMS)) return { ok: false, reason: 'insufficient-diamonds' };
+    const f = WG.State.get().forge;
+    f.wood = Math.min(TUNABLES.WOOD_CAP, f.wood + TUNABLES.WOOD_REFILL_AMT);
+    WG.Engine.emit('forge:resources-change', { wood: f.wood, stone: f.stone });
+    return { ok: true };
+  }
+  function refillStone() {
+    if (!WG.State.spend('diamonds', TUNABLES.STONE_REFILL_GEMS)) return { ok: false, reason: 'insufficient-diamonds' };
+    const f = WG.State.get().forge;
+    f.stone = Math.min(TUNABLES.STONE_CAP, f.stone + TUNABLES.STONE_REFILL_AMT);
+    WG.Engine.emit('forge:resources-change', { wood: f.wood, stone: f.stone });
+    return { ok: true };
+  }
+
+  // Spend resources for a craft attempt; shows refill prompt if insufficient.
+  const WOOD_PER_CRAFT = 20;
+  const STONE_PER_CRAFT = 10;
+  function canCraft() {
+    const f = WG.State.get().forge;
+    return f.wood >= WOOD_PER_CRAFT && f.stone >= STONE_PER_CRAFT;
+  }
+  function spendCraftResources() {
+    const f = WG.State.get().forge;
+    if (f.wood < WOOD_PER_CRAFT || f.stone < STONE_PER_CRAFT) return false;
+    f.wood -= WOOD_PER_CRAFT;
+    f.stone -= STONE_PER_CRAFT;
+    WG.Engine.emit('forge:resources-change', { wood: f.wood, stone: f.stone });
+    return true;
+  }
+
   // Idle income tick — call every frame.
   let accum = 0;
   function tickIdle(dt) {
@@ -113,13 +200,20 @@
     accum = 0;
   }
 
+  let _regenTickHandle = 0;
   function init() {
     WG.Engine.on('tick', ({ dt }) => tickIdle(dt));
+    // Catch-up offline regen on session start, then tick every 30s
+    processResourceRegen(Date.now());
+    if (!_regenTickHandle) _regenTickHandle = setInterval(() => processResourceRegen(Date.now()), 30000);
   }
 
   window.WG.ForgeBuildings = {
-    init, get, DEFS, DIAMOND_BYPASS_COST, AD_REWARD_AVAILABLE,
+    init, get, DEFS, DIAMOND_BYPASS_COST, AD_REWARD_AVAILABLE, TUNABLES,
     tryUpgrade, tryUnlock, tryUnlockByDiamonds, tryUnlockByAd,
     upgradeCost, genRate, gsMet,
+    processResourceRegen, nextWoodRegenMs, nextStoneRegenMs,
+    getResources, refillWood, refillStone, canCraft, spendCraftResources,
+    WOOD_PER_CRAFT, STONE_PER_CRAFT,
   };
 })();

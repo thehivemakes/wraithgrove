@@ -1,8 +1,15 @@
 // WG.DuelMatch — async PvP match resolver (Power-based)
 (function(){'use strict';
+  // W-Monetization-V2-Sub-Blockers §A — duel daily cap tunables.
+  const TUNABLES = Object.freeze({
+    MAX_DAILY_ATTEMPTS: 5,
+    REFILL_GEMS:        30,   // 30💎 refills REFILL_AMOUNT attempts
+    REFILL_AMOUNT:      5,
+  });
+
   function dailyAvailable() {
     const s = WG.State.get().duel;
-    return s.dailyDuelsUsed < s.dailyDuelsMax;
+    return s.dailyDuelsUsed < TUNABLES.MAX_DAILY_ATTEMPTS;
   }
   function startMatch() {
     if (!dailyAvailable()) return { ok: false, reason: 'daily-cap' };
@@ -29,8 +36,27 @@
     WG.State.grant('coins', reward.coins);
     if (reward.diamonds) WG.State.grant('diamonds', reward.diamonds);
     WG.State.get().duel.dailyDuelsUsed++;
+    WG.Engine.emit('duel:match-result', { won });
     return { won, ...result, reward, myScore: Math.round(myScore), oppScore: Math.round(oppScore) };
   }
-  function init() {}
-  window.WG.DuelMatch = { init, dailyAvailable, startMatch, resolve };
+  function refillAttempts() {
+    const s = WG.State.get();
+    if (!WG.State.spend('diamonds', TUNABLES.REFILL_GEMS)) return { ok: false, reason: 'insufficient-diamonds' };
+    s.duel.dailyDuelsUsed = Math.max(0, s.duel.dailyDuelsUsed - TUNABLES.REFILL_AMOUNT);
+    WG.Engine.emit('duel:refill', { remaining: TUNABLES.MAX_DAILY_ATTEMPTS - s.duel.dailyDuelsUsed });
+    return { ok: true };
+  }
+
+  function attemptsLeft() {
+    const s = WG.State.get().duel;
+    return Math.max(0, TUNABLES.MAX_DAILY_ATTEMPTS - s.dailyDuelsUsed);
+  }
+
+  function init() {
+    WG.Engine.on('daily:reset', () => {
+      WG.State.get().duel.dailyDuelsUsed = 0;
+      WG.Engine.emit('duel:daily-reset', {});
+    });
+  }
+  window.WG.DuelMatch = { init, dailyAvailable, startMatch, resolve, refillAttempts, attemptsLeft, TUNABLES };
 })();

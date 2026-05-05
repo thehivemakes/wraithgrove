@@ -1,6 +1,6 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-02 by W-Rift-Mechanic-Plumbing
+**Last updated:** 2026-05-05 by W-Monetization-V2-Whale-Ladder
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
@@ -13,6 +13,27 @@
 - `CLAUDE.md` — project protocol (this file's sibling)
 - `BUILD_PLAN.md` — phase queue (worker tasks)
 - `STATE_OF_BUILD.md` — this file
+
+### Missions + Battle Pass (W-Monetization-V2-Missions-Pass 2026-05-05)
+- **Daily missions** — 13-mission catalog; 5 picked deterministically per day (date+userId seed). Progress tracked per session + persisted. Claim button grants reward + +50 BP XP. TASKS side icon → live modal.
+- **Weekly missions** — 5-mission catalog; resets Monday 00:00 local. Claim grants reward + +200 BP XP.
+- **Missions modal** — DAILY/WEEKLY tab pills, progress bars, CLAIM buttons, countdown footer. Accessible from 📋 TASKS side icon in Hunt lobby.
+- **Battle Pass — Season 1 "Whispering Pines"** — 60 levels × 100 XP/level. Free track: 20 milestones every 3rd level. Premium track: reward every level. XP sources: mission claim (+50/+200), stage clear (+20), tower floor (+5), boss defeated (+100).
+- `meta-missions.js` — WG.Missions: catalog, tracker, modal, event dispatcher hub.
+- `meta-battle-pass.js` — WG.BattlePass: season engine, addXP, claimFree/claimPremium, modal with 60-cell grid.
+- `meta-iap.js` — `battle_pass_s1` SKU added ($9.99 entitlement, grants `battlePassPremium: 'wraithgrove_s1'`).
+- `duel-match.js` — emits `duel:match-result { won }` from resolve() for mission wiring.
+- State: `WG.State.get().missions` and `WG.State.get().battlePass` — initialized lazily by ensureState().
+- **Premium SKU stub** — `WG.IAP.purchase('battle_pass_s1')` falls through to dev stub on browser preview; production needs StoreKit/Play Billing (Phase 4).
+- Battle pass not yet started (startDate 2026-05-15) — modal shows correct countdown. Season 1 runs May 15 – Jun 15 2026.
+
+### Tower Gauntlet (W-Tower-Gauntlet 2026-05-05)
+- **Mode #2** — infinite-scaling roguelite alongside Hunt. Entry: 5 energy. GAUNTLET button below BATTLE in stage select.
+- `hunt-tower-buffs.js` — 24 buff cards (Common/Rare/Legendary). Weighted roll without replacement. `apply(buffId, rt)` mutates runtime fields. Same buff × 2 → upgrade variant applied.
+- `hunt-tower.js` — full Tower module: `startTower()`, `tickFloor(dt)`, floor scaling (HP ×1.18/floor, damage ×1.10, speed ×1.04 capped at 1.6×), spawner with 5 enemy bands unlocking at floors 1/4/8/13/18, mini-boss at 70% of floor time, 3-card buff picker between floors, milestone chest every 5 floors, death screen + 2 gem-paid continues, run summary with leaderboard stub.
+- `wg-state.js` — `towerProgress.peakFloor` added (persists personal best across runs).
+- `wg-game.js` — `startTowerRun()` (energy gate → spend → build → setRuntime → in-stage), rAF branch on `huntRuntime.mode === 'tower'`, `HuntTowerBuffs.init()` + `HuntTower.init()` in init chain, `exitHunt` tower overlay cleanup, `startTowerRun` exported.
+- Leaderboard in run summary: **stub data only** — TODO Phase 4 server sync.
 
 ### Rift mechanic (W-Rift-Mechanic-Plumbing 2026-05-02)
 - `state.rift.sigils` — cumulative counter; `floor(sigils/3)` = unlocked guest slots.
@@ -30,11 +51,23 @@
 - `wg-cache.js` — localStorage save/load + dirty-flag autosave (3s throttle)
 - `wg-audio.js` — Web Audio engine; biome ambient + 13 sfx + 6 ui events; fail-silent on missing files; mute/volume API persisted to `localStorage.wg_audio_v1`. **Wired + sourced** (W-Audio-Sourcing 2026-05-01) — 25 mp3s on disk, 6.6 MB total, all CC0/synthesized.
 
-### Meta (`js/meta/` — 4 modules)
-- `meta-iap.js` — 12 IAP SKUs ($0.99 to $99.99) with grant pipeline. **STUB** — production needs Apple StoreKit + Google Play Billing wiring.
+### Whale Ladder + Royal Pass + Gacha + Shop (W-Monetization-V2-Whale-Ladder 2026-05-05)
+- **SKU ladder** — 7 gem packs ($0.99→$99.99) + starter/weekly/monthly bundles + royal_pass_monthly $14.99. Sovereign Trove $99.99 is the whale gate.
+- **Gems currency** — `state.currencies.gems`; purple 💎 chip in top strip; tap → Shop (Gem Packs section). Synced via `syncTopStrip()`.
+- **Royal Pass** — `state.subscriptions.royalPass`; on activation: energy.max +20 (30→50), 2× stage-clear rewards, +10 daily energy on `daily:reset`. `isRoyalPassActive()` exported from WG.State.
+- **Gacha** — `meta-gacha.js` (WG.Gacha): standard pool (30💎 ×1 / 270💎 ×10) with pity (mythic@100, legendary@30). rift_guests pool LOCKED, empty catalog — Ysabel withheld until KingshotPro ships. Pity counters in `state.gacha.pity` (persisted). Rates disclosed via `getRates()`.
+- **Shop modal** — `meta-shop.js` (WG.Shop): 5 sections (Gem Packs / Bundles / Royal Pass / Summon / Offers). Entry: gems chip + SHOP side icon in Hunt lobby. Royal Pass landing: benefit comparison + full subscription disclosure per Apple §3.1.2 + FTC 2024. Summon: pull ×1/×10, rate disclosure `<details>`, pity display, locked rift_guests pool.
+- **VIP flex** — Royal purple portrait frame in Ascend, 👑 ROYAL badge in Duel rank row, "👑 ROYAL PASS · 2× REWARDS" banner in Hunt results when multiplier active.
+
+### Meta (`js/meta/` — 8 modules)
+- `meta-iap.js` — 30+ IAP SKUs ($0.99 to $99.99); gem packs, bundles, Royal Pass, energy refills. `isAvailable()` + `bundleResetIn()` for timed gating. **STUB** — production needs Apple StoreKit + Google Play Billing wiring.
 - `meta-ads.js` — rewarded video + interstitial placeholder modals; daily 50-RV cap; ad-removal entitlement check. **STUB** — production needs AdMob via Capacitor plugin.
+- `meta-gacha.js` — WG.Gacha: standard pool (open) + rift_guests pool (locked/empty). pull() / pullTiered() / getRates() / getPityDisplay(). Pity in state.
+- `meta-shop.js` — WG.Shop: fullscreen Shop modal. 5 sections. Royal Pass landing with legal disclosure. Gacha pull UI with rate disclosure.
 - `meta-account.js` — anonymous device-ID; optional email upgrade stub. **STUB** — production needs server endpoint.
 - `meta-events.js` — analytics event reporter. **STUB** — production needs server POST.
+- `meta-missions.js` — daily + weekly missions catalog, tracker, UI, event dispatcher.
+- `meta-battle-pass.js` — season battle pass engine + 60-level grid UI.
 
 ### Hunt (`js/hunt/` — 9 modules)
 - `hunt-stage.js` — 18 stages × 6 biomes (forest_summer / cold_stone / forest_autumn / temple / cave / eldritch). Each stage: id, name, biome, durationSec, enemyMix, bossId, weaponPickups list.
@@ -73,7 +106,7 @@
 - `duel-render.js` — DOM UI: rank icon, Power+Duels readout, FIND OPPONENT, match modal, result modal, ranked ladder.
 
 ### Orchestrator
-- `wg-game.js` — init order across all 36 modules, rAF loop, Hunt runtime construction, tab switching, top-strip currency sync, Hunt stage select.
+- `wg-game.js` — init order across all 38 modules, rAF loop, Hunt runtime construction, Tower Gauntlet entry (`startTowerRun`), rAF mode branch (`mode === 'tower'`), tab switching, top-strip currency sync, Hunt stage select + GAUNTLET button.
 
 ---
 
@@ -133,8 +166,8 @@
 
 ## Reference: file count
 
-- 37 JS modules + 1 index.html = 38 files
-- ~3,500 lines of vanilla JS
+- 41 JS modules + 1 index.html = 42 files
+- ~4,500 lines of vanilla JS
 - 0 frameworks
 - 0 third-party SDKs
 - 0 network calls (all client-side localStorage in v1.0)

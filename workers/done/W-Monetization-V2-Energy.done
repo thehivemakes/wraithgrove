@@ -1,0 +1,97 @@
+# W-Monetization-V2-Energy — DONE
+
+7 commits landed, one per concern. Energy economy foundation in place.
+
+## Per-concern verdict
+
+| Concern | Verdict | Commit |
+|---|---|---|
+| A — Energy state + regen + cap                  | PASS | 4b3a488 |
+| B — Top-strip energy chip + countdown           | PASS | d4aa043 |
+| C — Hunt entry deduction + win refund           | PASS | b27624f |
+| D — Treasure chest pickup                       | PASS | 8b3e9f7 |
+| E — Energy Modal + IAP refill SKUs              | PASS | 52e31fc |
+| F — Daily login + 7-day streak energy           | PASS | e15806f |
+| G — First-clear stage energy bonus              | PASS | e3cca75 |
+
+## Tunable values
+
+`WG.State.ENERGY_TUNABLES` (frozen, `js/core/wg-state.js`):
+- MAX = 30
+- REGEN_INTERVAL_MS = 900000  (15 min / +1)
+- STAGE_COST = 5
+- WIN_REFUND = 3
+- LOSS_REFUND = 0
+- LOGIN_BONUS = 20
+- STREAK_7_BONUS = 50
+- FIRST_CLEAR_BONUS = 10
+
+`WG.HuntPickups.TREASURE_TUNABLES` (frozen, `js/hunt/hunt-pickups.js`):
+- DROP_FROM_ENEMY = 0.05
+- DROP_FROM_BOSS = 0.30
+- OPEN_DURATION_SEC = 0.8
+- PICKUP_RADIUS = 28
+- GUARANTEE_EVERY_N = 5
+- LOOT_TABLE: 50% gold (1d3), 25% energy (+5), 15% fragment (+1), 8% rare_mat (+1), 2% gem (+1)
+
+## IAP SKU IDs
+
+Added to `WG.IAP.SKUS` (`js/meta/meta-iap.js`):
+
+| id          | price  | grants     | flag           |
+|-------------|--------|------------|----------------|
+| refill_5    | $0.99  | energy: 5  |                |
+| refill_15   | $1.99  | energy: 15 |                |
+| refill_30   | $4.99  | energy: 30 | bestValue:true |
+| refill_60   | $9.99  | energy: 60 |                |
+| refill_150  | $19.99 | energy:150 |                |
+
+Dev stub grants instantly via `WG.State.grantEnergy('iap-refill')`. Apple/Google/Stripe channels untouched.
+
+## Where energy is shown in UI
+
+- **Top strip** (`#top-strip` in `index.html`): amber chip `⚡ <cur>/<max>` with "+1 in MM:SS" countdown row beneath. Switches to "FULL" at cap.
+- **Energy Modal** (`#energy-modal`, `js/meta/meta-energy-modal.js`): opens on chip tap or out-of-energy interrupt. Header current/max + countdown, watch-ad row, 5-row refill ladder with BEST VALUE badge on refill_30.
+- **Results screen** (`js/hunt/hunt-results.js`): two new reward rows — `⚡ +3` (win refund) and `⚡ +10 First Clear!`.
+- **Toasts** (top-center): `+20 ⚡ Daily Login (Day N)`, then 600ms later `+50 ⚡ 7-Day Streak!` on Day 7.
+- **Chest loot reveal**: `HuntFXNumbers.spawn` floats text upward from chest world position; matching top-strip chip pulses 600ms.
+
+## Happy-path test results
+
+Browser smoke at `http://localhost:3996/`:
+
+1. ✅ Cold load with cleared `wg_save_v2` → energy chip renders 30/30 (Day 1 +20 capped at MAX), "FULL" countdown.
+2. ✅ Backdate `lastRegenAt` 32 min → `processEnergyRegen` granted 2 (offline catch-up); anchor advanced 30 min, 2 min leftover preserved.
+3. ✅ `startHunt(1, 'day')` with energy=30 → -5 deducted, runtime built. With energy=2 → modal opened, no deduction.
+4. ✅ `HuntResults.show({ cleared: true, energyRefund: 3 })` → row "⚡ +3" present. With `firstClearBonus: 10` → row "⚡ +10 First Clear!" present. `cleared:false` → no ⚡ rows.
+5. ✅ Treasure chest spawnChest + tick → state transitions closed→opening→loot grant; chest removed; `chest:opened` event fired with kind/amount/guaranteed.
+6. ✅ 1000 unforced rolls → 502 gold / 264 energy / 157 fragment / 58 rare_mat / 19 gem (within tolerance).
+7. ✅ 500 forced rolls (5th-chest streak) → 467 energy + 33 gem = 500/500 guaranteeable (no leak).
+8. ✅ 5 sequential chest opens → 5th has `guaranteed:true`, lands on energy.
+9. ✅ Energy chip click → modal opens with "ENERGY" title; out-of-energy reason → "OUT OF ENERGY" red title.
+10. ✅ refill_5 dev-stub purchase → energy 4→9; BEST VALUE badge anchored on refill_30.
+11. ✅ Watch-ad rewarded video flow grants +5 ⚡ on success; daily-cap remaining shown in modal.
+12. ✅ Daily-login matrix: cold start grants Day 1 +20; yesterday→today returns streak 2; same-day call no-op (returns 0); 1970-gap resets to 1; streak=6 + yesterday triggers Day 7 bonus event {bonus:50}, both toasts visible, streak wraps to 0.
+13. ✅ wasFirstClear sampling: `bestWaves[3] === undefined` → true; `=== 0` → false; `=== 1.2` → false.
+
+No console errors across all flows.
+
+## Files touched
+
+```
+js/core/wg-state.js              (energy state + tunables + lifecycle)
+js/core/wg-cache.js              (load merge + energy:change dirty flag)
+js/wg-game.js                    (startHunt gate, finishHunt refund + first-clear, syncTopStrip energy, EnergyModal init + chip click)
+js/meta/meta-iap.js              (5 refill SKUs + energy grant in dev stub)
+js/meta/meta-account.js          (processDailyLogin + 7-day streak + toasts)
+js/meta/meta-energy-modal.js     (NEW — WG.EnergyModal)
+js/hunt/hunt-pickups.js          (treasure chests + loot table + chip pulse)
+js/hunt/hunt-results.js          (energyRefund + firstClearBonus reward rows)
+index.html                       (top-strip chip + energy-modal script tag)
+```
+
+Notes for the next worker (Missions Pass / Whale Ladder / Sub Blockers):
+- `WG.State.grantEnergy(amount, reason)` is the single grant path — emits `energy:change` and respects MAX.
+- `WG.State.spendEnergy(amount)` returns false when below cost (callers must handle UI gate).
+- `state.forge.rareMats` is the new lazy field for chest rare-mat drops; downstream forge work can read it.
+- `WG.EnergyModal.open({ reason: 'out-of-energy' })` is the standard interrupt; same modal serves voluntary refills.

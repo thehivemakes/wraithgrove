@@ -10,6 +10,89 @@
     RIFT_SIGIL_DROP_RATE_STAGE_CLEAR: 0.01,
   };
 
+  // W-Monetization-V2-Energy §D — treasure chest tunables (frozen).
+  // Energy at 25% is the dopamine peak; every 5th chest re-rolls until energy
+  // or gem lands so the streak guarantee always feels rewarding.
+  const TREASURE_TUNABLES = Object.freeze({
+    DROP_FROM_ENEMY:        0.05,
+    DROP_FROM_BOSS:         0.30,
+    OPEN_DURATION_SEC:      0.8,
+    PICKUP_RADIUS:          28,
+    GUARANTEE_EVERY_N:      5,
+    LOOT_TABLE: Object.freeze([
+      { kind: 'gold',     weight: 50, range: [1, 3], guaranteeable: false },
+      { kind: 'energy',   weight: 25, amount: 5,    guaranteeable: true  },
+      { kind: 'fragment', weight: 15, amount: 1,    guaranteeable: false },
+      { kind: 'rare_mat', weight: 8,  amount: 1,    guaranteeable: false },
+      { kind: 'gem',      weight: 2,  amount: 1,    guaranteeable: true  },
+    ]),
+  });
+
+  function rollLoot(forceGuaranteeable){
+    // Forced rolls draw from the guaranteeable subset only (deterministic, never
+    // leaks gold/frag/rare-mat). Their internal weights are preserved so the
+    // streak reward still honors energy>>gem rarity.
+    const table = forceGuaranteeable
+      ? TREASURE_TUNABLES.LOOT_TABLE.filter(e => e.guaranteeable)
+      : TREASURE_TUNABLES.LOOT_TABLE;
+    const total = table.reduce((sum, e) => sum + e.weight, 0);
+    let pick = null;
+    let r = Math.random() * total;
+    for (const entry of table) {
+      r -= entry.weight;
+      if (r <= 0) { pick = entry; break; }
+    }
+    if (!pick) pick = table[0];
+    let amount = pick.amount || 1;
+    if (pick.range) amount = pick.range[0] + Math.floor(Math.random() * (pick.range[1] - pick.range[0] + 1));
+    return { kind: pick.kind, amount };
+  }
+
+  function grantLoot(loot){
+    const s = WG.State.get();
+    switch (loot.kind) {
+      case 'gold':     WG.State.grant('coins', loot.amount); break;
+      case 'energy':   if (WG.State.grantEnergy) WG.State.grantEnergy(loot.amount, 'chest'); break;
+      case 'gem':      WG.State.grant('diamonds', loot.amount); break;
+      case 'fragment': s.forge.craftFragments = (s.forge.craftFragments || 0) + loot.amount; break;
+      case 'rare_mat': s.forge.rareMats = (s.forge.rareMats || 0) + loot.amount; break;
+    }
+  }
+
+  // Visual + chip for the magnet/pulse polish.
+  const LOOT_VISUALS = {
+    gold:     { color: '#ffd870', label: '🪙', chip: '.currency.coins' },
+    energy:   { color: '#f0c060', label: '⚡', chip: '#energy-chip' },
+    gem:      { color: '#80c8ff', label: '💎', chip: '.currency.diamonds' },
+    fragment: { color: '#c0e0ff', label: '✦',  chip: null },
+    rare_mat: { color: '#d8a060', label: '◆', chip: null },
+  };
+
+  function pulseChip(selector){
+    if (!selector) return;
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.classList.remove('chest-loot-pulse');
+    void el.offsetWidth;
+    el.classList.add('chest-loot-pulse');
+    setTimeout(() => el.classList.remove('chest-loot-pulse'), 600);
+  }
+
+  // Inject pulse keyframes once.
+  if (typeof document !== 'undefined' && !document.getElementById('wg-chest-css')) {
+    const css = document.createElement('style');
+    css.id = 'wg-chest-css';
+    css.textContent = `
+      @keyframes wg-chest-pulse {
+        0%   { transform: scale(1);   filter: brightness(1); }
+        45%  { transform: scale(1.18); filter: brightness(1.6); }
+        100% { transform: scale(1);   filter: brightness(1); }
+      }
+      .chest-loot-pulse { animation: wg-chest-pulse 600ms cubic-bezier(.2,.8,.2,1); }
+    `;
+    document.head.appendChild(css);
+  }
+
   // Returns how many rift sigils to grant at the end of a cleared stage.
   // Called by wg-game.js finishHunt(true). Zero cost if eldritch biome not reached.
   function rollSigilDrop(stageId, bossDefeated) {
@@ -254,7 +337,142 @@
     }
   }
 
-  function init() {}
+  // W-Monetization-V2-Energy §D — chest spawning, tick, draw.
+  function spawnChest(runtime, x, y) {
+    if (!runtime) return;
+    if (!runtime.chests) runtime.chests = [];
+    runtime._nextChestId = (runtime._nextChestId || 0) + 1;
+    runtime.chests.push({
+      id: runtime._nextChestId,
+      x, y,
+      state: 'closed',          // 'closed' | 'opening'
+      stateTimer: 0,
+      _pulsePhase: Math.random() * Math.PI * 2,
+    });
+  }
 
-  window.WG.HuntPickups = { init, spawnForStage, draw, tick, rollSigilDrop, RIFT_TUNABLES };
+  function tickChests(runtime, dt) {
+    if (!runtime.chests || !runtime.chests.length) return;
+    const player = runtime.player;
+    if (!player) return;
+    const RAD = TREASURE_TUNABLES.PICKUP_RADIUS;
+    for (let i = runtime.chests.length - 1; i >= 0; i--) {
+      const c = runtime.chests[i];
+      c._pulsePhase = (c._pulsePhase + dt * 3) % (Math.PI * 2);
+      if (c.state === 'closed') {
+        const dx = player.x - c.x, dy = player.y - c.y;
+        if (dx * dx + dy * dy < RAD * RAD) {
+          c.state = 'opening';
+          c.stateTimer = TREASURE_TUNABLES.OPEN_DURATION_SEC;
+          WG.Engine.emit('chest:opening', { chest: c });
+        }
+      } else if (c.state === 'opening') {
+        c.stateTimer -= dt;
+        if (c.stateTimer <= 0) {
+          // Resolve loot
+          const s = WG.State.get();
+          s.meta.chestsOpenedSinceGuarantee = (s.meta.chestsOpenedSinceGuarantee || 0) + 1;
+          const force = (s.meta.chestsOpenedSinceGuarantee % TREASURE_TUNABLES.GUARANTEE_EVERY_N) === 0;
+          const loot = rollLoot(force);
+          grantLoot(loot);
+          const vis = LOOT_VISUALS[loot.kind] || LOOT_VISUALS.gold;
+          if (WG.HuntFXNumbers) {
+            WG.HuntFXNumbers.spawn(c.x, c.y - 12, vis.label + ' +' + loot.amount, { color: vis.color, size: 14, duration: 1100, velocity: -22 });
+          }
+          pulseChip(vis.chip);
+          WG.Engine.emit('chest:opened', { chest: c, loot, guaranteed: force });
+          runtime.chests.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  function drawChests(ctx, worldToScreen, runtime) {
+    if (!runtime.chests || !runtime.chests.length) return;
+    for (const c of runtime.chests) {
+      const s = worldToScreen(c.x, c.y);
+      const opening = c.state === 'opening';
+      const t = opening ? 1 - (c.stateTimer / TREASURE_TUNABLES.OPEN_DURATION_SEC) : 0;
+      const w = 22, h = 16;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      // Body (slightly wider than coin pickups per spec — 22 vs ~16)
+      ctx.fillStyle = '#5a3a1a';
+      ctx.strokeStyle = '#f0c060';
+      ctx.lineWidth = 1.2;
+      ctx.fillRect(-w/2, -h/2, w, h);
+      ctx.strokeRect(-w/2, -h/2, w, h);
+      // Iron bands
+      ctx.fillStyle = '#8a5a28';
+      ctx.fillRect(-w/2, -h/2 - 1, w, 3);
+      ctx.fillRect(-w/2, h/2 - 2, w, 3);
+      // Lid lift during opening (rotates up by t * 90deg)
+      ctx.save();
+      ctx.translate(0, -h/2);
+      ctx.rotate(-t * Math.PI / 2);
+      ctx.fillStyle = '#7a4a22';
+      ctx.fillRect(-w/2, -3, w, 4);
+      ctx.strokeStyle = '#f0c060';
+      ctx.strokeRect(-w/2, -3, w, 4);
+      // Lock plate
+      ctx.fillStyle = '#f0c060';
+      ctx.fillRect(-2, -2, 4, 3);
+      ctx.restore();
+      // Glow ring while closed
+      if (!opening) {
+        const alpha = 0.3 + 0.25 * Math.sin(c._pulsePhase);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffd870';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, w/2 + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Burst particles while opening
+      if (opening && t > 0.3) {
+        const burstA = (t - 0.3) / 0.7;
+        ctx.globalAlpha = 1 - burstA;
+        ctx.fillStyle = '#ffe080';
+        for (let k = 0; k < 6; k++) {
+          const ang = k * (Math.PI / 3);
+          const r = 4 + burstA * 16;
+          ctx.beginPath();
+          ctx.arc(Math.cos(ang) * r, Math.sin(ang) * r - h/2, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+    }
+  }
+
+  // Wrap original draw + tick to also process chests, preserving existing pickup logic.
+  const _origDraw = draw;
+  const _origTick = tick;
+  function drawAll(ctx, worldToScreen, runtime){
+    _origDraw(ctx, worldToScreen, runtime);
+    drawChests(ctx, worldToScreen, runtime);
+  }
+  function tickAll(runtime, dt){
+    _origTick(runtime, dt);
+    tickChests(runtime, dt);
+  }
+
+  function init() {
+    WG.Engine.on('enemy:killed', ({ creature }) => {
+      if (!creature) return;
+      const rt = WG.Game && WG.Game.getHuntRuntime && WG.Game.getHuntRuntime();
+      if (!rt) return;
+      if (Math.random() < TREASURE_TUNABLES.DROP_FROM_ENEMY) spawnChest(rt, creature.x, creature.y);
+    });
+    WG.Engine.on('boss:defeated', ({ boss }) => {
+      if (!boss) return;
+      const rt = WG.Game && WG.Game.getHuntRuntime && WG.Game.getHuntRuntime();
+      if (!rt) return;
+      if (Math.random() < TREASURE_TUNABLES.DROP_FROM_BOSS) spawnChest(rt, boss.x, boss.y);
+    });
+  }
+
+  window.WG.HuntPickups = { init, spawnForStage, draw: drawAll, tick: tickAll, rollSigilDrop, RIFT_TUNABLES, TREASURE_TUNABLES, spawnChest, rollLoot };
 })();

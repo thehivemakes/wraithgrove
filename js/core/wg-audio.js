@@ -29,35 +29,39 @@
     { event: 'player:fire',           id: 'fire_arrow',    bus: 'sfx', throttleMs: 80,  vol: 0.7 },
     { event: 'player:skill',          id: 'skill_burst',   bus: 'sfx', throttleMs: 0,   vol: 1.0 },
     { event: 'player:damaged',        id: 'player_hurt',   bus: 'sfx', throttleMs: 450, vol: 0.32 },  // Architect: less annoying — softer + slower retrigger
-    { event: 'player:died',           id: 'player_die',    bus: 'sfx', throttleMs: 0,   vol: 1.0 },
-    { event: 'player:level',          id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 0.9 },
+    { event: 'player:died',           id: 'death_sting',   bus: 'sfx', throttleMs: 0,   vol: 1.0 },
+    { event: 'player:level',          id: 'levelup_chime', bus: 'sfx', throttleMs: 0,   vol: 0.9 },
     { event: 'pet:attack',            id: 'pet_attack',    bus: 'sfx', throttleMs: 100, vol: 0.5 },
     { event: 'boss:damaged',          id: 'boss_hit',      bus: 'sfx', throttleMs: 120, vol: 0.6 },
     { event: 'enemy:crit',           id: 'boss_hit',      bus: 'sfx', throttleMs:  60, vol: 0.85 }, // W-Dopamine-P1 §B
     { event: 'boss:defeated',         id: 'boss_die',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
     // Pickups (require Concern B emits — fail-silent until then)
-    { event: 'pickup:orb',            id: 'orb',           bus: 'sfx', throttleMs: 40,  vol: 0.4 },
-    { event: 'pickup:coin',           id: 'coin',          bus: 'sfx', throttleMs: 60,  vol: 0.5 },
-    { event: 'relic:fragment-pickup', id: 'fragment',      bus: 'sfx', throttleMs: 80,  vol: 0.7 },
+    { event: 'pickup:orb',            id: 'orb_pickup',    bus: 'sfx', throttleMs: 40,  vol: 0.4 },
+    { event: 'pickup:coin',           id: 'coin_pickup',   bus: 'sfx', throttleMs: 60,  vol: 0.5 },
+    { event: 'relic:fragment-pickup', id: 'fragment_pickup', bus: 'sfx', throttleMs: 80, vol: 0.7 },
     // UI
-    { event: 'tab:change',            id: 'ui_tab',        bus: 'ui',  throttleMs: 100, vol: 0.5 },
-    { event: 'ui:button',             id: 'ui_button',     bus: 'ui',  throttleMs: 50,  vol: 0.6 },
-    { event: 'ui:modal',              id: 'ui_modal',      bus: 'ui',  throttleMs: 100, vol: 0.5 },
+    { event: 'tab:change',            id: 'tab_change',    bus: 'ui',  throttleMs: 100, vol: 0.5 },
+    { event: 'ui:button',             id: 'button_tap',    bus: 'ui',  throttleMs: 50,  vol: 0.6 },
+    { event: 'ui:modal',              id: 'modal_open',    bus: 'ui',  throttleMs: 100, vol: 0.5 },
     // Meta
     { event: 'iap:purchase',          id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 1.0 },
     { event: 'forge:craft',           id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.8 },
     { event: 'duel:victory',          id: 'duel_win',      bus: 'ui',  throttleMs: 0,   vol: 1.0 },
     { event: 'duel:defeat',           id: 'duel_lose',     bus: 'ui',  throttleMs: 0,   vol: 0.8 },
     // W-FX-Polish-Pass — gaps 1, 2, 3: closing the audio side of silent events.
-    // pickup:torch reuses orb sample (no torch sample shipped); player:revived
-    // reuses level_up (triumphal); buff:expired reuses ui_modal close; consumed
-    // reuses cha_ching for the small confirm payoff.
-    { event: 'pickup:torch',          id: 'orb',           bus: 'sfx', throttleMs: 60,  vol: 0.6 },
-    { event: 'player:revived',        id: 'level_up',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
-    { event: 'buff:expired',          id: 'ui_modal',      bus: 'ui',  throttleMs: 0,   vol: 0.5 },
+    // pickup:torch reuses orb_pickup (torch_flicker is a fire loop, wrong for pickup);
+    // buff:expired uses modal_close; buff:consumed reuses cha_ching confirm payoff.
+    { event: 'pickup:torch',          id: 'orb_pickup',    bus: 'sfx', throttleMs: 60,  vol: 0.6 },
+    { event: 'player:revived',        id: 'levelup_chime', bus: 'sfx', throttleMs: 0,   vol: 1.0 },
+    { event: 'buff:expired',          id: 'modal_close',   bus: 'ui',  throttleMs: 0,   vol: 0.5 },
     { event: 'buff:consumed',         id: 'cha_ching',     bus: 'ui',  throttleMs: 0,   vol: 0.7 },
     // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
     { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
+    // W-Audio-Sourcing-CC0 — new real samples wired to events (events stubbed; engine emits to activate)
+    { event: 'boss:intro',            id: 'boss_intro_drone', bus: 'sfx', throttleMs: 0,   vol: 1.0 },
+    { event: 'dialog:open',           id: 'dialog_pop',    bus: 'ui',  throttleMs: 100, vol: 0.6 },
+    { event: 'ui:reveal',             id: 'reveal_woosh',  bus: 'ui',  throttleMs: 200, vol: 0.7 },
+    { event: 'torch:active',          id: 'torch_flicker', bus: 'sfx', throttleMs: 5000, vol: 0.4 },
     // W-Polish-Gaps-1-5 §B — real banshee shriek replaces the boss_die placeholder.
     // Source: "Monster / Banshee Scream" by SypherZent on freesound.org
     //   https://freesound.org/people/SypherZent/sounds/420682/
@@ -70,12 +74,12 @@
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.
   const BIOME_AMBIENT = {
-    forest_summer: 'forest_day',
-    forest_autumn: 'forest_dusk',
-    cold_stone:    'wind_stone',
-    temple:        'temple_drone',
-    cave:          'cave_drips',
-    eldritch:      'wraith_choir',
+    forest_summer: 'forest_summer_ambient',
+    forest_autumn: 'forest_autumn_ambient',
+    cold_stone:    'cold_stone_ambient',
+    temple:        'temple_ambient',
+    cave:          'cave_ambient',
+    eldritch:      'eldritch_ambient',
   };
 
   let ctx = null;            // AudioContext (lazy)

@@ -34,6 +34,17 @@
   .nav-tab:active { background: rgba(232, 200, 120, 0.1); }
   .nav-tab .icon { width: 26px; height: 26px; }
   .nav-tab .label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+  /* W-Monetization-V2-Sub-Blockers §E — daily availability badges */
+  .nav-tab { position: relative; }
+  .nav-badge {
+    position: absolute; top: 4px; right: calc(50% - 18px);
+    min-width: 8px; height: 8px; border-radius: 4px;
+    background: #e85020; border: 1.5px solid #0e0a06;
+    font-size: 0; pointer-events: none;
+  }
+  .nav-badge.has-text { min-width: 16px; height: 14px; border-radius: 7px; font-size: 8px;
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    padding: 0 3px; top: 2px; right: calc(50% - 20px); }
 
   /* Top currency strip */
   #top-strip {
@@ -48,7 +59,19 @@
   #top-strip .currency.coins .glyph { background: radial-gradient(#ffe89a, #d8a838); border: 1px solid #b08820; }
   #top-strip .currency.diamonds .glyph { background: linear-gradient(135deg, #98c8ff, #4a7ad8); border: 1px solid #3060a0; transform: rotate(45deg); border-radius: 2px; }
   #top-strip .currency.cards .glyph { background: linear-gradient(135deg, #d88060, #a85020); border: 1px solid #802808; border-radius: 2px; }
+  /* W-Monetization-V2-Whale-Ladder §D — gems chip (purple; tappable → Shop) */
+  #top-strip .currency.gems .glyph { background: linear-gradient(135deg, #c080ff, #8040cc); border: 1px solid #6020a0; border-radius: 50%; }
+  #top-strip .currency.gems { cursor: pointer; }
+  #top-strip .currency.gems:active { transform: scale(0.95); }
   #top-strip .currency .val { color: #f0e0b4; font-weight: 600; }
+  /* W-Monetization-V2-Energy §B — energy chip with countdown row */
+  #top-strip .energy { display: flex; flex-direction: column; align-items: stretch; gap: 1px; background: rgba(0,0,0,0.55); padding: 3px 8px 2px 8px; border-radius: 12px; min-width: 72px; cursor: pointer; }
+  #top-strip .energy .row { display: flex; align-items: center; gap: 4px; }
+  #top-strip .energy .glyph { width: 14px; height: 14px; display: inline-block; clip-path: polygon(55% 0,15% 55%,45% 55%,40% 100%,85% 40%,55% 40%); background: linear-gradient(180deg,#ffe080,#f0c060); }
+  #top-strip .energy .val { color: #f0c060; font-weight: 600; }
+  #top-strip .energy .cd { color: #c8a868; font-size: 9px; letter-spacing: 0.5px; line-height: 1; text-align: center; opacity: 0.85; }
+  #top-strip .energy.full .cd { display: none; }
+  #top-strip .energy:active { transform: scale(0.96); }
   #top-strip .power { display: flex; align-items: center; gap: 4px; background: rgba(40,20,8,0.8); padding: 4px 10px; border-radius: 12px; border: 1px solid #604020; }
   #top-strip .power .label { color: #c8a868; font-size: 10px; letter-spacing: 1px; }
   #top-strip .power .val { color: #ffd870; font-weight: 700; font-size: 13px; }
@@ -204,6 +227,25 @@
     display: flex; align-items: center;
   }
   #hunt-hud .back-btn:active { background: rgba(40,20,8,0.9); }
+
+  /* Tutorial hint system (W-Tutorial-Polish-V2)
+     Keyframes + complex rules injected by hunt-tutorial.js ensureStyles();
+     simple selectors here for readability and DevTools visibility. */
+  .wg-hint { position: absolute; z-index: 115; pointer-events: none; }
+  .wg-skip-btn {
+    position: absolute; top: 106px; right: 12px; z-index: 116;
+    pointer-events: auto;
+    background: rgba(8,4,2,0.78); border: 1px solid #5a3a18; border-radius: 6px;
+    color: #907858; font-size: 9px; letter-spacing: 1.5px; padding: 5px 10px;
+    cursor: pointer; text-transform: uppercase;
+  }
+  .wg-skip-btn:active { opacity: 0.55; }
+  .wg-victory {
+    position: absolute; inset: 0; z-index: 125;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; background: rgba(0,0,0,0); transition: background 500ms;
+  }
+  .wg-victory.show { background: rgba(0,0,0,0.88); }
 </style>
 </head>
 <body>
@@ -216,6 +258,12 @@
         <div class="currency coins"><span class="glyph"></span><span class="val" data-bind="coins">0</span></div>
         <div class="currency diamonds"><span class="glyph"></span><span class="val" data-bind="diamonds">0</span></div>
         <div class="currency cards"><span class="glyph"></span><span class="val" data-bind="cards">0</span></div>
+        <!-- W-Monetization-V2-Whale-Ladder §D: gems chip — tap to open Shop at Gem Packs -->
+        <div class="currency gems" id="gems-chip" title="Gems — tap to open Shop"><span class="glyph"></span><span class="val" data-bind="gems">0</span></div>
+        <div class="energy" id="energy-chip" title="Energy">
+          <div class="row"><span class="glyph"></span><span class="val" data-bind="energy-current">0</span><span style="color:#806040;">/</span><span class="val" data-bind="energy-max" style="color:#a89060;">0</span></div>
+          <div class="cd" data-bind="energy-cd">+1 in --:--</div>
+        </div>
       </div>
       <div class="power" data-show-on="ascend forge relics duel">
         <span class="label">PWR</span><span class="val" data-bind="power">0</span>
@@ -277,7 +325,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.22.1-tighter-pacing-1777851149', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.24.0-monetization-v2-1778000128', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -344,6 +392,12 @@
       'js/meta/meta-account.js',
       'js/meta/meta-events.js',
       'js/meta/meta-buffs.js',
+      'js/meta/meta-daily-reset.js',
+      'js/meta/meta-energy-modal.js',
+      'js/meta/meta-gacha.js',
+      'js/meta/meta-shop.js',
+      'js/meta/meta-missions.js',
+      'js/meta/meta-battle-pass.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
       'js/hunt/hunt-enemies.js',
@@ -357,6 +411,8 @@
       'js/hunt/hunt-fx.js',
       'js/hunt/hunt-turret.js',
       'js/hunt/hunt-tutorial.js',
+      'js/hunt/hunt-tower-buffs.js',
+      'js/hunt/hunt-tower.js',
       'js/ascend/ascend-character.js',
       'js/ascend/ascend-skins.js',
       'js/ascend/ascend-equipment.js',

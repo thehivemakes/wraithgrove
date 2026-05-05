@@ -40,7 +40,13 @@
     if (s.forge.craftDailyUsed >= s.forge.craftDailyMax) return { ok: false, reason: 'daily-cap' };
     const cost = n * 3;
     if (s.forge.craftFragments < cost) return { ok: false, reason: 'insufficient-fragments', cost };
+    // W-Monetization-V2-Sub-Blockers §C — wood+stone gate per craft call.
+    if (WG.ForgeBuildings && !WG.ForgeBuildings.canCraft()) {
+      return { ok: false, reason: 'insufficient-resources',
+               wood: WG.State.get().forge.wood, stone: WG.State.get().forge.stone };
+    }
     s.forge.craftFragments -= cost;
+    if (WG.ForgeBuildings) WG.ForgeBuildings.spendCraftResources();
     s.forge.craftDailyUsed++;
     const drops = [];
     for (let i = 0; i < n; i++) {

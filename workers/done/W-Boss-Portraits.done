@@ -1,0 +1,19 @@
+W-Boss-Portraits — done 2026-05-03
+
+6 ukiyo-e boss portraits generated via DALL-E 3 (1024×1024 PNG):
+  pale_bride, frozen_crone, autumn_lord, temple_warden, cave_mother, wraith_father
+
+Style register matches biome backgrounds + character portraits (same DALL-E pipeline,
+same paper-texture / fine-ink-line / washed-muted ukiyo-e prompt anchor).
+
+Wired BOSS_PORTRAITS const into js/wg-game.js (parallel to BIOME_ART + CHARACTER_PORTRAITS).
+Boss-intro reveal moment added: 1.5s overlay on `boss:spawned` event with
+portrait fade-in (300ms ease) + boss name (serif uppercase, gold) + slide-out
+(scale + opacity) + WG.Engine.hitPause(1500) to freeze world-sim during reveal.
+
+Falls through to no-overlay when BOSS_PORTRAITS[bossType] is null/missing or
+image errors at runtime — gameplay-first parity preserved.
+
+Verified in preview (port 3996): emit boss:spawned → overlay appears centered
+with portrait + name → fade-out by 1500ms. No console errors. All 6 portraits
+loaded at 1024×1024.

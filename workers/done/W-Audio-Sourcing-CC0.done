@@ -1,0 +1,50 @@
+# W-Audio-Sourcing-CC0 — Done Marker
+Worker: Fen | 2026-05-05
+
+## SFX (audio/sfx/)
+
+| Filename | Source Title | Author | Sound ID | License | Page URL | Size | Notes |
+|---|---|---|---|---|---|---|---|
+| banshee_screech.mp3 | Monster / Banshee Scream | SypherZent | 420682 | CC0 1.0 | https://freesound.org/people/SypherZent/sounds/420682/ | 12840b ~0.8s | Excellent folk-horror fit |
+| orb_pickup.mp3 | Small Bell #2 | steffcaffrey | 452379 | CC0 1.0 | https://freesound.org/people/steffcaffrey/sounds/452379/ | 12648b ~0.8s | Clean bell chime; good magical pickup |
+| coin_pickup.mp3 | Nintendo Coin Pickup | plasterbrain | 608433 | CC0 1.0 | https://freesound.org/people/plasterbrain/sounds/608433/ | 5784b ~0.36s | Classic coin clink; works well |
+| fragment_pickup.mp3 | snd_fragment_retrieve.wav | rocker12523 | 678497 | CC0 1.0 | https://freesound.org/people/rocker12523/sounds/678497/ | 3456b ~0.22s | Crystalline retrieve; good aesthetic match |
+| torch_flicker.mp3 | Ambiance_Fire_Loop_Stereo | Nox_Sound | 472591 | CC0 1.0 | https://freesound.org/people/Nox_Sound/sounds/472591/ | 117312b ~7.3s | Fire loop; wired to torch:active (5000ms throttle). NOT used for pickup:torch (too long). |
+| dialog_pop.mp3 | Soft-Notifications - Bell - Ding-Dong | LegitCheese | 571513 | CC0 1.0 | https://freesound.org/people/LegitCheese/sounds/571513/ | 7248b ~0.45s | Soft bell; good for dialog open |
+| boss_intro_drone.mp3 | Inception.mp3 | Slothfully_So | 685066 | CC0 1.0 | https://freesound.org/people/Slothfully_So/sounds/685066/ | 39744b ~2.5s | BRAAAM-style drone; cinematic, works for boss intro |
+| levelup_chime.mp3 | Level up | Bastianhallo | 682633 | CC0 1.0 | https://freesound.org/people/Bastianhallo/sounds/682633/ | 47544b ~2.9s | Triumphant chime; slightly long but appropriate |
+| death_sting.mp3 | 8bit Fall | Fupicat | 538151 | CC0 1.0 | https://freesound.org/people/Fupicat/sounds/538151/ | 12384b ~0.77s | ⚠️ 8-bit retro aesthetic — functional but not folk-horror. Recommend manual replacement with a darker sting. |
+| reveal_woosh.mp3 | Whoosh For Whip Zoom | BennettFilmTeacher | 486234 | CC0 1.0 | https://freesound.org/people/BennettFilmTeacher/sounds/486234/ | 19824b ~1.24s | Clean whoosh; acceptable for reveal transitions |
+
+## Ambient (audio/ambient/)
+
+| Filename | Source Title | Author | Sound ID | License | Page URL | Size | Notes |
+|---|---|---|---|---|---|---|---|
+| forest_summer_ambient.mp3 | SummerInsectsJuly2017ShawneeNationalForest | kvgarlic | 397949 | CC0 1.0 | https://freesound.org/people/kvgarlic/sounds/397949/ | 947664b ~59s | Excellent summer insects loop |
+| forest_autumn_ambient.mp3 | Autumn wind and dry leaves | Stek59 | 457318 | CC0 1.0 | https://freesound.org/people/Stek59/sounds/457318/ | 354192b ~22s | Dry leaves in wind; good autumn atmosphere |
+| cold_stone_ambient.mp3 | Ambience Mountain Outdoor Muntanya Forat del Vent | bitlab_coop | 486895 | CC0 1.0 | https://freesound.org/people/bitlab_coop/sounds/486895/ | 1365816b ~85s | Mountain wind; strong cold stone feel |
+| temple_ambient.mp3 | Bells at Golden Buddha Temple, Bangkok | marc.om | 806553 | CC0 1.0 | https://freesound.org/people/marc.om/sounds/806553/ | 509160b ~31s | Real Asian temple bells; excellent aesthetic match |
+| cave_ambient.mp3 | cave dripping | AKkingStudio | 580931 | CC0 1.0 | https://freesound.org/people/AKkingStudio/sounds/580931/ | 134592b ~8.4s | Cave drips; short loop (~8s) — may have audible seam. Functional. |
+| eldritch_ambient.mp3 | Dark Fantasy Horror Soundscape Ambient | szegvari | 534873 | CC0 1.0 | https://freesound.org/people/szegvari/sounds/534873/ | 165576b ~10.3s | Dark horror drone; short loop (~10s) — may have seam. Functional. |
+
+## UI (audio/ui/)
+
+| Filename | Source Title | Author | Sound ID | License | Page URL | Size | Notes |
+|---|---|---|---|---|---|---|---|
+| tab_change.mp3 | UI click | Ranner | 488534 | CC0 1.0 | https://freesound.org/people/Ranner/sounds/488534/ | 5136b ~0.32s | Clean UI click; good for tab changes |
+| button_tap.mp3 | Videogame Menu BUTTON CLICK | Christopherderp | 342200 | CC0 1.0 | https://freesound.org/people/Christopherderp/sounds/342200/ | 1704b ~0.11s | Very short click; perfect for button tap |
+| modal_open.mp3 | PageTurn | NicolasLikesThisWebsite496 | 811255 | CC0 1.0 | https://freesound.org/people/NicolasLikesThisWebsite496/sounds/811255/ | 14112b ~0.88s | Page turn sound; good for modal open |
+| modal_close.mp3 | OBJBag-Blue Snowball Microphone, CU_Paper, Close Top | designerschoice | 809945 | CC0 1.0 | https://freesound.org/people/designerschoice/sounds/809945/ | 26352b ~1.65s | Paper close sound; slightly long but appropriate |
+
+## Attribution
+All sounds are CC0 1.0 Universal (Public Domain Dedication). No attribution required.
+
+## Known quality flags for Auditor
+1. death_sting: 8-bit retro style (Fupicat/538151) — aesthetic mismatch with folk-horror register. Works functionally. Recommend replacing with a darker sting if a matching CC0 source is found.
+2. cave_ambient: ~8 sec loop — may produce audible seam on repeat. Short but the engine's `src.loop=true` handles it.
+3. eldritch_ambient: ~10 sec loop — same seam concern. szegvari's dark fantasy work is aesthetically correct.
+4. boss_intro_drone: "Inception.mp3" title suggests BRAAAM — cinematic but effective for boss intro.
+5. boss:intro, dialog:open, ui:reveal, torch:active events are stubbed in EVENT_MAP — wired and ready, but engine must emit these events to activate. See wg-audio.js:61-65.
+
+## Freesound search behavior note
+freesound.org search does NOT work via Chrome MCP (returns 0 results — JavaScript-rendered results). Server-side HTML search via curl DOES work. All searches done via curl + HTTP HEAD for file size verification.

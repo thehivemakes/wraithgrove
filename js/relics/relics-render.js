@@ -14,7 +14,37 @@
   const TIER_COLOR = { common:'#a89878', rare:'#80a0e0', epic:'#c080e0', legendary:'#e8c060', mythic:'#e08080' };
 
   function getRoot() { return document.getElementById('tab-relics'); }
+
+  // W-Monetization-V2-Sub-Blockers §E — nav badge helper.
+  function updateNavBadge() {
+    const navTab = document.querySelector('.nav-tab[data-tab="relics"]');
+    if (!navTab) return;
+    let badge = navTab.querySelector('.nav-badge');
+    const avail = WG.RelicsCollection && WG.RelicsCollection.freeSummonAvailable();
+    if (avail) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'nav-badge'; navTab.appendChild(badge); }
+      badge.className = 'nav-badge';
+    } else {
+      if (badge) badge.remove();
+    }
+  }
+
+  function msUntilMidnight() {
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    return midnight - now;
+  }
+  function fmtCountdown(ms) {
+    if (ms <= 0) return '0:00';
+    const totalSec = Math.ceil(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return (h ? h + ':' : '') + (h ? String(m).padStart(2,'0') : m) + ':' + String(s).padStart(2,'0');
+  }
+
   function refresh() {
+    updateNavBadge();
     const root = getRoot(); root.innerHTML = '';
     const scroll = el('div', { class:'scroll' }); root.appendChild(scroll);
     scroll.appendChild(el('h2', null, 'Relics'));
@@ -67,6 +97,31 @@
     }
     scroll.appendChild(grid);
 
+    // W-Monetization-V2-Sub-Blockers §B — daily free summon section
+    const freeAvail = WG.RelicsCollection.freeSummonAvailable();
+    const summonBox = el('div', {
+      class: 'scene-row',
+      style: 'margin-top:12px;flex-direction:column;align-items:center;gap:8px;' +
+             (freeAvail ? 'border:1px solid #a8d878;' : 'opacity:0.6;')
+    });
+    if (freeAvail) {
+      const btn = el('button', {
+        class: 'btn primary',
+        style: 'font-size:14px;padding:12px 28px;animation:pulse 1.6s ease-in-out infinite;',
+        onclick: () => {
+          const r = WG.RelicsCollection.doFreeSummon();
+          if (r.ok && r.relic) toast('✨ Got: ' + r.relic.icon + ' ' + r.relic.name);
+          refresh();
+        }
+      }, '✨ FREE SUMMON');
+      summonBox.appendChild(btn);
+      summonBox.appendChild(el('div', { style:'font-size:10px;color:#a8d878;' }, '1 free relic pull · resets daily'));
+    } else {
+      summonBox.appendChild(el('div', { style:'font-size:12px;color:#c8a868;' }, '✨ FREE SUMMON'));
+      summonBox.appendChild(el('div', { style:'font-size:10px;color:#a89878;' }, 'Used today — resets in ' + fmtCountdown(msUntilMidnight())));
+    }
+    scroll.appendChild(summonBox);
+
     // CTA: link to Forge for crafting more
     const ctaBox = el('div', { class:'scene-row', style:'margin-top:12px;' });
     ctaBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;text-align:center;' }, 'Craft more relics at the Forge'));
@@ -83,6 +138,9 @@
   function init() {
     WG.Engine.on('tab:change', ({ tab }) => { if (tab === 'relics') refresh(); });
     WG.Engine.on('relics:gained', () => { if (WG.State.get().activeTab === 'relics') refresh(); });
+    WG.Engine.on('relics:free-summon', () => { updateNavBadge(); });
+    WG.Engine.on('relics:summon-reset', () => { updateNavBadge(); if (WG.State.get().activeTab === 'relics') refresh(); });
+    WG.Engine.on('state:init', () => updateNavBadge());
   }
   window.WG.RelicsRender = { init, refresh };
 })();

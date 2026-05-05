@@ -39,7 +39,11 @@
     heroBox.appendChild(el('h2', null, 'Ascend'));
 
     // Hero portrait — current Rebirth-tier appearance
-    const portrait = el('div', { style:'position:relative;width:80px;height:96px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));border:1px solid #604020;border-radius:6px;margin:6px 0;display:flex;align-items:flex-end;justify-content:center;' });
+    // W-Monetization-V2-Whale-Ladder §F: Royal-purple frame when Royal Pass active
+    const _vipFrame = WG.State.isRoyalPassActive && WG.State.isRoyalPassActive()
+      ? 'border:2px solid #c080ff;box-shadow:0 0 10px rgba(192,96,255,0.5),inset 0 0 4px rgba(192,96,255,0.2);'
+      : 'border:1px solid #604020;';
+    const portrait = el('div', { style:'position:relative;width:80px;height:96px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));' + _vipFrame + 'border-radius:6px;margin:6px 0;display:flex;align-items:flex-end;justify-content:center;' });
     const fig = el('div', { style:`width:30px;height:48px;background:${tier.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;` });
     const head = el('div', { style:`position:absolute;top:-12px;left:6px;width:18px;height:18px;background:${tier.accent};border-radius:50%;border:1px solid #2a1c10;` });
     fig.appendChild(head);

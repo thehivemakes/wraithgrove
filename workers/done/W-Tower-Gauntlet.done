@@ -1,0 +1,60 @@
+# W-Tower-Gauntlet — DONE
+
+6 commits landed across 7 concerns (E+G combined). Tower Gauntlet mode #2 in place.
+
+## Per-concern verdict
+
+| Concern | Verdict | Commit |
+|---|---|---|
+| A — Tower runtime + state shape + script entries | PASS | a704b3c |
+| B — Floor scaling formula + enemy spawning       | PASS | 67e4a7f |
+| C — Buff card catalog (24 cards) + pick UI        | PASS | 2f107b0 |
+| D — Floor-clear rewards + milestone chests        | PASS | 7ce746a |
+| E — Death screen + continue prompt + run summary  | PASS | 37fa9db |
+| F — GAUNTLET button + startTowerRun + rAF branch  | PASS | 95e9a38 |
+| G — Leaderboard placeholder in run summary        | PASS | 37fa9db |
+
+## Files shipped
+
+```
+js/hunt/hunt-tower-buffs.js     (NEW — 24 buff cards, roll/apply/getRarityColors)
+js/hunt/hunt-tower.js           (NEW — full Tower Gauntlet module)
+js/core/wg-state.js             (towerProgress.peakFloor added to state schema)
+js/wg-game.js                   (startTowerRun, rAF branch, GAUNTLET button, inits, exitHunt cleanup)
+index.html                      (hunt-tower-buffs.js + hunt-tower.js script entries)
+```
+
+## Tunables (frozen in hunt-tower.js TUNABLES)
+
+- ENERGY_COST: 5
+- BASE_HP_MULT: 1.0 / HP_MULT_PER_FLOOR: 0.18
+- DAMAGE_MULT_PER_FLOOR: 0.10 / SPEED_MULT_PER_FLOOR: 0.04 / SPEED_MULT_CAP: 1.6
+- BASE_SPAWN_RATE: 1.5 / SPAWN_RATE_PER_FLOOR: 0.15
+- FLOOR_DURATION_BASE: 75s / FLOOR_DURATION_STEP: 5 / FLOOR_DURATION_DECAY: 2 / FLOOR_DURATION_MIN: 45s
+- MINIBOSS_AT_FLOOR_PCT: 0.70 / MINIBOSS_HP_BASE: 200 / MINIBOSS_HP_PER_FLOOR: 30
+- MAX_CONTINUES: 2 / CONTINUE_COST_LOW: 1💎 (fl1–4) / MID: 3💎 (fl5–9) / HIGH: 5💎 (fl10+)
+
+## Buff card catalog (hunt-tower-buffs.js)
+
+Common (weight 60): damage_plus_15, crit_plus_5, hp_plus_25, magnet_plus_30, move_plus_10, wood_plus_1
+Rare (weight 30): damage_plus_30, lifesteal_4, crit_dmg_plus_50, cooldown_minus_15, proj_count_plus_1, chest_drop_plus_10
+Legendary (weight 10, floor 5+): revive_once, lifesteal_15, damage_plus_60, crit_plus_15, phantom_strike, floor_skip
+
+## Milestone loot (every 5 floors)
+
+| Floor | Gold | Gems | Frags | Rare Mats |
+|-------|------|------|-------|-----------|
+| 5     | 20   | 1    | 1     | 0         |
+| 10    | 50   | 3    | 5     | 0         |
+| 15    | 100  | 5    | 10    | 1         |
+| 20+   | factor×40 | factor×2 | factor×4 | floor(factor/3) |
+
+Floor 20+ also pre-applies a random legendary buff.
+
+## Architecture notes
+
+- `stage: null` on tower runtime suppresses constructionTick / repairTick / tickTorch (all guard on `runtime.stage`).
+- `WG.HuntPlayer.place(x, y, rt)` sets the module-level `runtime` var; all subsequent `tick()` calls use tower runtime.
+- Tower runtime reuses identical combat arrays (`creatures`, `projectiles`, `enemyProjectiles`, `drops`, `boss`) — HuntEnemies/HuntBosses work without modification.
+- rAF tower branch: `if (huntRuntime.mode === 'tower') { WG.HuntTower.tickFloor(dt); }` — Hunt path unchanged.
+- Leaderboard in run summary is stub data (TODO: Phase 4 server sync).

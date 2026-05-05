@@ -1,0 +1,8 @@
+TestFlight shell prepped for Wraithgrove: app icon (1024x1024 Zapfino calligraphic W, dark radial gradient), splash (2732x2732 WRAITHGROVE + tagline), Info.plist ATS + MARKETING_VERSION 0.23.0, bundleId → com.thehivemakes.wraithgrove, iosScheme, build script + metadata.
+ASSETS: AppIcon-512@2x.png (95KB), splash-2732x2732 ×3 (213KB each) — ios/App/App/Assets.xcassets/
+CONFIG: capacitor.config.ts (bundleId, iosScheme), ios/App/App.xcodeproj (PRODUCT_BUNDLE_IDENTIFIER, MARKETING_VERSION)
+PLIST: ios/App/App/Info.plist (NSAppTransportSecurity, AdMob+Stripe HTTPS exceptions)
+DOCS: docs/PRIVACY_NUTRITION.md, docs/TESTFLIGHT_METADATA.md
+SCRIPTS: ios/scripts/build_testflight.sh (cap sync→pod install→archive→export→upload), ios/scripts/ExportOptions.plist
+Commits: 9948ebc (A+B assets), f5ebd57 (C plist), ecc9f8f (D config — bundleId already in prior commit), 8160293 (E+F scripts+metadata). No git remote — push skipped.
+high

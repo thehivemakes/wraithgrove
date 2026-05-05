@@ -492,11 +492,37 @@
 
     // Cost line
     const costPerBatch = 30;
+    const tun = WG.ForgeBuildings ? WG.ForgeBuildings.TUNABLES : {};
+    const woodOk = s.forge.wood >= (WG.ForgeBuildings ? WG.ForgeBuildings.WOOD_PER_CRAFT : 20);
+    const stoneOk = s.forge.stone >= (WG.ForgeBuildings ? WG.ForgeBuildings.STONE_PER_CRAFT : 10);
     const cost = el('div', { class:'modal-body', style:'text-align:center;' });
     cost.appendChild(el('div', { style:'font-size:12px;color:#a89878;margin-bottom:4px;' },
       '10 fragments → 1 relic each (×10)'));
     cost.appendChild(el('div', { style:'font-size:14px;color:#f0d890;font-weight:600;' },
       '✦ ' + s.forge.craftFragments + ' fragments  ·  Daily ' + s.forge.craftDailyUsed + '/' + s.forge.craftDailyMax));
+    // W-Monetization-V2-Sub-Blockers §C — wood + stone resource display
+    const resRow = el('div', { style:'display:flex;justify-content:center;gap:12px;margin-top:6px;' });
+    resRow.appendChild(el('span', { style:'font-size:12px;color:' + (woodOk ? '#a8d878' : '#ff8838') + ';' },
+      '🪵 ' + s.forge.wood + ' / ' + (tun.WOOD_CAP || 500)));
+    resRow.appendChild(el('span', { style:'font-size:12px;color:' + (stoneOk ? '#a8d878' : '#ff8838') + ';' },
+      '🪨 ' + s.forge.stone + ' / ' + (tun.STONE_CAP || 200)));
+    cost.appendChild(resRow);
+    if (!woodOk) {
+      const refWood = el('button', { class:'btn', style:'margin-top:4px;font-size:10px;padding:4px 10px;', onclick: () => {
+        const r = WG.ForgeBuildings.refillWood();
+        if (!r.ok) { toast('Not enough 💎'); return; }
+        wrap.remove(); openCraftModal();
+      }}, 'Buy ' + (tun.WOOD_REFILL_AMT||200) + ' wood: ' + (tun.WOOD_REFILL_GEMS||25) + ' 💎');
+      cost.appendChild(refWood);
+    }
+    if (!stoneOk) {
+      const refStone = el('button', { class:'btn', style:'margin-top:4px;font-size:10px;padding:4px 10px;', onclick: () => {
+        const r = WG.ForgeBuildings.refillStone();
+        if (!r.ok) { toast('Not enough 💎'); return; }
+        wrap.remove(); openCraftModal();
+      }}, 'Buy ' + (tun.STONE_REFILL_AMT||100) + ' stone: ' + (tun.STONE_REFILL_GEMS||25) + ' 💎');
+      cost.appendChild(refStone);
+    }
     if (s.forge.craftFragments < costPerBatch) {
       cost.appendChild(el('div', { style:'font-size:11px;color:#ff8838;margin-top:4px;' },
         'Need ' + (costPerBatch - s.forge.craftFragments) + ' more fragments'));
@@ -512,7 +538,9 @@
         setTimeout(() => craftBtn.style.transform = '', 90);
         const r = WG.ForgeCraft.craftBatch(10);
         if (!r.ok) {
-          toast(r.reason === 'daily-cap' ? 'Daily craft cap reached' : 'Need ' + costPerBatch + ' fragments');
+          if (r.reason === 'daily-cap') toast('Daily craft cap reached');
+          else if (r.reason === 'insufficient-resources') toast('Need more 🪵 wood or 🪨 stone');
+          else toast('Need ' + costPerBatch + ' fragments');
           return;
         }
         wrap.remove();
@@ -520,8 +548,8 @@
         refresh();
       },
     }, 'Craft × 10  (✦ ' + costPerBatch + ')');
-    if (s.forge.craftFragments < costPerBatch || s.forge.craftDailyUsed >= s.forge.craftDailyMax) {
-      craftBtn.disabled = true;
+    if (s.forge.craftFragments < costPerBatch || s.forge.craftDailyUsed >= s.forge.craftDailyMax || !woodOk || !stoneOk) {
+      craftBtn.disabled = !woodOk || !stoneOk ? true : (s.forge.craftFragments < costPerBatch || s.forge.craftDailyUsed >= s.forge.craftDailyMax);
     }
     btnRow.appendChild(craftBtn);
     btnRow.appendChild(el('button', {
@@ -632,6 +660,7 @@
     });
     WG.Engine.on('currency:change', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
     WG.Engine.on('forge:upgrade', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
+    WG.Engine.on('forge:resources-change', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
   }
 
   // Public API. The `_show*` hooks let Concern B override modal behaviors

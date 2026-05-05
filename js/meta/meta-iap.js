@@ -14,6 +14,48 @@
     { id: 'champion_bundle',   price: 9.99,  type: 'bundle',   grants: { coins: 4500, diamonds: 60, cards: 12 } },
     { id: 'ad_removal',        price: 4.99,  type: 'entitlement', grants: { adRemovalActive: true, premiumUnlock: true } },
     { id: 'mega_bundle',       price: 99.99, type: 'bundle',   grants: { coins: 200000, diamonds: 1500, cards: 250, megaBundleClaimed: true } },
+    // W-Monetization-V2-Energy §E — refill ladder. Refill_30 carries the
+    // "Best Value!" badge (middle-anchored psychology). Stripe/StoreKit wiring
+    // happens in W-N_AdMob-Wire / Phase 3 — purchase() falls through to the
+    // dev stub for now.
+    { id: 'refill_5',   price: 0.99,  type: 'energy', grants: { energy: 5 } },
+    { id: 'refill_15',  price: 1.99,  type: 'energy', grants: { energy: 15 } },
+    { id: 'refill_30',  price: 4.99,  type: 'energy', grants: { energy: 30 }, bestValue: true },
+    { id: 'refill_60',  price: 9.99,  type: 'energy', grants: { energy: 60 } },
+    { id: 'refill_150', price: 19.99, type: 'energy', grants: { energy: 150 } },
+
+    // W-Monetization-V2-Whale-Ladder §A — gem packs (premium gacha currency)
+    { id: 'gems_5',    price: 0.99,  type: 'gems', name: "Pocket Pouch",        display: '50 💎',               grants: { gems: 50 } },
+    { id: 'gems_15',   price: 1.99,  type: 'gems', name: "Traveler's Bag",      display: '150 + 15 💎',         grants: { gems: 165 } },
+    { id: 'gems_30',   price: 4.99,  type: 'gems', name: "Wandering Chest",     display: '300 + 60 💎',         grants: { gems: 360 }, bestValue: true },
+    { id: 'gems_60',   price: 9.99,  type: 'gems', name: "Pilgrim's Hoard",     display: '600 + 200 💎',        grants: { gems: 800 } },
+    { id: 'gems_150',  price: 19.99, type: 'gems', name: "Shrine Vault",        display: '1500 + 700 💎',       grants: { gems: 2200 } },
+    { id: 'gems_500',  price: 49.99, type: 'gems', name: "Ancestral Treasury",  display: '5000 + 3000 💎',      grants: { gems: 8000 } },
+    { id: 'gems_1500', price: 99.99, type: 'gems', name: "Sovereign Trove",     display: '15000 + 10000 💎',    grants: { gems: 25000 } },
+
+    // W-Monetization-V2-Whale-Ladder §A — timed bundles
+    // starter_pack: one-time only, expires 7d after install. Contents: 500 gems + 50 frags + 1 rare relic pull + 30 energy + cosmetic.
+    { id: 'starter_pack',  price: 4.99,  type: 'bundle', oneTimeOnly: true, expiresAfterInstallMs: 604800000,
+      name: 'Starter Pack', display: '500 💎 + 50 frags + Rare Relic + 30 ⚡ + exclusive cosmetic',
+      grants: { gems: 500, craftFragments: 50, energy: 30, starterCosmeticGranted: true, pullRare: true } },
+    // weekly_deal: resets every 7 days. Contents: 200 gems + 100 frags + 50 energy + 1000 XP.
+    { id: 'weekly_deal',   price: 9.99,  type: 'bundle', resetMs: 604800000,
+      name: 'Weekly Deal',  display: '200 💎 + 100 frags + 50 ⚡ + 1000 XP',
+      grants: { gems: 200, craftFragments: 100, energy: 50, xp: 1000 } },
+    // monthly_deal: resets every 28 days. Contents: 800 gems + 500 frags + 200 energy + 1 legendary relic pull.
+    { id: 'monthly_deal',  price: 19.99, type: 'bundle', resetMs: 2419200000,
+      name: 'Monthly Deal', display: '800 💎 + 500 frags + 200 ⚡ + Legendary Relic',
+      grants: { gems: 800, craftFragments: 500, energy: 200, pullLegendary: true } },
+
+    // W-Monetization-V2-Whale-Ladder §A — Royal Pass subscription ($14.99/mo auto-renew)
+    // Apple §3.1.2 + FTC 2024: recurring billing and cancel path are clearly disclosed in the subscription paywall UI (meta-shop.js §E).
+    { id: 'royal_pass_monthly', price: 14.99, type: 'subscription', period: 'P1M',
+      name: 'Royal Pass', display: '2× stage rewards · +20 energy cap · +10 daily · 20% gem discount · exclusive monthly stage',
+      grants: { royalPassActive: true } },
+    // W-Monetization-V2-Missions-Pass §D — Season 1 battle pass premium unlock ($9.99).
+    { id: 'battle_pass_s1', price: 9.99, type: 'entitlement',
+      name: 'Whispering Pines Pass', display: 'Premium track unlock — 60-level Season 1 battle pass',
+      grants: { battlePassPremium: 'wraithgrove_s1' } },
   ];
 
   function bySKU(id) { return SKUS.find(s => s.id === id); }
@@ -35,16 +77,73 @@
     if (s.iap.ownedSKUs.includes(sku.id) && sku.type === 'entitlement') {
       return Promise.resolve({ ok: false, reason: 'already owned' });
     }
+    // One-time bundles: reject if already owned
+    if (sku.oneTimeOnly && s.iap.ownedSKUs.includes(sku.id)) {
+      return Promise.resolve({ ok: false, reason: 'already purchased' });
+    }
+    // Timed bundles: reject if within reset window
+    if (sku.resetMs) {
+      const lastMs = s.iap.bundleLastPurchased[sku.id] || 0;
+      if (Date.now() - lastMs < sku.resetMs) {
+        return Promise.resolve({ ok: false, reason: 'not yet reset' });
+      }
+    }
     const g = sku.grants;
-    if (g.coins)    WG.State.grant('coins', g.coins);
-    if (g.diamonds) WG.State.grant('diamonds', g.diamonds);
-    if (g.cards)    WG.State.grant('cards', g.cards);
-    if (g.adRemovalActive)   s.iap.adRemovalActive = true;
-    if (g.premiumUnlock)     s.iap.premiumUnlock = true;
-    if (g.megaBundleClaimed) s.iap.megaBundleClaimed = true;
-    s.iap.ownedSKUs.push(sku.id);
+    if (g.coins)           WG.State.grant('coins', g.coins);
+    if (g.diamonds)        WG.State.grant('diamonds', g.diamonds);
+    if (g.cards)           WG.State.grant('cards', g.cards);
+    if (g.gems)            WG.State.grant('gems', g.gems);
+    if (g.energy && WG.State.grantEnergy) WG.State.grantEnergy(g.energy, 'iap-bundle');
+    if (g.craftFragments)  s.forge.craftFragments = (s.forge.craftFragments || 0) + g.craftFragments;
+    if (g.xp)              s.player.xp = (s.player.xp || 0) + g.xp;
+    if (g.adRemovalActive)        s.iap.adRemovalActive = true;
+    if (g.premiumUnlock)          s.iap.premiumUnlock = true;
+    if (g.megaBundleClaimed)      s.iap.megaBundleClaimed = true;
+    if (g.starterCosmeticGranted) s.iap.starterCosmeticGranted = true;
+    // Guaranteed rarity pulls (bundle rewards)
+    if (g.pullRare      && window.WG.Gacha) WG.Gacha.pullTiered('standard', 'rare');
+    if (g.pullLegendary && window.WG.Gacha) WG.Gacha.pullTiered('standard', 'legendary');
+    // Royal Pass subscription activation
+    if (g.royalPassActive) {
+      s.subscriptions.royalPass.active = true;
+      s.subscriptions.royalPass.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      s.energy.max = WG.State.ENERGY_TUNABLES.MAX + 20; // +20 VIP cap
+      WG.Engine.emit('royal-pass:activated', {});
+    }
+    // Track timed bundle purchase timestamp
+    if (sku.resetMs) s.iap.bundleLastPurchased[sku.id] = Date.now();
+    if (!s.iap.ownedSKUs.includes(sku.id)) s.iap.ownedSKUs.push(sku.id);
     WG.Engine.emit('iap:purchased', { sku, grants: g, channel: 'dev' });
     return Promise.resolve({ ok: true, sku, grants: g, channel: 'dev', transaction_id: 'dev-' + Date.now() });
+  }
+
+  // Returns true if a bundle SKU is currently purchaseable (one-time check, timed window check).
+  function isAvailable(id) {
+    const sku = bySKU(id);
+    if (!sku) return false;
+    const s = WG.State.get();
+    if (sku.oneTimeOnly) {
+      if (s.iap.ownedSKUs.includes(id)) return false;
+      // Expires 7d after install
+      if (sku.expiresAfterInstallMs && s.meta.installTimeMs) {
+        if (Date.now() - s.meta.installTimeMs > sku.expiresAfterInstallMs) return false;
+      }
+    }
+    if (sku.resetMs) {
+      const lastMs = (s.iap.bundleLastPurchased && s.iap.bundleLastPurchased[id]) || 0;
+      if (lastMs && Date.now() - lastMs < sku.resetMs) return false;
+    }
+    return true;
+  }
+
+  // Returns ms until a timed bundle resets (0 if available now).
+  function bundleResetIn(id) {
+    const sku = bySKU(id);
+    if (!sku || !sku.resetMs) return 0;
+    const s = WG.State.get();
+    const lastMs = (s.iap.bundleLastPurchased && s.iap.bundleLastPurchased[id]) || 0;
+    if (!lastMs) return 0;
+    return Math.max(0, sku.resetMs - (Date.now() - lastMs));
   }
 
   // Apple StoreKit via @capacitor/in-app-purchases
@@ -145,5 +244,5 @@
   }
 
   function init() {}
-  window.WG.IAP = { init, list, bySKU, purchase, SKUS };
+  window.WG.IAP = { init, list, bySKU, purchase, isAvailable, bundleResetIn, SKUS };
 })();
