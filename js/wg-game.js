@@ -888,13 +888,21 @@
     leftCol.appendChild(sideIcon({glyph:'📋',label:'TASKS',onClick:()=>{ if (WG.Missions && WG.Missions.openModal) WG.Missions.openModal(); else openInfoModal('Tasks','Loading...'); }}));
     // W-Monetization-V2-Whale-Ladder §D — OFFERS renamed SHOP; Offers is sub-section inside Shop modal.
     leftCol.appendChild(sideIcon({glyph:'🛒',label:'SHOP',border:'#c080ff',onClick:()=>WG.Shop && WG.Shop.open()}));
+    // W-Achievements-UI — long-term achievement track
+    leftCol.appendChild(sideIcon({glyph:'🏆',label:'FEATS',border:'#c8a030',onClick:()=>{ if (WG.Achievements && WG.Achievements.openModal) WG.Achievements.openModal(); else openInfoModal('Achievements','Loading...'); }}));
     hero.appendChild(leftCol);
 
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:8px;z-index:3;';
     rightCol.appendChild(sideIcon({glyph:'⚙',label:'SETTINGS',onClick:()=>openSettingsModal()}));
     rightCol.appendChild(sideIcon({glyph:'🎟',label:'PASS',border:'#5030a0',onClick:()=>{ if (WG.BattlePass && WG.BattlePass.openModal) WG.BattlePass.openModal(); else openInfoModal('Battle Pass','Loading...'); }}));
-    rightCol.appendChild(sideIcon({glyph:'🎁',label:'DAILY',timer:'01:58',onClick:()=>openInfoModal('Daily Reward','Today\'s claim + 7-day streak grid — preview, full wiring v0.20.')}));
+    // W-Daily-Reward-Streak-UI — live 7-day streak grid modal + red dot badge
+    const _drIcon = sideIcon({glyph:'🎁',label:'DAILY',onClick:()=>{ if (WG.DailyRewards && WG.DailyRewards.openModal) WG.DailyRewards.openModal(); }});
+    const _drDot = document.createElement('span');
+    _drDot.style.cssText = 'position:absolute;top:-3px;right:-3px;width:9px;height:9px;background:#e02828;border-radius:50%;border:1.5px solid #200808;pointer-events:none;display:' + (WG.DailyRewards && WG.DailyRewards.hasUnclaimed() ? 'block' : 'none') + ';';
+    _drIcon.appendChild(_drDot);
+    if (WG.DailyRewards && WG.DailyRewards.setBadgeEl) WG.DailyRewards.setBadgeEl(_drDot);
+    rightCol.appendChild(_drIcon);
     rightCol.appendChild(sideIcon({glyph:'📅',label:'7-DAYS',badge:'!',onClick:()=>openInfoModal('7-Day Login','Day-of streak rewards — preview.')}));
     hero.appendChild(rightCol);
 
@@ -1261,6 +1269,7 @@
       '<div style="font-size:11px;color:#a89878;line-height:1.7;padding:2px 0;">' +
         '<div>Wraithgrove v0.25 · Build 2026-05-05</div>' +
         '<div>Made by <span style="color:#d4a040;">The Hive Makes</span></div>' +
+        '<div style="margin-top:6px;font-size:10px;color:#7a6858;line-height:1.5;">All purchases final. Refunds handled by App Store or Google Play per platform policy. We do not handle refunds directly.</div>' +
       '</div>' +
 
       '<div style="'+SL+'">LINKS</div>' +
@@ -1278,6 +1287,10 @@
           '<button id="cfg-delete-no" style="flex:1;padding:7px;border-radius:7px;border:1.5px solid #5a4028;background:#1a1208;color:#a89878;font-size:10px;font-weight:700;cursor:pointer;">CANCEL</button>' +
         '</div>' +
       '</div>' +
+
+      '<div style="'+SL+'">PURCHASES</div>' +
+      '<button id="cfg-restore" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a6028;background:#0a1a08;color:#a8d878;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;">RESTORE PURCHASES</button>' +
+      '<div id="cfg-restore-msg" style="display:none;font-size:10px;text-align:center;padding:4px 0;letter-spacing:0.5px;"></div>' +
 
       '<div style="'+SL+'">ACCOUNT</div>' +
       '<button disabled style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a2818;background:#1a1208;color:#5a4028;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:not-allowed;opacity:0.5;">LOG OUT</button>' +
@@ -1330,10 +1343,50 @@
     if (delBtn) delBtn.addEventListener('click', () => { delConf.style.display='block'; delBtn.style.display='none'; });
     if (delNo)  delNo.addEventListener('click',  () => { delConf.style.display='none';  delBtn.style.display='block'; });
     if (delYes) delYes.addEventListener('click', () => {
-      try { ['wg_save_v2','wg_audio_v1',SKEY].forEach(k => localStorage.removeItem(k)); } catch(e) {}
-      overlay.remove();
-      window.location.reload();
+      const _cleanup = () => {
+        try { ['wg_save_v2','wg_audio_v1',SKEY].forEach(k => localStorage.removeItem(k)); } catch(e) {}
+        overlay.remove();
+        window.location.reload();
+      };
+      // Phase 4 save sync: signal server to delete save before local clear.
+      // 1.5s grace; proceeds regardless of server response.
+      if (window.WG && WG.MetaSaveSync) {
+        Promise.race([
+          WG.MetaSaveSync.delete(),
+          new Promise(function(r){ setTimeout(r, 1500); }),
+        ]).then(_cleanup).catch(_cleanup);
+      } else {
+        _cleanup();
+      }
     });
+
+    // W-Ad-Removal-Cross-Device — Concern C: Restore Purchases button.
+    const restoreBtn = overlay.querySelector('#cfg-restore');
+    const restoreMsg = overlay.querySelector('#cfg-restore-msg');
+    if (restoreBtn && restoreMsg && window.WG && WG.IAP && WG.IAP.restorePurchases) {
+      restoreBtn.addEventListener('click', () => {
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'CHECKING…';
+        WG.IAP.restorePurchases().then(result => {
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = 'RESTORE PURCHASES';
+          if (result.restored) {
+            restoreMsg.style.color = '#a8d878';
+            restoreMsg.textContent = 'Purchases restored — ads removed.';
+          } else {
+            restoreMsg.style.color = '#a89878';
+            restoreMsg.textContent = 'Nothing to restore.';
+          }
+          restoreMsg.style.display = 'block';
+        }).catch(() => {
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = 'RESTORE PURCHASES';
+          restoreMsg.style.color = '#e06060';
+          restoreMsg.textContent = 'Restore failed — try again.';
+          restoreMsg.style.display = 'block';
+        });
+      });
+    }
   }
 
   function syncTopStrip() {
@@ -1403,8 +1456,6 @@
     if (!WG.Engine || !WG.State || !WG.Display) throw new Error('core modules missing');
     // Init cycle
     WG.State.init();
-    // W-Monetization-V2-Sub-Blockers §D — fire daily:reset if date advanced since last session.
-    if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
     WG.Cache.init();
     WG.Cache.load();
     WG.Account.init();
@@ -1413,6 +1464,7 @@
     WG.Ads.init();
     if (WG.EnergyModal && WG.EnergyModal.init) WG.EnergyModal.init();
     if (WG.Gacha && WG.Gacha.init) WG.Gacha.init();
+    if (WG.Compliance && WG.Compliance.init) WG.Compliance.init(); // must follow Gacha — wraps pull()
     if (WG.Shop && WG.Shop.init) WG.Shop.init();
     if (WG.Buffs && WG.Buffs.init) WG.Buffs.init();
     if (WG.Audio && WG.Audio.init) WG.Audio.init();
@@ -1463,6 +1515,14 @@
     // W-Monetization-V2-Missions-Pass — after cache load so saved progress is restored
     if (WG.Missions && WG.Missions.init) WG.Missions.init();
     if (WG.BattlePass && WG.BattlePass.init) WG.BattlePass.init();
+    // W-Achievements-UI — after cache load so saved achievement state is restored
+    if (WG.Achievements && WG.Achievements.init) WG.Achievements.init();
+    // W-Daily-Reward-Streak-UI — subscribe handlers before firing daily:reset
+    // MetaDailyReset.init() subscribes Royal Pass daily-bonus (pre-existing missing call fixed here)
+    if (WG.MetaDailyReset && WG.MetaDailyReset.init) WG.MetaDailyReset.init();
+    if (WG.DailyRewards && WG.DailyRewards.init) WG.DailyRewards.init();
+    // Fire daily:reset now — state is loaded + all listeners registered
+    if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
 
     setupNav();
     syncTopStrip();

@@ -1,12 +1,34 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-05 by W-Onboarding-Flow
+**Last updated:** 2026-05-05 by W-Daily-Reward-Streak-UI
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### Daily Reward Streak UI (W-Daily-Reward-Streak-UI 2026-05-05)
+- **`meta-daily-rewards.js`** — `WG.DailyRewards`: `WEEK_REWARDS` catalog (7 entries, Object.freeze), `openModal()`, `hasUnclaimed()`, `refreshBadge()`, `setBadgeEl()`, `init()`.
+- **Concern A — Catalog** — `WEEK_REWARDS` 7-entry freeze: day 1 (energy+gold), days 2-6 (gold/gems/frags combos), day 7 (gems+energy+frags big payday). `gold` maps to `coins`. `energy` shown in UI but NOT re-granted on claim (auto-granted by `meta-account.js` login system).
+- **Concern B — Modal** — `openModal()`: header "DAILY REWARDS — Day N/7", 7-tile grid, today tile pulses gold (CSS `wg-dr-pulse` animation), past tiles dimmed + ✓, future tiles dim + 🔒, CLAIM button when unclaimed / "✓ CLAIMED — See you tomorrow" when claimed, footer "Streak resets if you miss a day".
+- **Concern C — Claim flow** — `doClaim()`: marks state, shows toast, calls `grantAndFly()` which flies 🪙→`.currency.coins`, 💎→`#gems-chip`, 🧩→`[data-tab="forge"]` nav tab sequentially via rAF (380ms each). Closes modal + calls `syncTopStrip()` on completion.
+- **Concern D — Red dot** — `_drDot` span appended to DAILY sideIcon in `wg-game.js`. `setBadgeEl()` registers it; `refreshBadge()` shows/hides. Clears on claim, reappears on `daily:reset`.
+- **Concern E — Reset hook** — `init()` subscribes to `daily:reset`. If `lastClaimKey === yesterday` → advance `streakDay` (wraps 7→1). If `lastClaimKey < yesterday` → reset to 1, show "Streak Reset" toast after 1.2s delay. If never claimed → streakDay stays 1. Sets `claimedToday = false`.
+- **Init ordering fix** — `MetaDailyReset.checkAndReset()` was firing before any listeners or cache.load() (pre-existing bug). Moved to end of init chain: `MetaDailyReset.init()` → `DailyRewards.init()` → `checkAndReset()`. Also wires `MetaDailyReset.init()` for the first time (Royal Pass daily bonus was never firing).
+- **State** — `state.meta.dailyReward = { streakDay, lastClaimKey, claimedToday }`. Initialized lazily by `ensureState()`. Persisted automatically via `wg-cache.js` `Object.assign(s.meta, data.meta)` pattern.
+- `index.html` — `meta-daily-rewards.js` added after `meta-achievements.js`.
+- `wg-game.js` — DAILY side icon stub replaced with live `openModal()` call + red-dot badge element. `DailyRewards.init()` added to init chain.
+
+### Compliance Disclosure (W-Compliance-Disclosure 2026-05-05)
+- **`meta-compliance.js`** — `WG.Compliance`: `init()`, `confirmPurchase(sku)`, `checkAgeGate()`, `showGachaDisclosure()`, `checkGachaDisclosure()`.
+- **Concern A — Pre-purchase modal** — `WG.Compliance.confirmPurchase(sku)` → `Promise<boolean>`. Shows SKU name, price, contents, and auto-renew warning for subscriptions. `meta-iap.js` `purchase()` now async; calls `confirmPurchase` before any StoreKit/Play Billing/Stripe call. Returns `{ ok:false, reason:'user_cancelled' }` if user taps CANCEL.
+- **Concern B — Age gate** — `WG.Compliance.checkAgeGate()` → `Promise<boolean>`. Shown before first gacha pull. On YES: persists `wg_compliance_v1.ageVerified13Plus`, sets `WG.State.ageVerified13Plus = true`. Never shown again. `WG.Gacha.pull()` is wrapped in `WG.Compliance.init()` to always return a Promise and enforce the age gate. `meta-shop.js` pull buttons updated to use `Promise.resolve(WG.Gacha.pull(...)).then(...)`.
+- **Concern C — Gacha disclosure** — Bottom-sheet modal: drop rates, pity, randomness notice, BeGambleAware.org / 1-800-GAMBLER help line. Auto-shown first time `_sectionSummon()` renders (via `checkGachaDisclosure()`); marked seen in `wg_compliance_v1.gachaDisclosureSeen`. Always accessible via "?" button in shop summon section header. `showGachaDisclosure()` is the public API for "?" icon.
+- **Concern D — Refund disclosure** — "All purchases final. Refunds handled by App Store or Google Play per platform policy. We do not handle refunds directly." added to ABOUT section of settings modal in `wg-game.js`.
+- **Storage** — `localStorage.wg_compliance_v1` (separate from save file): `{ ageVerified13Plus, gachaDisclosureSeen }`. Never resets on save-delete.
+- **Init wiring** — `WG.Compliance.init()` called in `wg-game.js` init chain immediately after `WG.Gacha.init()`.
+- `index.html` — `meta-compliance.js` added after `meta-gacha.js`, before `meta-shop.js`.
 
 ### Onboarding Flow (W-Onboarding-Flow 2026-05-05)
 - **First-launch gate** — `WG.State.get().firstLaunch` (default `true`; `wg-cache.js` sets to `false` for existing saves). `WG.Onboarding.maybeShow()` called after `showHuntStageList()` in init; fires overlay only on first install.
@@ -75,6 +97,18 @@
 - **Shop modal** — `meta-shop.js` (WG.Shop): 5 sections (Gem Packs / Bundles / Royal Pass / Summon / Offers). Entry: gems chip + SHOP side icon in Hunt lobby. Royal Pass landing: benefit comparison + full subscription disclosure per Apple §3.1.2 + FTC 2024. Summon: pull ×1/×10, rate disclosure `<details>`, pity display, locked rift_guests pool.
 - **VIP flex** — Royal purple portrait frame in Ascend, 👑 ROYAL badge in Duel rank row, "👑 ROYAL PASS · 2× REWARDS" banner in Hunt results when multiplier active.
 
+### Achievements (W-Achievements-UI 2026-05-05)
+- **21-entry catalog** (Object.freeze) — kill milestones (4), stage clears (4), tower floors (4), combo peaks (2), gold spent (1), character roster (2), crafting (1), duel rank (3).
+- **State shape** — `WG.State.get().achievements = { [id]: { progress, unlockedAt, claimed } }`. Initialized lazily. Persisted via `wg-cache.js` (added `if (data.achievements) s.achievements = data.achievements` to load()).
+- **Event wiring** — `enemy:killed` (cumulative kills), `hunt:stage-cleared` (stageId check), `tower:floor-start` (peak floor), `combo:step` (peak count in run), `currency:change` (coins spent), `character:unlocked` (ownedCharacters.length), `forge:craft-batch` (+10 per batch), `duel:rank-change` (rank tier index).
+- **_checkOnInit()** — seeds existing-player progress on first install of this feature (highestStageCleared, towerProgress.peakFloor, ownedCharacters.length, duel.rank) without granting rewards — lets players discover and claim.
+- **Toast** — `🏆 ACHIEVEMENT: <name>` animates up from bottom, auto-dismisses in 3.2s.
+- **Modal** — 🏆 FEATS side icon in Hunt lobby (left column, below SHOP). Full scrollable list: icon + name + desc + progress bar + progress text + reward + CLAIM / ✓ / 🔒. Header: "X / 21 unlocked" counter + "N rewards ready" banner. Claim grants: gold→coins, gems→gems, frags→craftFragments, rareMat→forge.rareMaterials.
+- `meta-achievements.js` — `WG.Achievements`: `CATALOG`, `init`, `claim`, `openModal`, `ensureState`.
+- `wg-cache.js` — `load()` patched to restore achievements state.
+- `wg-game.js` — `Achievements.init()` in init chain (after BattlePass.init); FEATS side icon wired.
+- `index.html` — `meta-achievements.js` added to module loader (after `meta-onboarding.js`).
+
 ### Leaderboard (W-Leaderboard-Backend-Stub 2026-05-05)
 - **Contract doc** — `docs/LEADERBOARD_API.md`: 4 endpoints (submit / top / me / around/:userId), auth shape, anti-cheat validation, rate limits, Phase 4 integration notes.
 - **`meta-leaderboard.js`** — `WG.MetaLeaderboard`: `submit(peakFloor, runDuration, charactersUsed)` / `top(limit)` / `meAndAround()`. All stubs: log "Phase 4 server swap", return cached fake data. Real fetch paths written and fail-gracefully. Activates when `WG.Config.SERVER_BASE_URL` is set.
@@ -82,7 +116,7 @@
 - **Submit hook** — `hunt-tower.js#endRun`: calls `WG.MetaLeaderboard.submit(rt.floor, rt.totalElapsed, [skinId])` on every run end (death or exit), before summary overlay.
 - `WG.Config` initialized as `{}` if absent (safe default in stub mode, swapped for real config in Phase 4).
 
-### Meta (`js/meta/` — 9 modules)
+### Meta (`js/meta/` — 10 modules)
 - `meta-iap.js` — 30+ IAP SKUs ($0.99 to $99.99); gem packs, bundles, Royal Pass, energy refills. `isAvailable()` + `bundleResetIn()` for timed gating. **STUB** — production needs Apple StoreKit + Google Play Billing wiring.
 - `meta-ads.js` — rewarded video + interstitial placeholder modals; daily 50-RV cap; ad-removal entitlement check. **STUB** — production needs AdMob via Capacitor plugin.
 - `meta-gacha.js` — WG.Gacha: standard pool (open) + rift_guests pool (locked/empty). pull() / pullTiered() / getRates() / getPityDisplay(). Pity in state.
@@ -92,6 +126,8 @@
 - `meta-events.js` — analytics event reporter. **STUB** — production needs server POST.
 - `meta-missions.js` — daily + weekly missions catalog, tracker, UI, event dispatcher.
 - `meta-battle-pass.js` — season battle pass engine + 60-level grid UI.
+- `meta-achievements.js` — WG.Achievements: 21-entry permanent catalog, event-wired tracker, claim flow, modal UI. 🏆 FEATS side icon in Hunt lobby.
+- `meta-daily-rewards.js` — WG.DailyRewards: 7-entry WEEK_REWARDS catalog, 7-tile streak grid modal, claim flow with fly animations, red dot badge. 🎁 DAILY side icon in Hunt lobby.
 
 ### Hunt (`js/hunt/` — 9 modules)
 - `hunt-stage.js` — 18 stages × 6 biomes (forest_summer / cold_stone / forest_autumn / temple / cave / eldritch). Each stage: id, name, biome, durationSec, enemyMix, bossId, weaponPickups list.
@@ -190,8 +226,8 @@
 
 ## Reference: file count
 
-- 42 JS modules + 1 index.html = 43 files
-- ~4,500 lines of vanilla JS
+- 43 JS modules + 1 index.html = 44 files
+- ~4,700 lines of vanilla JS
 - 0 frameworks
 - 0 third-party SDKs
 - 0 network calls (all client-side localStorage in v1.0)

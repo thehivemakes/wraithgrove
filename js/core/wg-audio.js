@@ -58,7 +58,7 @@
     // W-Building-Repair — turret HP fully restored. Reuses existing craft sample.
     { event: 'audio:repair_complete', id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.7 },
     // W-Audio-Sourcing-CC0 — new real samples wired to events (ENGINE-PENDING: engine does not yet emit these 4 events; audio is inert until emitters are added)
-    { event: 'boss:intro',            id: 'boss_intro_drone', bus: 'sfx', throttleMs: 0,   vol: 1.0 }, // ENGINE-PENDING
+    { event: 'boss:intro',            id: 'boss_intro_drone', bus: 'sfx', throttleMs: 0,   vol: 1.0 }, // emit landed in W-FX-P2-Polish C (commit 59c9032)
     { event: 'dialog:open',           id: 'dialog_pop',    bus: 'ui',  throttleMs: 100, vol: 0.6 }, // ENGINE-PENDING
     { event: 'ui:reveal',             id: 'reveal_woosh',  bus: 'ui',  throttleMs: 200, vol: 0.7 }, // ENGINE-PENDING
     { event: 'torch:active',          id: 'torch_flicker', bus: 'sfx', throttleMs: 5000, vol: 0.4 }, // ENGINE-PENDING

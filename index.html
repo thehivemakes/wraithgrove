@@ -325,7 +325,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.25.0-launch-readiness-1778002540', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.26.0-launch-extended-1778005363', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -391,15 +391,19 @@
       'js/meta/meta-ads.js',
       'js/meta/meta-account.js',
       'js/meta/meta-leaderboard.js',
+      'js/meta/meta-savesync.js',
       'js/meta/meta-events.js',
       'js/meta/meta-buffs.js',
       'js/meta/meta-daily-reset.js',
       'js/meta/meta-energy-modal.js',
       'js/meta/meta-gacha.js',
+      'js/meta/meta-compliance.js',
       'js/meta/meta-shop.js',
       'js/meta/meta-missions.js',
       'js/meta/meta-battle-pass.js',
       'js/meta/meta-onboarding.js',
+      'js/meta/meta-achievements.js',
+      'js/meta/meta-daily-rewards.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
       'js/hunt/hunt-enemies.js',
@@ -487,6 +491,11 @@
     }
   })();
 </script>
+
+<!-- QA harness — NOT in MODULES[]; loaded separately so the production bundle
+     is unaffected. 5-tap #top-strip to reveal panel. Safe to ship; panel is
+     gate-locked and adds zero overhead until activated. -->
+<script src="js/qa/qa-harness.js"></script>
 
 </body>
 </html>

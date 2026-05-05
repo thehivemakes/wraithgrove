@@ -229,12 +229,19 @@
   // ── Summon section (gacha) ─────────────────────────────────────────────────
 
   function _sectionSummon(body) {
+    // W-Compliance-Disclosure Concern C — show gacha disclosure on first open.
+    if (window.WG && WG.Compliance) WG.Compliance.checkGachaDisclosure();
+
     const gemsNow = WG.State.get().currencies.gems || 0;
 
     const gemsRow = document.createElement('div');
-    gemsRow.style.cssText = 'text-align:center;margin-bottom:10px;font-size:13px;color:#c8a0ff;font-weight:700;letter-spacing:1px;';
-    gemsRow.textContent = '💎 ' + gemsNow + ' Gems available';
+    gemsRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;';
+    gemsRow.innerHTML =
+      '<span style="font-size:13px;color:#c8a0ff;font-weight:700;letter-spacing:1px;">💎 ' + gemsNow + ' Gems available</span>' +
+      '<button id="wg-gacha-info-btn" style="background:none;border:1.5px solid #5a3a90;border-radius:50%;width:20px;height:20px;color:#a080c0;font-size:11px;font-weight:700;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="Gacha information">?</button>';
     body.appendChild(gemsRow);
+    const infoBtn = gemsRow.querySelector('#wg-gacha-info-btn');
+    if (infoBtn) infoBtn.addEventListener('click', function() { if (window.WG && WG.Compliance) WG.Compliance.showGachaDisclosure(); });
 
     const POOLS = [
       { id: 'standard',    label: 'Standard Pool',  icon: '🔮', poolColor: '#5a3a90', borderColor: '#8a60c0' },
@@ -296,24 +303,28 @@
           btn.addEventListener('click', () => {
             if (!WG.Gacha) return;
             btn.disabled = true;
-            const res = WG.Gacha.pull(spec.id, count);
-            btn.disabled = false;
-            if (!res.ok) {
-              if (resultEl) resultEl.innerHTML = '<span style="color:#e06060;">' + (res.reason || 'Error') + '</span>';
-              return;
-            }
-            // Show results summary
-            const byTier = {};
-            (res.results || []).forEach(r => { byTier[r.tier] = (byTier[r.tier] || 0) + 1; });
-            if (resultEl) {
-              resultEl.innerHTML = Object.entries(byTier)
-                .map(([t,n]) => '<span style="color:' + _tierColor(t) + ';font-weight:700;">' + _tierLabel(t) + ' ×' + n + '</span>')
-                .join('  ') || 'No results';
-            }
-            _refreshGemsChip();
-            // Refresh pity line
-            const pityEl = card.querySelector('div > div[style*="font-size:10px"]');
-            if (pityEl && WG.Gacha) pityEl.textContent = WG.Gacha.getPityDisplay(spec.id);
+            // W-Compliance-Disclosure: WG.Gacha.pull now returns a Promise (age gate
+            // wrapping). Promise.resolve() keeps this handler compatible whether pull
+            // is sync (pre-compliance) or async (post-compliance init).
+            Promise.resolve(WG.Gacha.pull(spec.id, count)).then(function(res) {
+              btn.disabled = false;
+              if (!res.ok) {
+                if (resultEl) resultEl.innerHTML = '<span style="color:#e06060;">' + (res.reason || 'Error') + '</span>';
+                return;
+              }
+              // Show results summary
+              const byTier = {};
+              (res.results || []).forEach(r => { byTier[r.tier] = (byTier[r.tier] || 0) + 1; });
+              if (resultEl) {
+                resultEl.innerHTML = Object.entries(byTier)
+                  .map(([t,n]) => '<span style="color:' + _tierColor(t) + ';font-weight:700;">' + _tierLabel(t) + ' ×' + n + '</span>')
+                  .join('  ') || 'No results';
+              }
+              _refreshGemsChip();
+              // Refresh pity line
+              const pityEl = card.querySelector('div > div[style*="font-size:10px"]');
+              if (pityEl && WG.Gacha) pityEl.textContent = WG.Gacha.getPityDisplay(spec.id);
+            });
           });
         });
       }

@@ -27,6 +27,9 @@
   async function showRewardedVideo(opts) {
     resetIfNewDay();
     if (adRemovalActive()) {
+      // W-Ad-Removal-Cross-Device — Concern B: grant the reward even though no ad plays.
+      // Player paid; they keep the buff. Emit ad:rewarded so callers and listeners both fire.
+      WG.Engine.emit('ad:rewarded', { reward: opts && opts.reward, bypassed: true });
       WG.Engine.emit('ad:bypassed', { reason: 'premium' });
       return { ok: true, bypassed: true };
     }

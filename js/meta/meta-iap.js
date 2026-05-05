@@ -233,16 +233,110 @@
     });
   }
 
-  // Channel dispatcher
-  function purchase(id) {
+  // Channel dispatcher — W-Compliance-Disclosure Concern A: shows confirmPurchase modal first.
+  async function purchase(id) {
     const sku = bySKU(id);
-    if (!sku) return Promise.resolve({ ok: false, reason: 'unknown sku' });
+    if (!sku) return { ok: false, reason: 'unknown sku' };
+    if (window.WG && WG.Compliance) {
+      const confirmed = await WG.Compliance.confirmPurchase(sku);
+      if (!confirmed) return { ok: false, reason: 'user_cancelled' };
+    }
     const ch = detectChannel();
     if (ch === 'apple')  return purchaseApple(sku);
     if (ch === 'google') return purchaseGoogle(sku);
     return purchaseStripe(sku);
   }
 
-  function init() {}
-  window.WG.IAP = { init, list, bySKU, purchase, isAvailable, bundleResetIn, SKUS };
+  // W-Ad-Removal-Cross-Device — Concern A
+  // Checks local purchase record and platform receipt store for ad_removal SKU.
+  // Silent on launch (ok=false/restored=false is normal for non-purchasers).
+  // Stubs call platform API when Capacitor plugin is present; fall back to local check.
+  // Phase 3: replace stub bodies with real receipt-validation server call POST /wg/iap-grant.
+
+  function restoreLocal() {
+    const s = WG.State.get();
+    const had = s.iap.adRemovalActive;
+    if (s.iap.ownedSKUs.includes('ad_removal')) {
+      s.iap.adRemovalActive = true;
+    }
+    const restored = !had && s.iap.adRemovalActive;
+    if (restored) {
+      WG.Engine.emit('iap:restored', { skus: ['ad_removal'] });
+      WG.Cache.save();
+    }
+    return Promise.resolve({ ok: true, restored, skus: restored ? ['ad_removal'] : [] });
+  }
+
+  function restoreApple() {
+    // Phase 3: call plugin.restorePurchases() and validate receipts at POST /wg/iap-grant.
+    const plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.InAppPurchases;
+    if (!plugin) return restoreLocal();
+    return plugin.restorePurchases()
+      .then(function(result) {
+        const s = WG.State.get();
+        const had = s.iap.adRemovalActive;
+        let found = false;
+        (result.transactions || []).forEach(function(t) {
+          if (t.productId === 'ad_removal') {
+            s.iap.adRemovalActive = true;
+            if (!s.iap.ownedSKUs.includes('ad_removal')) s.iap.ownedSKUs.push('ad_removal');
+            found = true;
+          }
+        });
+        const restored = !had && found;
+        if (restored) {
+          WG.Engine.emit('iap:restored', { skus: ['ad_removal'] });
+          WG.Cache.save();
+        }
+        return { ok: true, restored, skus: found ? ['ad_removal'] : [] };
+      })
+      .catch(function(err) {
+        console.warn('[WG.IAP] Apple restore failed — falling back to local', err);
+        return restoreLocal();
+      });
+  }
+
+  function restoreGoogle() {
+    // Phase 3: call plugin.restorePurchases() / queryPurchases and validate at POST /wg/iap-grant.
+    const plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.InAppPurchases;
+    if (!plugin) return restoreLocal();
+    return plugin.restorePurchases()
+      .then(function(result) {
+        const s = WG.State.get();
+        const had = s.iap.adRemovalActive;
+        let found = false;
+        (result.transactions || []).forEach(function(t) {
+          if (t.productId === 'ad_removal') {
+            s.iap.adRemovalActive = true;
+            if (!s.iap.ownedSKUs.includes('ad_removal')) s.iap.ownedSKUs.push('ad_removal');
+            found = true;
+          }
+        });
+        const restored = !had && found;
+        if (restored) {
+          WG.Engine.emit('iap:restored', { skus: ['ad_removal'] });
+          WG.Cache.save();
+        }
+        return { ok: true, restored, skus: found ? ['ad_removal'] : [] };
+      })
+      .catch(function(err) {
+        console.warn('[WG.IAP] Google restore failed — falling back to local', err);
+        return restoreLocal();
+      });
+  }
+
+  function restorePurchases() {
+    const ch = detectChannel();
+    if (ch === 'apple')  return restoreApple();
+    if (ch === 'google') return restoreGoogle();
+    return restoreLocal();
+  }
+
+  function init() {
+    // Silent restore on launch — confirms ad_removal entitlement from platform receipt store.
+    // Non-purchasers get ok=true, restored=false — that is normal and expected.
+    restorePurchases().catch(function() {});
+  }
+
+  window.WG.IAP = { init, list, bySKU, purchase, isAvailable, bundleResetIn, restorePurchases, SKUS };
 })();
