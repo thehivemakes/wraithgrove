@@ -13,6 +13,10 @@
 // purely decorative — every tap target is a DOM element.
 (function(){'use strict';
 
+  // Deterministic pseudo-noise — same index always yields same value.
+  // Identical to wg-game.js _hash; defined locally because IIFEs don't share scope.
+  function _hash(i) { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
   // ---------- diorama tunables ----------
   const DIORAMA_HEIGHT_VH = 30;          // ~30% of viewport height per spec
   const DIORAMA_FLICKER_HZ_PRIMARY = 4.7; // campfire flame primary frequency
@@ -74,38 +78,64 @@
     const H = dioramaCanvas.height;
     const t = (performance.now() - dioramaStartMs) / 1000;
 
-    // Sky / forest backdrop
+    // Sky — forest_summer BIOME_PALETTE sky (#1a3a1c) with paper-texture stipple
     const sky = ctx.createLinearGradient(0, 0, 0, H * 0.55);
-    sky.addColorStop(0,  '#0a1004');
-    sky.addColorStop(1,  '#1c2c12');
+    sky.addColorStop(0,    '#0c1a0a');
+    sky.addColorStop(0.55, '#162c10');
+    sky.addColorStop(1,    '#1a3a1c');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
+    // Paper-texture stipple on sky (ink-speckle feel)
+    ctx.fillStyle = 'rgba(168,216,120,0.045)';
+    for (let i = 0; i < 80; i++) {
+      ctx.fillRect(_hash(i + 700) * W, _hash(i + 701) * H * 0.50, 1, 1);
+    }
 
-    // Distant tree silhouettes
-    ctx.fillStyle = '#091308';
-    const treeCount = 14;
+    // Mist band — horizontal drift at mid-horizon
+    ctx.fillStyle = 'rgba(148,196,120,0.07)';
+    for (let my = H * 0.40; my < H * 0.54; my += 3) ctx.fillRect(0, my, W, 1.5);
+
+    // Distant pagoda silhouette on right horizon (matches paintBiome_forest_summer)
+    const pagX = W * 0.72, pagY = H * 0.50;
+    ctx.fillStyle = '#04100a';
+    ctx.beginPath();
+    ctx.moveTo(pagX - 18, pagY);    ctx.lineTo(pagX + 18, pagY);
+    ctx.lineTo(pagX + 14, pagY - 9); ctx.lineTo(pagX + 20, pagY - 9);
+    ctx.lineTo(pagX, pagY - 22);     ctx.lineTo(pagX - 20, pagY - 9);
+    ctx.lineTo(pagX - 14, pagY - 9); ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(pagX - 9, pagY, 18, H * 0.07);
+
+    // Distant tree silhouettes — silhouette color from BIOME_PALETTE (#082010)
+    ctx.fillStyle = '#082010';
+    const treeCount = 12;
     for (let i = 0; i < treeCount; i++) {
       const x = (i + 0.5) * (W / treeCount);
-      const baseY = H * 0.55;
-      const trH = H * (0.18 + 0.06 * Math.sin(i * 1.3));
+      const baseY = H * 0.53;
+      const trH = H * (0.16 + 0.05 * Math.sin(i * 1.3));
       ctx.beginPath();
-      ctx.moveTo(x - W * 0.04, baseY);
-      ctx.lineTo(x,             baseY - trH);
-      ctx.lineTo(x + W * 0.04, baseY);
+      ctx.moveTo(x - W * 0.035, baseY);
+      ctx.lineTo(x,              baseY - trH);
+      ctx.lineTo(x + W * 0.035, baseY);
       ctx.closePath();
       ctx.fill();
     }
 
-    // Ground (clearing)
-    const ground = ctx.createLinearGradient(0, H * 0.5, 0, H);
-    ground.addColorStop(0, '#3a6020');
-    ground.addColorStop(1, '#244010');
+    // Ground — forest_summer BIOME_PALETTE floor (#2a5028) with grass-tuft stipple
+    const ground = ctx.createLinearGradient(0, H * 0.50, 0, H);
+    ground.addColorStop(0, '#2a5028');
+    ground.addColorStop(1, '#183418');
     ctx.fillStyle = ground;
-    ctx.fillRect(0, H * 0.5, W, H * 0.5);
+    ctx.fillRect(0, H * 0.50, W, H * 0.50);
+    // Grass-tuft stipple (matches paintBiome_forest_summer floor stipple exactly)
+    ctx.fillStyle = 'rgba(168,216,120,0.22)';
+    for (let i = 0; i < 100; i++) {
+      ctx.fillRect(_hash(i + 800) * W, H * 0.50 + _hash(i + 801) * H * 0.50, 1, 2);
+    }
 
-    // Lit center clearing
+    // Lit center clearing (campfire warmth, kept from original)
     const clearing = ctx.createRadialGradient(W * 0.5, H * 0.78, W * 0.05, W * 0.5, H * 0.78, W * 0.42);
-    clearing.addColorStop(0, 'rgba(140,180,80,0.45)');
+    clearing.addColorStop(0, 'rgba(140,180,80,0.40)');
     clearing.addColorStop(1, 'rgba(140,180,80,0)');
     ctx.fillStyle = clearing;
     ctx.fillRect(0, 0, W, H);
@@ -116,78 +146,347 @@
     const pagoda   = buildings.find(b => b.id === 'forge'    && b.unlocked);
     const campfire = buildings.find(b => b.id === 'campfire' && b.unlocked);
 
-    if (cave)     drawCave(ctx, W * 0.22, H * 0.55, W * 0.22, cave.level);
-    if (pagoda)   drawPagoda(ctx, W * 0.50, H * 0.50, W * 0.20, pagoda.level);
+    if (cave)     drawTent(ctx, W * 0.22, H * 0.55, W * 0.22, cave.level, t);
+    if (pagoda)   drawHouse(ctx, W * 0.50, H * 0.50, W * 0.20, pagoda.level);
     if (campfire) drawCampfire(ctx, W * 0.78, H * 0.78, W * 0.10, campfire.level, t);
   }
 
-  function drawCave(ctx, cx, cy, sz, level) {
-    // Dark mound with cave mouth — gets bigger with level
-    const s = sz * (0.85 + 0.04 * level);
-    ctx.fillStyle = '#3a3028';
+  // Ukiyo-e folk tent / yurt — conical canvas with rope flap, ink outline, stipple texture.
+  // Replaces the flat dark-gray dome of the original drawCave.
+  function drawTent(ctx, cx, cy, sz, level, t) {
+    const s = sz * (0.85 + 0.04 * Math.min(level, 10));
+    const tentH = s * 1.8;
+    const tentW = s * 1.2;
+    const baseY = cy;
+
+    // --- tent body: conical with slight side curvature (quadratic) ---
     ctx.beginPath();
-    ctx.moveTo(cx - s, cy + s * 0.55);
-    ctx.quadraticCurveTo(cx - s * 0.6, cy - s * 0.5, cx, cy - s * 0.6);
-    ctx.quadraticCurveTo(cx + s * 0.6, cy - s * 0.5, cx + s, cy + s * 0.55);
+    ctx.moveTo(cx - tentW * 0.5, baseY);
+    ctx.quadraticCurveTo(cx - tentW * 0.56, baseY - tentH * 0.44, cx, baseY - tentH);
+    ctx.quadraticCurveTo(cx + tentW * 0.56, baseY - tentH * 0.44, cx + tentW * 0.5, baseY);
+    ctx.closePath();
+    const bodyGrad = ctx.createLinearGradient(cx - tentW * 0.5, baseY, cx, baseY - tentH);
+    bodyGrad.addColorStop(0, '#b8ac82');
+    bodyGrad.addColorStop(0.55, '#d0c498');
+    bodyGrad.addColorStop(1,  '#a49870');
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+
+    // --- paper-texture stipple on canvas body ---
+    ctx.fillStyle = 'rgba(72,50,22,0.11)';
+    for (let i = 0; i < 55; i++) {
+      const tx = cx + (_hash(i + 300) - 0.5) * tentW * 0.86;
+      const ty = baseY - _hash(i + 301) * tentH * 0.88;
+      const prog = (baseY - ty) / tentH;
+      if (Math.abs(tx - cx) < tentW * 0.5 * (1 - prog) * 1.02) ctx.fillRect(tx, ty, 1, 1);
+    }
+
+    // --- panel seam lines (canvas sections) ---
+    ctx.strokeStyle = 'rgba(55,38,16,0.28)';
+    ctx.lineWidth = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(cx - tentW * 0.27, baseY);
+    ctx.quadraticCurveTo(cx - tentW * 0.15, baseY - tentH * 0.58, cx, baseY - tentH);
+    ctx.moveTo(cx + tentW * 0.27, baseY);
+    ctx.quadraticCurveTo(cx + tentW * 0.15, baseY - tentH * 0.58, cx, baseY - tentH);
+    ctx.stroke();
+
+    // --- ink-line outline ---
+    ctx.strokeStyle = '#1a120a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - tentW * 0.5, baseY);
+    ctx.quadraticCurveTo(cx - tentW * 0.56, baseY - tentH * 0.44, cx, baseY - tentH);
+    ctx.quadraticCurveTo(cx + tentW * 0.56, baseY - tentH * 0.44, cx + tentW * 0.5, baseY);
+    ctx.stroke();
+
+    // --- rope-tied flap entrance ---
+    const flapW = tentW * 0.24;
+    const flapH = tentH * 0.27;
+    ctx.fillStyle = '#160c04';
+    ctx.beginPath();
+    ctx.moveTo(cx - flapW * 0.5, baseY);
+    ctx.lineTo(cx + flapW * 0.5, baseY);
+    ctx.lineTo(cx + flapW * 0.24, baseY - flapH);
+    ctx.lineTo(cx - flapW * 0.24, baseY - flapH);
     ctx.closePath();
     ctx.fill();
-    // Cave mouth
-    ctx.fillStyle = '#0a0604';
+    // rope accent across flap
+    ctx.strokeStyle = '#5a3418';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + s * 0.25, s * 0.32, s * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+    ctx.moveTo(cx - flapW * 0.5, baseY - flapH * 0.48);
+    ctx.lineTo(cx + flapW * 0.5, baseY - flapH * 0.48);
+    ctx.stroke();
 
-  function drawPagoda(ctx, cx, cy, sz, level) {
-    // Tiered red roof + body — tiers grow with level
-    const tiers = Math.min(4, 1 + Math.floor((level - 1) / 2));
-    const wallH = sz * 0.7;
-    const wallW = sz * 1.1;
-    // Walls
-    ctx.fillStyle = '#5a3820';
-    ctx.fillRect(cx - wallW * 0.5, cy, wallW, wallH);
-    // Door
-    ctx.fillStyle = '#1a0e06';
-    ctx.fillRect(cx - sz * 0.18, cy + wallH * 0.45, sz * 0.36, wallH * 0.55);
-    // Roofs (stacked)
-    for (let i = 0; i < tiers; i++) {
-      const rW = wallW * (1.4 - i * 0.18);
-      const ry = cy - i * sz * 0.32;
-      ctx.fillStyle = i === 0 ? '#9c2818' : '#7a2010';
+    // --- wood pole at peak ---
+    ctx.strokeStyle = '#2a1a0c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY - tentH);
+    ctx.lineTo(cx, baseY - tentH - s * 0.22);
+    ctx.stroke();
+    // small flag
+    ctx.fillStyle = '#7a3818';
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY - tentH - s * 0.22);
+    ctx.lineTo(cx + s * 0.09, baseY - tentH - s * 0.15);
+    ctx.lineTo(cx, baseY - tentH - s * 0.09);
+    ctx.closePath();
+    ctx.fill();
+
+    // --- smoke wisps drifting from peak hole ---
+    for (let i = 0; i < 3; i++) {
+      const seed = _hash(i + 360);
+      const period = s * 0.65;
+      const rise = ((seed * period + t * (9 + seed * 4)) % period);
+      const wx = cx + (seed - 0.5) * s * 0.12 + Math.sin(t * 1.4 + i) * s * 0.07;
+      const wy = baseY - tentH - rise;
+      const alpha = 0.15 * (1 - rise / period);
+      const wg = ctx.createRadialGradient(wx, wy, 0, wx, wy, 4 + i * 2.2);
+      wg.addColorStop(0, `rgba(170,162,148,${alpha})`);
+      wg.addColorStop(1, 'rgba(170,162,148,0)');
+      ctx.fillStyle = wg;
       ctx.beginPath();
-      ctx.moveTo(cx - rW * 0.5, ry);
-      ctx.lineTo(cx + rW * 0.5, ry);
-      ctx.lineTo(cx + rW * 0.42, ry - sz * 0.18);
-      ctx.lineTo(cx - rW * 0.42, ry - sz * 0.18);
-      ctx.closePath();
+      ctx.arc(wx, wy, 4 + i * 2.2, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
+  // Ukiyo-e folk house / minka — wooden lattice walls, curved tile roof, stone foundation.
+  // Replaces the flat brown box with red-square roof of the original drawPagoda.
+  function drawHouse(ctx, cx, cy, sz, level) {
+    const s = sz * (0.85 + 0.04 * Math.min(level, 10));
+    const wallH = s * 0.80;
+    const wallW = s * 1.15;
+    const tiers  = Math.min(3, 1 + Math.floor((level - 1) / 3));
+    const baseY  = cy + wallH;
+
+    // --- stone foundation row ---
+    ctx.fillStyle = '#38302a';
+    ctx.fillRect(cx - wallW * 0.56, baseY - s * 0.10, wallW * 1.12, s * 0.12);
+    // foundation stipple
+    ctx.fillStyle = 'rgba(56,44,32,0.30)';
+    for (let i = 0; i < 10; i++) {
+      ctx.fillRect(cx - wallW * 0.5 + _hash(i + 400) * wallW, baseY - s * 0.07, 3, 2);
+    }
+
+    // --- wooden lattice walls (weathered cedar) ---
+    const wallGrad = ctx.createLinearGradient(cx - wallW * 0.5, cy, cx + wallW * 0.5, cy);
+    wallGrad.addColorStop(0, '#5c3c20');
+    wallGrad.addColorStop(0.5, '#704830');
+    wallGrad.addColorStop(1, '#543418');
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(cx - wallW * 0.5, cy, wallW, wallH);
+    // vertical panel divisions (ink)
+    ctx.strokeStyle = 'rgba(24,10,4,0.38)';
+    ctx.lineWidth = 0.75;
+    const panels = 3 + Math.min(Math.floor(level / 2), 3);
+    for (let i = 1; i < panels; i++) {
+      const px = cx - wallW * 0.5 + wallW * i / panels;
+      ctx.beginPath(); ctx.moveTo(px, cy); ctx.lineTo(px, cy + wallH); ctx.stroke();
+    }
+    // horizontal mid-band
+    ctx.beginPath();
+    ctx.moveTo(cx - wallW * 0.5, cy + wallH * 0.50);
+    ctx.lineTo(cx + wallW * 0.5, cy + wallH * 0.50);
+    ctx.stroke();
+    // wall stipple
+    ctx.fillStyle = 'rgba(24,10,4,0.10)';
+    for (let i = 0; i < 40; i++) {
+      ctx.fillRect(
+        cx - wallW * 0.44 + _hash(i + 500) * wallW * 0.88,
+        cy + _hash(i + 501) * wallH, 1, 1
+      );
+    }
+    // ink wall outline
+    ctx.strokeStyle = '#180904';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - wallW * 0.5, cy, wallW, wallH);
+
+    // --- door alcove with paper-screen suggestion ---
+    const dW = wallW * 0.23;
+    const dH = wallH * 0.37;
+    ctx.fillStyle = '#0c0502';
+    ctx.fillRect(cx - dW * 0.5, baseY - dH, dW, dH);
+    // faint paper-screen interior
+    ctx.fillStyle = 'rgba(216,196,152,0.10)';
+    ctx.fillRect(cx - dW * 0.4, baseY - dH + 3, dW * 0.8, dH * 0.82);
+
+    // --- curved minka tile roofs (bottom tier drawn last = on top) ---
+    for (let tier = tiers - 1; tier >= 0; tier--) {
+      const rW    = wallW * (1.42 - tier * 0.24);
+      const rBaseY = cy - tier * s * 0.26;
+      const rH    = s * 0.22;
+
+      // muted terracotta fill
+      ctx.fillStyle = tier === 0 ? '#783620' : '#683018';
+      ctx.beginPath();
+      ctx.moveTo(cx - rW * 0.5, rBaseY);
+      ctx.lineTo(cx + rW * 0.5, rBaseY);
+      // curved eaves — bezier gives subtle upward curl at tips
+      ctx.bezierCurveTo(
+        cx + rW * 0.42, rBaseY - rH * 0.10,
+        cx + rW * 0.28, rBaseY - rH * 0.76,
+        cx, rBaseY - rH
+      );
+      ctx.bezierCurveTo(
+        cx - rW * 0.28, rBaseY - rH * 0.76,
+        cx - rW * 0.42, rBaseY - rH * 0.10,
+        cx - rW * 0.5, rBaseY
+      );
+      ctx.closePath();
+      ctx.fill();
+      // ink edge
+      ctx.strokeStyle = '#180800';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // tile row stipple near eave
+      ctx.fillStyle = 'rgba(18,6,2,0.22)';
+      const tc = Math.floor(rW / 7);
+      for (let j = 0; j < tc; j++) {
+        ctx.fillRect(cx - rW * 0.5 + j * 7 + 1, rBaseY - 4, 5, 2);
+      }
+    }
+  }
+
+  // Ukiyo-e folk campfire — stacked ink-outlined logs, stone ring, flickering
+  // bezier flame with muted amber palette, ash motes, and smoke wisps.
   function drawCampfire(ctx, cx, cy, sz, level, t) {
-    // Logs
-    ctx.fillStyle = '#3a2010';
-    ctx.fillRect(cx - sz, cy + sz * 0.2, sz * 2, sz * 0.3);
-    ctx.fillStyle = '#2a1808';
-    ctx.fillRect(cx - sz * 0.9, cy + sz * 0.05, sz * 1.8, sz * 0.2);
-    // Flame — two-frequency flicker, scales with level
+    const s = sz * (0.85 + 0.04 * Math.min(level, 10));
+
+    // --- ground ember glow ---
+    const glowG = ctx.createRadialGradient(cx, cy, s * 0.06, cx, cy, s * 1.1);
+    glowG.addColorStop(0, 'rgba(180,96,28,0.28)');
+    glowG.addColorStop(1, 'rgba(180,96,28,0)');
+    ctx.fillStyle = glowG;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, s * 1.1, s * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- stone ring (8 stones, perspective ellipse) ---
+    const stoneShades = ['#484038','#3c3430','#504840','#443c34'];
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const sx = cx + Math.cos(angle) * s * 0.54;
+      const sy = cy + Math.sin(angle) * s * 0.20;
+      ctx.fillStyle = stoneShades[i % stoneShades.length];
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 3.5 + _hash(i + 100) * 2.0, 2.2 + _hash(i + 101) * 1.4, angle, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(18,10,4,0.50)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+
+    // --- stacked log pile ---
+    const logBase = cy - s * 0.04;
+    // bottom-left log (rotated)
+    ctx.save();
+    ctx.translate(cx - s * 0.18, logBase + s * 0.12);
+    ctx.rotate(-0.45);
+    ctx.fillStyle = '#2c1a0a';
+    ctx.fillRect(-s * 0.50, -s * 0.09, s * 0.86, s * 0.18);
+    ctx.strokeStyle = 'rgba(14,8,2,0.65)';
+    ctx.lineWidth = 0.75;
+    ctx.strokeRect(-s * 0.50, -s * 0.09, s * 0.86, s * 0.18);
+    ctx.restore();
+    // bottom-right log (rotated opposite)
+    ctx.save();
+    ctx.translate(cx + s * 0.18, logBase + s * 0.12);
+    ctx.rotate(0.45);
+    ctx.fillStyle = '#2c1a0a';
+    ctx.fillRect(-s * 0.50, -s * 0.09, s * 0.86, s * 0.18);
+    ctx.strokeStyle = 'rgba(14,8,2,0.65)';
+    ctx.lineWidth = 0.75;
+    ctx.strokeRect(-s * 0.50, -s * 0.09, s * 0.86, s * 0.18);
+    ctx.restore();
+    // top log (horizontal, ember-dark)
+    ctx.fillStyle = '#382010';
+    ctx.fillRect(cx - s * 0.45, logBase - s * 0.08, s * 0.90, s * 0.17);
+    ctx.strokeStyle = 'rgba(14,8,2,0.62)';
+    ctx.lineWidth = 0.75;
+    ctx.strokeRect(cx - s * 0.45, logBase - s * 0.08, s * 0.90, s * 0.17);
+    // ember blush on top log
+    ctx.fillStyle = 'rgba(200,90,24,0.18)';
+    ctx.fillRect(cx - s * 0.34, logBase - s * 0.06, s * 0.68, s * 0.06);
+
+    // --- flickering flame (bezier tongue spline) ---
     const flickA = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * DIORAMA_FLICKER_HZ_PRIMARY);
     const flickB = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * DIORAMA_FLICKER_HZ_OVERTONE);
-    const flameH = sz * (1.0 + 0.18 * level + 0.12 * flickA + 0.06 * flickB);
-    const flameW = sz * 0.85;
-    const fg = ctx.createRadialGradient(cx, cy - flameH * 0.3, sz * 0.2, cx, cy - flameH * 0.3, flameH);
-    fg.addColorStop(0,    'rgba(255,220,120,0.95)');
-    fg.addColorStop(0.5,  'rgba(255,140,40,0.7)');
-    fg.addColorStop(1,    'rgba(120,30,10,0)');
-    ctx.fillStyle = fg;
+    const flickC = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 3.1 + 0.8);
+    const flameH  = s * (1.1 + 0.14 * level + 0.09 * flickA + 0.05 * flickB);
+    const flameBase = logBase - s * 0.05;
+    const fw = s * 0.46 * (0.9 + flickC * 0.11);
+    // outer flame
+    const of = ctx.createRadialGradient(
+      cx + (flickA - 0.5) * s * 0.07, flameBase - flameH * 0.27, s * 0.08,
+      cx, flameBase - flameH * 0.18, flameH * 0.92
+    );
+    of.addColorStop(0,    'rgba(206,148,48,0.82)');
+    of.addColorStop(0.42, 'rgba(176,76,22,0.58)');
+    of.addColorStop(1,    'rgba(88,16,6,0)');
+    ctx.fillStyle = of;
     ctx.beginPath();
-    ctx.ellipse(cx, cy - flameH * 0.4, flameW, flameH * 0.9, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - fw, flameBase);
+    ctx.bezierCurveTo(
+      cx - fw * 1.09, flameBase - flameH * 0.27,
+      cx - fw * 0.36 + (flickB - 0.5) * s * 0.07, flameBase - flameH * 0.73,
+      cx + (flickA - 0.5) * s * 0.08, flameBase - flameH
+    );
+    ctx.bezierCurveTo(
+      cx + fw * 0.36 + (flickC - 0.5) * s * 0.06, flameBase - flameH * 0.73,
+      cx + fw * 1.09, flameBase - flameH * 0.27,
+      cx + fw, flameBase
+    );
+    ctx.closePath();
     ctx.fill();
-    // Hot core
-    ctx.fillStyle = 'rgba(255,250,200,0.85)';
+    // inner hot core
+    const ic = ctx.createRadialGradient(
+      cx, flameBase - flameH * 0.22, 0,
+      cx, flameBase - flameH * 0.22, flameH * 0.42
+    );
+    ic.addColorStop(0,    'rgba(250,238,188,0.90)');
+    ic.addColorStop(0.45, 'rgba(238,168,66,0.60)');
+    ic.addColorStop(1,    'rgba(196,66,14,0)');
+    ctx.fillStyle = ic;
     ctx.beginPath();
-    ctx.ellipse(cx, cy - flameH * 0.25, flameW * 0.35, flameH * 0.45, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, flameBase - flameH * 0.22, fw * 0.43, flameH * 0.44, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // --- ash motes drifting upward ---
+    for (let i = 0; i < 7; i++) {
+      const seed = _hash(i + 120);
+      const period = flameH * 2.2;
+      const riseY = (seed * period + t * (15 + seed * 10)) % period;
+      const mx = cx + (seed - 0.5) * s * 0.58 + Math.sin(t * 1.4 + i * 1.3) * s * 0.13;
+      const my = flameBase - riseY;
+      if (my > flameBase - flameH * 1.7 && my < flameBase - s * 0.04) {
+        const a = Math.max(0, (1 - riseY / period)) * 0.44;
+        ctx.fillStyle = `rgba(206,140,54,${a})`;
+        ctx.beginPath();
+        ctx.arc(mx, my, 0.8 + seed * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // --- smoke wisps curling upward ---
+    for (let i = 0; i < 4; i++) {
+      const seed = _hash(i + 140);
+      const period = flameH * 2.8;
+      const riseY = (seed * period + t * (8 + seed * 5)) % period;
+      const wx = cx + (seed - 0.5) * s * 0.48 + Math.sin(t * 0.7 + i * 1.5) * s * 0.18;
+      const wy = (flameBase - flameH) - riseY;
+      const alpha = Math.max(0, (1 - riseY / period)) * 0.17;
+      const wR = 5 + i * 2.8 + riseY * 0.055;
+      const wg = ctx.createRadialGradient(wx, wy, 0, wx, wy, wR);
+      wg.addColorStop(0, `rgba(152,145,135,${alpha})`);
+      wg.addColorStop(1, 'rgba(152,145,135,0)');
+      ctx.fillStyle = wg;
+      ctx.beginPath();
+      ctx.arc(wx, wy, wR, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function startDioramaLoop() {

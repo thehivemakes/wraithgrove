@@ -1136,7 +1136,10 @@
         portrait.src = portraitUrl;
         // Centered via calc-offset, not translateX(-50%), so the rift glitch
         // keyframe (which owns `transform`) cannot overwrite the centering.
-        portrait.style.cssText = 'position:absolute;left:calc(50% - 48px);bottom:18%;width:96px;height:140px;object-fit:contain;display:block;z-index:2;pointer-events:none;';
+        // Architect 2026-05-05 visual cleanup: object-fit was 'contain' which letterboxed the
+        // cream parchment borders baked into the DALL-E portrait. Switching to 'cover' + larger
+        // container crops the parchment margins so only the character art is visible.
+        portrait.style.cssText = 'position:absolute;left:calc(50% - 56px);bottom:14%;width:112px;height:160px;object-fit:cover;object-position:center 25%;display:block;z-index:2;pointer-events:none;border-radius:6px;';
         if (isRift) portrait.classList.add('wg-rift-intrude');
         portrait.addEventListener('load', () => { charCanvas.style.display = 'none'; });
         portrait.addEventListener('error', () => { if (portrait.parentNode) portrait.parentNode.removeChild(portrait); });
