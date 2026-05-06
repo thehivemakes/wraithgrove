@@ -23,11 +23,16 @@
   // W-Enemy-Sprites — sprite catalog for the 5 briefed enemy types.
   // All other enemy types keep their existing per-type draw functions.
   const ENEMY_SPRITES = {
-    lurker:      ['art/enemies/lurker/walk0.png',      'art/enemies/lurker/walk1.png',      'art/enemies/lurker/walk2.png'],
-    walker:      ['art/enemies/walker/walk0.png',      'art/enemies/walker/walk1.png',      'art/enemies/walker/walk2.png'],
-    sprite:      ['art/enemies/sprite/walk0.png',      'art/enemies/sprite/walk1.png',      'art/enemies/sprite/walk2.png'],
-    brute_small: ['art/enemies/brute_small/walk0.png', 'art/enemies/brute_small/walk1.png', 'art/enemies/brute_small/walk2.png'],
-    caller:      ['art/enemies/caller/walk0.png',      'art/enemies/caller/walk1.png',      'art/enemies/caller/walk2.png'],
+    lurker:         ['art/enemies/lurker/walk0.png',         'art/enemies/lurker/walk1.png',         'art/enemies/lurker/walk2.png'],
+    walker:         ['art/enemies/walker/walk0.png',         'art/enemies/walker/walk1.png',         'art/enemies/walker/walk2.png'],
+    sprite:         ['art/enemies/sprite/walk0.png',         'art/enemies/sprite/walk1.png',         'art/enemies/sprite/walk2.png'],
+    brute_small:    ['art/enemies/brute_small/walk0.png',    'art/enemies/brute_small/walk1.png',    'art/enemies/brute_small/walk2.png'],
+    caller:         ['art/enemies/caller/walk0.png',         'art/enemies/caller/walk1.png',         'art/enemies/caller/walk2.png'],
+    // W-Enemy-Sprites-Stage1-Pack — Stage 1 (Lantern Vigil) closing THE GATE
+    red_zombie:     ['art/enemies/red_zombie/walk0.png',     'art/enemies/red_zombie/walk1.png',     'art/enemies/red_zombie/walk2.png'],
+    pumpkin_lantern:['art/enemies/pumpkin_lantern/walk0.png','art/enemies/pumpkin_lantern/walk1.png','art/enemies/pumpkin_lantern/walk2.png'],
+    skull_swarmer:  ['art/enemies/skull_swarmer/walk0.png',  'art/enemies/skull_swarmer/walk1.png',  'art/enemies/skull_swarmer/walk2.png'],
+    wraith_fast:    ['art/enemies/wraith_fast/walk0.png',    'art/enemies/wraith_fast/walk1.png',    'art/enemies/wraith_fast/walk2.png'],
   };
   // Preloaded Image objects: _spriteCache[type][frameIdx] — populated by init().
   const _spriteCache = {};
@@ -2072,12 +2077,26 @@
       if (_feverGlow) { ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9; }
       const s = w2s(c.x, c.y);
       switch (c.type) {
-        case 'pumpkin_lantern': drawPumpkin(ctx, s.x, s.y, c);   break;
+        // W-Enemy-Sprites-Stage1-Pack Concern C — sprite-first with geometric fallback
+        case 'red_zombie':
+          if (ENEMY_SPRITES.red_zombie && _spriteCache.red_zombie) drawSpriteCreature(ctx, s.x, s.y, c);
+          else drawZombie(ctx, s.x, s.y, c);
+          break;
+        case 'pumpkin_lantern':
+          if (ENEMY_SPRITES.pumpkin_lantern && _spriteCache.pumpkin_lantern) drawSpriteCreature(ctx, s.x, s.y, c);
+          else drawPumpkin(ctx, s.x, s.y, c);
+          break;
+        case 'skull_swarmer':
+          if (ENEMY_SPRITES.skull_swarmer && _spriteCache.skull_swarmer) drawSpriteCreature(ctx, s.x, s.y, c);
+          else drawSkullImp(ctx, s.x, s.y, c);
+          break;
+        case 'wraith_fast':
+          if (ENEMY_SPRITES.wraith_fast && _spriteCache.wraith_fast) drawSpriteCreature(ctx, s.x, s.y, c);
+          else drawWraithFast(ctx, s.x, s.y, c);
+          break;
         case 'jiangshi':        drawJiangshi(ctx, s.x, s.y, c);  break;
         case 'samurai_grunt':   drawSamurai(ctx, s.x, s.y, c);   break;
         case 'banshee':         drawBanshee(ctx, s.x, s.y, c);   break;
-        case 'wraith_fast':     drawWraithFast(ctx, s.x, s.y, c); break;
-        case 'skull_swarmer':   drawSkullImp(ctx, s.x, s.y, c);  break;
         case 'sigil_drone':     drawSigilDrone(ctx, s.x, s.y, c); break;
         case 'memory_husk':     drawMemoryHusk(ctx, s.x, s.y, c); break;
         default:
