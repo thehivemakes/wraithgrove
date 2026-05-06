@@ -2044,23 +2044,37 @@
   // Falls back to drawZombie on cache miss (image not yet loaded or missing file).
   // HP bar is drawn after the sprite so it always renders on top.
   function drawSpriteCreature(ctx, sx, sy, c) {
+    // Architect 2026-05-06: DALL-E walk-cycle frames aren't frame-coherent (each
+    // generation is independent), cycling them = strobe noise. Pin to neutral
+    // pose (frame 1) and use math-based squish-stretch + bob for animation.
     const frames = _spriteCache[c.type];
-    const frame = Math.floor(performance.now() / 200 + (c.id || 0)) % 3;
-    const img = frames && frames[frame];
+    const img = frames && frames[1];  // neutral pose only
     if (!img || !img.complete || img.naturalWidth === 0) {
       drawZombie(ctx, sx, sy, c);
       return;
     }
     const sz = c.size;
     const displaySize = sz * 2;
+    // Per-creature walk bob — small Y oscillation timed off id+now so each
+    // creature is out of phase. Frequency scales with movement speed.
+    const t = performance.now() / 1000;
+    const phase = (c.id || 0) * 0.7 + t * (c._typeData ? c._typeData.speed / 30 : 4);
+    const bob = Math.sin(phase) * (sz * 0.06);  // ~6% of size, max ~1.5px
+    // Squash-stretch on bob — wider when "down", taller when "up"
+    const sqx = 1.00 + Math.sin(phase) * 0.04;       // ±4% width
+    const sqy = 1.00 - Math.sin(phase) * 0.04;       // inverse — preserves pixel volume
+    const dw = displaySize * 2 * sqx;
+    const dh = displaySize * 2 * sqy;
+    const dx = sx - dw / 2;
+    const dy = sy - dh * 0.75 + bob;  // anchor near feet
     if (c.facing === 'W') {
       ctx.save();
       ctx.translate(sx, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, -displaySize, sy - displaySize * 1.5, displaySize * 2, displaySize * 2);
+      ctx.drawImage(img, -dw / 2, dy, dw, dh);
       ctx.restore();
     } else {
-      ctx.drawImage(img, sx - displaySize, sy - displaySize * 1.5, displaySize * 2, displaySize * 2);
+      ctx.drawImage(img, dx, dy, dw, dh);
     }
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 3 - 2, Math.max(20, sz + 4), c.hp, c.maxHp);
   }
