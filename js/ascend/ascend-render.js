@@ -43,23 +43,35 @@
     const _vipFrame = WG.State.isRoyalPassActive && WG.State.isRoyalPassActive()
       ? 'border:2px solid #c080ff;box-shadow:0 0 10px rgba(192,96,255,0.5),inset 0 0 4px rgba(192,96,255,0.2);'
       : 'border:1px solid #604020;';
-    // Architect 2026-05-05 visual cleanup: was tag-shape + red-dot procedural placeholder.
-    // Now renders the actual ukiyo-e illustrated portrait if available; falls back to
-    // tier-tinted procedural figure on image error or missing asset.
+    // W-Character-Animate-MJ: try animated WebP first; fall back to static PNG
+    // (+ CSS breathe); fall back to procedural figure on static PNG error too.
     const portrait = el('div', { style:'position:relative;width:96px;height:128px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));' + _vipFrame + 'border-radius:6px;margin:6px 0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;' });
     const portraitImg = document.createElement('img');
     portraitImg.alt = '';
     portraitImg.decoding = 'async';
     portraitImg.loading = 'lazy';
-    portraitImg.src = 'images/portraits/' + charId + '.png';
-    portraitImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 22%;animation:wg-char-breathe 4.6s ease-in-out infinite;transform-origin:center bottom;';
+    const _ascAnimSrc   = 'images/portraits/anim/' + charId + '.webp';
+    const _ascStaticSrc = 'images/portraits/' + charId + '.png';
+    portraitImg.src = _ascAnimSrc;
+    // Base style without breathe — animated WebP IS the breathing.
+    const _ascBaseStyle = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 22%;transform-origin:center bottom;';
+    portraitImg.style.cssText = _ascBaseStyle;
     portrait.appendChild(portraitImg);
-    // Procedural fallback (hidden by default; revealed on img error)
+    // Procedural fallback (hidden by default; revealed on static PNG error)
     const fig = el('div', { style:`width:30px;height:48px;background:${tier.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;display:none;` });
     const head = el('div', { style:`position:absolute;top:-12px;left:6px;width:18px;height:18px;background:${tier.accent};border-radius:50%;border:1px solid #2a1c10;` });
     fig.appendChild(head);
     portrait.appendChild(fig);
-    portraitImg.addEventListener('error', () => { portraitImg.style.display = 'none'; fig.style.display = ''; });
+    portraitImg.addEventListener('error', () => {
+      if (portraitImg.src.endsWith('.webp')) {
+        // Animated WebP unavailable — fall back to static PNG + CSS breathe.
+        portraitImg.src = _ascStaticSrc;
+        portraitImg.style.cssText = _ascBaseStyle + 'animation:wg-char-breathe 4.6s ease-in-out infinite;';
+      } else {
+        portraitImg.style.display = 'none';
+        fig.style.display = '';
+      }
+    });
     heroBox.appendChild(portrait);
 
     // Name / tier / level

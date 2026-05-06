@@ -311,7 +311,19 @@
     if (tab === 'forge' && WG.ForgeRender) WG.ForgeRender.refresh();
     if (tab === 'relics' && WG.RelicsRender) WG.RelicsRender.refresh();
     if (tab === 'duel' && WG.DuelRender) WG.DuelRender.refresh();
-    if (tab === 'hunt') showHuntStageList();
+    if (tab === 'hunt') {
+      // W-Character-Animate-MJ Concern D: preload active character's animated
+      // WebP so it's cache-warm when renderHero() fires. Injected once per
+      // unique character URL (querySelector guard prevents duplicate links).
+      const _preActiveId = (WG.State.get().player && WG.State.get().player.activeCharacter) || 'lantern_acolyte';
+      const _preUrl = 'images/portraits/anim/' + _preActiveId + '.webp';
+      if (!document.querySelector('link[rel="preload"][href="' + _preUrl + '"]')) {
+        const _pl = document.createElement('link');
+        _pl.rel = 'preload'; _pl.as = 'image'; _pl.type = 'image/webp'; _pl.href = _preUrl;
+        document.head.appendChild(_pl);
+      }
+      showHuntStageList();
+    }
   }
 
   // SPEC W-Hard-Tuning-And-Monetization §B — ad-watch buff buttons in level select.
@@ -439,6 +451,20 @@
     ash_brawler:     'images/portraits/ash_brawler.png',
     fox_kabuki:      'images/portraits/fox_kabuki.png',
     cap_apprentice:  'images/portraits/cap_apprentice.png',
+  };
+  // W-Character-Animate-MJ: animated WebP loops (12fps, 360×480, ~250KB each).
+  // Populated when MJ Animate outputs exist; empty until then so fallback chain
+  // (anim WebP → static PNG → procedural canvas) degrades gracefully.
+  const CHARACTER_PORTRAITS_ANIM = {
+    lantern_acolyte: 'images/portraits/anim/lantern_acolyte.webp',
+    sigil_student:   'images/portraits/anim/sigil_student.webp',
+    horned_oni:      'images/portraits/anim/horned_oni.webp',
+    paper_priest:    'images/portraits/anim/paper_priest.webp',
+    silent_seer:     'images/portraits/anim/silent_seer.webp',
+    scythe_widow:    'images/portraits/anim/scythe_widow.webp',
+    ash_brawler:     'images/portraits/anim/ash_brawler.webp',
+    fox_kabuki:      'images/portraits/anim/fox_kabuki.webp',
+    cap_apprentice:  'images/portraits/anim/cap_apprentice.webp',
   };
   // W-Boss-Portraits — 1024×1024 ukiyo-e portraits shown during boss-intro reveal.
   // Same style register as BIOME_ART + CHARACTER_PORTRAITS. Null id falls through
@@ -1123,26 +1149,35 @@
       heroContent.appendChild(charCanvas);
       const cctx = charCanvas.getContext('2d');
 
-      // Concern D — character portrait slot. If CHARACTER_PORTRAITS[activeId]
-      // is a non-null URL, overlay an <img> matching the procedural sprite's
-      // box. On load, hide the procedural sprite. On error, fall back. Rift
-      // biome class follows the biome (cross-IP characters appear in rifts).
-      const portraitUrl = CHARACTER_PORTRAITS[activeId];
-      if (portraitUrl) {
+      // W-Character-Animate-MJ: portrait slot. Fallback chain:
+      //   animated WebP (MJ Animate output) → static PNG → procedural canvas.
+      // Animated WebP carries its own breathing; CSS breathe keyframe only
+      // applies to the static PNG fallback to avoid double-animation.
+      const _animUrl   = CHARACTER_PORTRAITS_ANIM[activeId];
+      const _staticUrl = CHARACTER_PORTRAITS[activeId];
+      const _firstSrc  = _animUrl || _staticUrl;
+      if (_firstSrc) {
         const portrait = document.createElement('img');
         portrait.alt = '';
         portrait.decoding = 'async';
         portrait.loading = 'lazy';
-        portrait.src = portraitUrl;
-        // Centered via calc-offset, not translateX(-50%), so the rift glitch
+        portrait.src = _firstSrc;
+        // Base style: centered via calc-offset (not translateX) so rift glitch
         // keyframe (which owns `transform`) cannot overwrite the centering.
-        // Architect 2026-05-05 visual cleanup #2: parchment borders cropped at the
-        // PNG level via Pillow (see images/portraits/_raw_backup originals). Now uses
-        // a clean cover-fit and adds gentle breathing animation for character liveness.
-        portrait.style.cssText = 'position:absolute;left:calc(50% - 56px);bottom:14%;width:112px;height:160px;object-fit:cover;object-position:center 22%;display:block;z-index:2;pointer-events:none;border-radius:6px;animation:wg-char-breathe 4.6s ease-in-out infinite;transform-origin:center bottom;';
+        const _baseStyle = 'position:absolute;left:calc(50% - 56px);bottom:14%;width:112px;height:160px;object-fit:cover;object-position:center 22%;display:block;z-index:2;pointer-events:none;border-radius:6px;transform-origin:center bottom;';
+        // Only apply CSS breathe to static PNG; animated WebP IS the breathing.
+        portrait.style.cssText = _baseStyle + (_animUrl ? '' : 'animation:wg-char-breathe 4.6s ease-in-out infinite;');
         if (isRift) portrait.classList.add('wg-rift-intrude');
         portrait.addEventListener('load', () => { charCanvas.style.display = 'none'; });
-        portrait.addEventListener('error', () => { if (portrait.parentNode) portrait.parentNode.removeChild(portrait); });
+        portrait.addEventListener('error', () => {
+          if (_animUrl && portrait.src.endsWith('.webp') && _staticUrl) {
+            // Animated WebP unavailable — fall back to static PNG + CSS breathe.
+            portrait.src = _staticUrl;
+            portrait.style.cssText = _baseStyle + 'animation:wg-char-breathe 4.6s ease-in-out infinite;';
+          } else if (portrait.parentNode) {
+            portrait.parentNode.removeChild(portrait);
+          }
+        });
         heroContent.appendChild(portrait);
       }
       let lastW = 0, lastH = 0;

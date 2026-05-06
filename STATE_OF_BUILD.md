@@ -1,12 +1,20 @@
 # STATE_OF_BUILD.md — Wraithgrove
 
-**Last updated:** 2026-05-05 by W-i18n-Scaffolding (Loom)
+**Last updated:** 2026-05-05 by W-Character-Animate-MJ (Wick)
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### Animated Character Portraits — Infrastructure (W-Character-Animate-MJ 2026-05-05, Wick)
+- **`images/portraits/anim/`** — destination for 9 animated WebP loops (created, empty until MJ Animate runs).
+- **`images/portraits/_anim_raw/`** — destination for raw MP4s from MJ Animate (created, empty).
+- **`js/wg-game.js`** — `CHARACTER_PORTRAITS_ANIM` constant added (parallel to `CHARACTER_PORTRAITS`); `renderHero()` now tries animated WebP first, falls back to static PNG (+CSS breathe keyframe) on error, falls back to procedural canvas on static PNG error. `switchTab('hunt')` injects `<link rel="preload" as="image" type="image/webp">` for the active character's WebP once on tab entry (dedup-guarded).
+- **`js/ascend/ascend-render.js`** — same fallback chain: tries `images/portraits/anim/<id>.webp` first; on `.webp` error falls back to `images/portraits/<id>.png` + CSS breathe; on static error shows procedural figure.
+- **Asset budget:** 9 WebPs at ~250KB each ≈ 2.25 MB total. Hard budget: ≤ 3 MB (≤ 333KB per file). ffmpeg target: `-q:v 60 -s 360x480 -r 12` (12fps, 360×480 output, lossy quality 60).
+- **Blocker — Concern A (MJ Animate generation):** Chrome MCP not configured in this session (`mcpServers: {}`). The infrastructure code ships now; MJ Animate runs when Chrome MCP is available. See `Autonomous/WORKER_OUTPUT/w-character-animate-mj/SELF_REVIEW.md`.
 
 ### i18n Scaffolding (W-i18n-Scaffolding 2026-05-05)
 - **`js/core/wg-i18n.js`** — `WG.i18n`: `init(code)`, `t(key, params)`, `setLocale(code)`, `refreshDOM()`, `getLocale()`, `isReady()`.
