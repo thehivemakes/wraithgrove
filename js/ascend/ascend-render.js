@@ -47,7 +47,6 @@
     // Now renders the actual ukiyo-e illustrated portrait if available; falls back to
     // tier-tinted procedural figure on image error or missing asset.
     const portrait = el('div', { style:'position:relative;width:96px;height:128px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));' + _vipFrame + 'border-radius:6px;margin:6px 0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;' });
-    const charId = (character && character.id) || 'lantern_acolyte';
     const portraitImg = document.createElement('img');
     portraitImg.alt = '';
     portraitImg.decoding = 'async';
