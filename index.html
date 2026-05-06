@@ -127,6 +127,18 @@
     animation: modal-pop 200ms ease-out;
   }
   @keyframes modal-pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  /* Architect 2026-05-05 — breathing/idle animation for menu + ascend character portraits.
+     Subtle scale + vertical drift mimics breathing; fixed pivot prevents jitter. */
+  @keyframes wg-char-breathe {
+    0%   { transform: translateY(0)    scale(1.000); filter: brightness(1.00); }
+    50%  { transform: translateY(-2px) scale(1.018); filter: brightness(1.06); }
+    100% { transform: translateY(0)    scale(1.000); filter: brightness(1.00); }
+  }
+  /* Soft warm glow halo for character — pulses opposite phase to breathing for liveness */
+  @keyframes wg-char-glow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(216,168,56,0.15) inset, 0 4px 20px rgba(216,168,56,0.04); }
+    50%      { box-shadow: 0 0 0 1px rgba(240,200,96,0.30) inset, 0 6px 28px rgba(240,200,96,0.16); }
+  }
   .modal-title { font-size: 16px; color: #f0d890; margin-bottom: 12px; letter-spacing: 1px; text-align: center; }
   .modal-body { font-size: 13px; color: #d8c898; line-height: 1.5; margin-bottom: 16px; }
   .modal-btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
@@ -325,7 +337,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.27.2-boot-hotfix-1778037071', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Wraithgrove', version: '0.27.3-portrait-cleanup-1778037743', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');

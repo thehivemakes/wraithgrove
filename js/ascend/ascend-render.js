@@ -52,7 +52,7 @@
     portraitImg.decoding = 'async';
     portraitImg.loading = 'lazy';
     portraitImg.src = 'images/portraits/' + charId + '.png';
-    portraitImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 25%;';
+    portraitImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 22%;animation:wg-char-breathe 4.6s ease-in-out infinite;transform-origin:center bottom;';
     portrait.appendChild(portraitImg);
     // Procedural fallback (hidden by default; revealed on img error)
     const fig = el('div', { style:`width:30px;height:48px;background:${tier.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;display:none;` });

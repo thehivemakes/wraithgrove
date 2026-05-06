@@ -28,9 +28,14 @@
     s.textContent = keyframes + [
       '.wg-ext-hint{position:fixed;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px;animation:tut-fadein 220ms ease-out both;}',
       '.wg-ext-hint.arrow-below{flex-direction:column-reverse;}',
-      '.wg-ext-hint .ext-body{position:relative;background:rgba(8,4,2,.92);border:1px solid #b08840;border-radius:8px;padding:6px 22px 6px 13px;font-size:11px;letter-spacing:.8px;color:#f0d890;white-space:pre-line;line-height:1.5;box-shadow:0 2px 10px rgba(0,0,0,.7);}',
-      '.wg-ext-hint .ext-close{position:absolute;top:0;right:4px;background:none;border:none;color:#a08060;font-size:15px;line-height:1.3;cursor:pointer;pointer-events:auto;padding:1px 2px;}',
-      '.wg-ext-hint .ext-close:active{color:#f0d890;}',
+      // Architect 2026-05-05: tutorial hint UX — close button too small to find, body
+      // didn't read as dismissible. Bigger × + caption + tap-anywhere to dismiss.
+      '.wg-ext-hint .ext-body{position:relative;background:rgba(8,4,2,.94);border:1px solid #d8a838;border-radius:8px;padding:9px 38px 22px 14px;font-size:12px;letter-spacing:.8px;color:#f0d890;white-space:pre-line;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.85),0 0 0 1px rgba(216,168,56,0.18) inset;pointer-events:auto;cursor:pointer;}',
+      '.wg-ext-hint .ext-body:hover{border-color:#f0c060;}',
+      '.wg-ext-hint .ext-close{position:absolute;top:3px;right:6px;background:rgba(216,168,56,0.18);border:1px solid #d8a838;border-radius:50%;color:#f0d890;font-size:16px;line-height:1;cursor:pointer;pointer-events:auto;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;}',
+      '.wg-ext-hint .ext-close:hover{background:rgba(216,168,56,0.4);}',
+      '.wg-ext-hint .ext-close:active{transform:scale(0.92);}',
+      '.wg-ext-hint .ext-caption{position:absolute;bottom:5px;right:10px;font-size:9px;color:#a08060;letter-spacing:0.5px;text-transform:uppercase;opacity:0.7;pointer-events:none;}',
       '.wg-ext-arrow{animation:tut-pulse 1.4s infinite ease-in-out;}',
       '.wg-ext-toast{position:fixed;left:50%;transform:translateX(-50%);background:rgba(8,4,2,.92);border:1px solid #b08840;border-radius:8px;padding:7px 16px;font-size:11px;letter-spacing:.8px;color:#f0d890;text-align:center;white-space:pre-line;line-height:1.5;box-shadow:0 2px 10px rgba(0,0,0,.7);animation:tut-fadein 220ms ease-out both;}',
       '.wg-ext-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#e04040;pointer-events:none;animation:tut-fadein 400ms ease-out both;}',
@@ -66,8 +71,14 @@
     closeBtn.className = 'ext-close';
     closeBtn.setAttribute('aria-label', 'Dismiss hint');
     closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', () => dismissHint(id, onClose));
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); dismissHint(id, onClose); });
     body.appendChild(closeBtn);
+    // Architect 2026-05-05: tap-anywhere-on-body dismisses (in addition to ×)
+    body.addEventListener('click', () => dismissHint(id, onClose));
+    const caption = document.createElement('div');
+    caption.className = 'ext-caption';
+    caption.textContent = 'tap to dismiss';
+    body.appendChild(caption);
 
     if (arrowAbove) {
       const arrowWrap = document.createElement('span');
