@@ -982,7 +982,11 @@
     select.style.cssText = 'position:absolute;inset:36px 0 0 0;padding:8px 14px 16px 14px;background:#0c0a08;z-index:10;display:flex;flex-direction:column;';
     root.appendChild(select);
 
-    const stages = WG.HuntStage.list();
+    // Architect 2026-05-06 hotfix: Stage 0 is the tutorial pre-stage — auto-launched
+    // on first boot only. It's never shown in the carousel. Otherwise it appeared as
+    // a locked tile (no stage -1 exists for the unlock check) and players with existing
+    // saves (firstLaunch=false) couldn't get past it.
+    const stages = WG.HuntStage.list().filter(s => s.id !== 0);
 
     // Clamp selection to a valid stage on (re)open.
     if (selectedStageIdx < 0 || selectedStageIdx >= stages.length) selectedStageIdx = 0;
