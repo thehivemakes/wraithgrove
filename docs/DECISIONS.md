@@ -1,3 +1,48 @@
+# Decision 2026-05-06 — Path A monetization locked for launch
+
+**Architect ratification 2026-05-06:** *"path A"* — direct response to PIVOT_REPORT.md §"Ad Cadence Decision."
+
+## What this means
+- Faithful Wood Siege clone monetization (BLUEPAPER §0 Rule 4)
+- Aggressive ad cadence: interstitial after every stage clear, rewarded video buff auto-popups, hard energy wall, daily 50-RV cap, daily "watch 5 ads" missions
+- ~12-18 ads in a typical 30-minute session
+- Higher revenue-per-install at launch; trade-off is potential 1-star reviews per Klovur App Store review pattern
+
+## Pivot report's Path B recommendation
+Pivot report recommended launching Path B (humane cadence) and switching to A after sufficient traction (5K+ reviews) when 1-star noise can't tank store rank.
+
+**Architect rejected Path B.** Decision documented; not relitigated.
+
+## Implementation status
+Path A is what we already specced and shipped through 0.27.4. No code changes required for this decision — just locking the direction.
+
+---
+
+# Decision 2026-05-06 — Project rename: Wraithgrove → Unlimited Chaos
+
+**Architect ratification 2026-05-06:** *"Unlimited Chaos"* after collision check.
+
+## Collision check result
+- Google AI Overview: no major app strictly named Unlimited Chaos
+- Apple.com global search: no matches
+- Phrase appears in marketing taglines for 3-4 smaller Android party games (not as actual app titles)
+- App Store Connect first-come/first-claim — register at submission
+
+## Scope
+Global rename across:
+- index.html title + boot screen + in-game header
+- package.json + manifest.json
+- Capacitor config (app id stays com.thehivemakes.wraithgrove for backward-compat? Or rename?)
+- ASO_PACKAGE_v1.md
+- privacy.html + terms.html (entity name placeholder unchanged)
+- BLUEPAPER §1 identity
+- All worker prompts referencing "Wraithgrove" — update to "Unlimited Chaos" only where customer-facing
+
+## Visual register
+KEEP the existing ukiyo-e folk-horror aesthetic. Architect indicated the contrast (chill atmosphere + chaos action) is the brand. Do NOT shift to "chaos energy" register.
+
+---
+
 # Decision 2026-05-03 — Stage durations cut aggressively for mobile pacing
 
 **Architect verbal directive 2026-05-03 14:50 EDT:** *"the enemy waves during battle are way too long. people don't want to wait that long. Especially for stage 1."*

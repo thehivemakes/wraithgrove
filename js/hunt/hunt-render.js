@@ -20,6 +20,18 @@
   // Player swing squash timestamp (DOPAMINE_DESIGN §9 sprite techniques).
   let _lastSwingAt = 0;
 
+  // W-Enemy-Sprites — sprite catalog for the 5 briefed enemy types.
+  // All other enemy types keep their existing per-type draw functions.
+  const ENEMY_SPRITES = {
+    lurker:      ['art/enemies/lurker/walk0.png',      'art/enemies/lurker/walk1.png',      'art/enemies/lurker/walk2.png'],
+    walker:      ['art/enemies/walker/walk0.png',      'art/enemies/walker/walk1.png',      'art/enemies/walker/walk2.png'],
+    sprite:      ['art/enemies/sprite/walk0.png',      'art/enemies/sprite/walk1.png',      'art/enemies/sprite/walk2.png'],
+    brute_small: ['art/enemies/brute_small/walk0.png', 'art/enemies/brute_small/walk1.png', 'art/enemies/brute_small/walk2.png'],
+    caller:      ['art/enemies/caller/walk0.png',      'art/enemies/caller/walk1.png',      'art/enemies/caller/walk2.png'],
+  };
+  // Preloaded Image objects: _spriteCache[type][frameIdx] — populated by init().
+  const _spriteCache = {};
+
   // SPEC §0 — Night Mode lighting. Overlay alpha eases with (1 - torchAmount).
   // Holes carved at player + every built campfire via destination-out compositing.
   // Constants in world units (radii) and seconds (time-bases).
@@ -1982,6 +1994,31 @@
     if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz*0.8, Math.max(22, sz+4), c.hp, c.maxHp);
   }
 
+  // W-Enemy-Sprites: draw a sprite-sheet enemy using the preloaded cache.
+  // Falls back to drawZombie on cache miss (image not yet loaded or missing file).
+  // HP bar is drawn after the sprite so it always renders on top.
+  function drawSpriteCreature(ctx, sx, sy, c) {
+    const frames = _spriteCache[c.type];
+    const frame = Math.floor(performance.now() / 200 + (c.id || 0)) % 3;
+    const img = frames && frames[frame];
+    if (!img || !img.complete || img.naturalWidth === 0) {
+      drawZombie(ctx, sx, sy, c);
+      return;
+    }
+    const sz = c.size;
+    const displaySize = sz * 2;
+    if (c.facing === 'W') {
+      ctx.save();
+      ctx.translate(sx, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -displaySize, sy - displaySize * 1.5, displaySize * 2, displaySize * 2);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx - displaySize, sy - displaySize * 1.5, displaySize * 2, displaySize * 2);
+    }
+    if (c.hp < c.maxHp) WG.Render.drawHpBar(ctx, sx, sy - sz * 3 - 2, Math.max(20, sz + 4), c.hp, c.maxHp);
+  }
+
   function drawCreatures(ctx) {
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
@@ -1995,7 +2032,9 @@
         case 'skull_swarmer':   drawSkullImp(ctx, s.x, s.y, c);  break;
         case 'sigil_drone':     drawSigilDrone(ctx, s.x, s.y, c); break;
         case 'memory_husk':     drawMemoryHusk(ctx, s.x, s.y, c); break;
-        default:                drawZombie(ctx, s.x, s.y, c);  // red_zombie + classic five
+        default:
+          if (ENEMY_SPRITES[c.type]) drawSpriteCreature(ctx, s.x, s.y, c);
+          else drawZombie(ctx, s.x, s.y, c);
       }
     }
     if (runtime.boss && runtime.boss.hp > 0) {
@@ -2664,6 +2703,14 @@
   function init() {
     if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.init) WG.HuntFXNumbers.init();
     if (window.WG.HuntFX && WG.HuntFX.init) WG.HuntFX.init();
+    // Preload enemy sprites lazily — game boots even if assets are missing.
+    Object.keys(ENEMY_SPRITES).forEach(type => {
+      _spriteCache[type] = ENEMY_SPRITES[type].map(path => {
+        const img = new Image();
+        img.src = path;
+        return img;
+      });
+    });
     // Manual HUD pulse trigger — DOPAMINE_DESIGN §2: any module can ping a counter.
     WG.Engine.on('hud:pulse', ({ key }) => {
       if (_hudPulse[key]) _hudPulse[key].ts = performance.now();

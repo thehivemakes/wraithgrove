@@ -100,6 +100,170 @@ chibi anime pixel art enemy, tall thin gaunt figure in deep purple ceremonial ro
 
 ---
 
+---
+
+## red_zombie
+
+**HP / speed / damage:** 22 HP / speed 65 / damage 6
+**Color register:** #a82820
+**Accent register:** #ffe0b0
+
+**Read-at-glance silhouette:** Cloaked robed figure with a pointed hood and pale face — reads as the default threatening presence, the foot-soldier archetype.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, cloaked humanoid in dark crimson-brown hooded robe, pale sallow face visible under hood, dark hollow eye sockets, robe widening to ground like a trapezoid, arms hidden inside sleeves, dominant color #a82820, glowing accent #ffe0b0, 32×32 px sprite, hostile predatory body language, no weapon visible (claws/fangs only unless specified), 3-frame walk cycle (left foot, neutral, right foot), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
+## pumpkin_lantern
+
+**HP / speed / damage:** 32 HP / speed 70 / damage 8
+**Color register:** #e07820
+**Accent register:** #ffc848
+
+**Read-at-glance silhouette:** A huge glowing orange pumpkin-head on a thin dark stick body — reads as volatile, flickering, night-mode folk-horror.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, thin dark stick-figure body with an oversized glowing orange pumpkin for a head, triangular glowing eyes and jagged mouth carved into the pumpkin, small dark arm stubs extending sideways, bare stick-legs ending in black shoes, green-brown stem on pumpkin crown, dominant color #e07820, glowing accent #ffc848, 32×32 px sprite, hostile predatory body language, no weapon visible (claws/fangs only unless specified), 3-frame walk cycle (left foot, neutral, right foot), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
+## jiangshi
+
+**HP / speed / damage:** 50 HP / speed 85 / damage 12
+**Color register:** #3a2018
+**Accent register:** #f8e8c8
+
+**Read-at-glance silhouette:** Stiff-armed hopping figure under a wide conical straw hat, paper amulet hanging from the brim — reads as an ancient folk monster, arms forward, shuffling advance.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, Chinese hopping vampire jiangshi, dark green-brown funeral robe, arms stretched stiffly horizontal at shoulder height, pale green-tinged face with two tiny red dot eyes, wide conical straw hat with vertical paper amulet strip hanging from brim, gold waist sash, dominant color #3a2018, accent #f8e8c8, 32×32 px sprite, hostile predatory body language, no weapon visible (claws/fangs only unless specified), 3-frame hop cycle (hop up, mid-air, land), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
+## samurai_grunt
+
+**HP / speed / damage:** 70 HP / speed 80 / damage 15
+**Color register:** #a82828
+**Accent register:** #ffc850
+
+**Read-at-glance silhouette:** Armored warrior with horned kabuto helmet and crimson battle armor — reads as a heavy threatening threat that demands immediate attention.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, compact armored samurai warrior in dark crimson lacquer chest plate with gold trim, horned kabuto helmet with full face guard, red haori battle coat over dark armor, katana scabbard at hip (sheathed, no weapon drawn), dominant color #a82828, gold accent #ffc850, 32×32 px sprite, hostile predatory body language, 3-frame walk cycle (left foot, neutral, right foot), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western fantasy demons, weapons drawn or attacking, text, multiple characters, gore`
+
+---
+
+## banshee
+
+**HP / speed / damage:** 220 HP / speed 130 / damage 22 (rare — max 1 alive)
+**Color register:** #e8e0f0
+**Accent register:** #a060ff
+
+**Read-at-glance silhouette:** Large drifting pale-violet wraith-woman with flowing hair and hollow glowing eyes — reads as "run or prepare to be charged." Largest of the regular enemy types.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, large rare night banshee, tall ethereal spirit woman in pale violet-white tattered robe drifting around her feet, long black hair flowing in all directions, hollow wide eyes glowing deep violet, mouth open in a silent shriek, 3-layer violet aura halo surrounding her, dominant color #e8e0f0, glowing accent #a060ff, 64×64 px sprite (large), hostile predatory body language, no weapon (spirit energy only), 3-frame drift cycle (lean left, center, lean right), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
+## wraith_fast
+
+**HP / speed / damage:** 18 HP / speed 140 / damage 7
+**Color register:** #404858
+**Accent register:** #a8c0e8
+
+**Read-at-glance silhouette:** Small pale-blue oval ghost wisp with a fading tail and hollow dot eyes — reads as a darting threat that materializes from behind, fast and hard to track.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, small fast ghost wisp creature, blue-grey oval body with a fading transparent tail trailing below it, no legs, hollow dark dot eyes, faint blue-white glow at the edges, dominant color #404858, glowing accent #a8c0e8, 32×32 px sprite, fast darting body language, 3-frame drift cycle (drift left, centered, drift right), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, no drop shadow (hovering), no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore, legs`
+
+---
+
+## skull_swarmer
+
+**HP / speed / damage:** 9 HP / speed 95 / damage 3 (spawns in clusters of 4)
+**Color register:** #e8e0d0
+**Accent register:** #3a2010
+
+**Read-at-glance silhouette:** Bone-white oversized skull on a tiny dark stick skeleton body — reads as small, fragile, and terrifying in numbers. The skull is comically large relative to the body.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, small skeletal imp, enormous bone-white skull head oversized compared to a tiny dark stick-skeleton body, hollow dark eye sockets, row of jagged teeth, thin stick arms and stick legs in dark brown, dominant color #e8e0d0, accent #3a2010, 32×32 px sprite, aggressive darting body language, 3-frame run cycle (arms flailing, left foot, right foot), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
+## sigil_drone
+
+**HP / speed / damage:** 25 HP / speed 50 / damage 7 (ranged — fires sigil projectiles at range 280)
+**Color register:** #3a1058
+**Accent register:** #c060ff
+
+**Read-at-glance silhouette:** Small floating dark-violet entity radiating glowing sigil runes — reads as a ranged threat that should be prioritized, a caster that hangs back.
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, small hovering dark-violet sigil drone creature, compact rounded body with glowing purple runic sigils etched across the surface, two small glowing violet eyes, no legs, faint purple rune-glyph aura orbiting the body, dominant color #3a1058, glowing accent #c060ff, 32×32 px sprite, floating threatening body language, 3-frame hover cycle (tilt left, level, tilt right), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, modern weapons, text, multiple characters, gore`
+
+---
+
+## memory_husk
+
+**HP / speed / damage:** 80 HP / speed 16 / damage 14 (on death: splits into 2 lurkers)
+**Color register:** #5a3870
+**Accent register:** #a880c8
+
+**Read-at-glance silhouette:** Slow wide-shouldered shambling figure in purple-grey burial wrappings, like a mummy half-dissolved into shadow — reads as "slow but take it seriously, it splits when it dies."
+
+**MJ prompt:**
+
+```
+chibi anime pixel art enemy, wide slow-moving shambler wrapped in tattered purple-grey burial shroud bandages, large rounded shoulders hunched forward, face hidden under wrappings except for two faint glowing violet pinpoint eyes, heavy plodding stance, some bandage strips trailing loosely, dominant color #5a3870, glowing accent #a880c8, 32×32 px sprite, slow heavy threatening body language, 3-frame shamble cycle (left foot drag, neutral, right foot drag), transparent magenta #FF00FF background, sharp pixel edges, single overhead light source, soft black drop shadow under feet, no text or watermark, eastern folk-horror register, --ar 1:1 --stylize 200 --v 7
+```
+
+**Negative directives:** `--no realistic, photorealism, western horror demons, weapons, text, multiple characters, gore`
+
+---
+
 ## Bosses
 
 ---
