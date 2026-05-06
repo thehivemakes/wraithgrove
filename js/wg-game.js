@@ -8,6 +8,8 @@
   let huntRuntime = null;
   // SPEC §0 — Day/Night mode chosen on lobby level select; persists across panel rerenders
   let currentLevelMode = 'day';
+  // W-Stage-Zero-Tutorial — set when stage 0 is cleared; consumed in exitHunt to trigger tabs reveal
+  let _stage0JustCleared = false;
 
   function buildHuntRuntime(stageId, mode) {
     const stage = WG.HuntStage.get(stageId);
@@ -45,7 +47,8 @@
   function startHunt(stageId, mode) {
     // W-Monetization-V2-Energy §C — energy gate. If insufficient, open the
     // Energy Modal (refund SKUs + watch-ad) instead of silently failing.
-    const cost = WG.State.ENERGY_TUNABLES ? WG.State.ENERGY_TUNABLES.STAGE_COST : 0;
+    // W-Stage-Zero-Tutorial: Stage 0 is free (tutorial, no energy cost).
+    const cost = (stageId === 0) ? 0 : (WG.State.ENERGY_TUNABLES ? WG.State.ENERGY_TUNABLES.STAGE_COST : 0);
     if (cost > 0 && WG.State.getEnergy && WG.State.getEnergy().current < cost) {
       if (WG.EnergyModal && WG.EnergyModal.open) WG.EnergyModal.open({ reason: 'out-of-energy' });
       return;
@@ -92,11 +95,30 @@
     WG.HuntRender.setRuntime(null);
     // SPEC §0 — tabs+top-strip restored on lobby return
     document.body.classList.remove('in-stage');
+    // W-Stage-Zero-Tutorial: on first-ever lobby reveal, animate tabs sliding up
+    if (_stage0JustCleared) {
+      _stage0JustCleared = false;
+      _ensureTabsRevealCss();
+      const navBar = document.getElementById('nav-bar');
+      if (navBar) {
+        navBar.style.animation = 'wg-tabs-slide-in 600ms ease-out both';
+        setTimeout(function () { navBar.style.animation = ''; }, 620);
+      }
+    }
     WG.State.setActiveTab('hunt');
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-hunt').classList.add('active');
     document.querySelectorAll('.nav-tab').forEach(n => n.classList.toggle('active', n.dataset.tab === 'hunt'));
     showHuntStageList();
+  }
+
+  // W-Stage-Zero-Tutorial — inject slide-in keyframe once for tabs-reveal animation
+  function _ensureTabsRevealCss() {
+    if (document.getElementById('wg-tabs-reveal-css')) return;
+    const st = document.createElement('style');
+    st.id = 'wg-tabs-reveal-css';
+    st.textContent = '@keyframes wg-tabs-slide-in{from{transform:translateY(100%);opacity:0;}to{transform:translateY(0);opacity:1;}}';
+    document.head.appendChild(st);
   }
 
   // rAF main loop
@@ -120,6 +142,14 @@
         WG.HuntTower.tickFloor(dt);
       } else if (huntRuntime.player && huntRuntime.player.hp > 0 && !huntRuntime.pendingLevelUp) {
       if (!huntRuntime._tutorialPaused && !WG.Engine.isHitPaused()) {
+      // W-Special-Abilities: time_slow effect — scale world dt for enemies/projectiles
+      const _tsNow = Date.now();
+      if (huntRuntime._timeSlow && _tsNow < huntRuntime._timeSlow.endsAt) {
+        dt *= huntRuntime._timeSlow.factor;
+      } else if (huntRuntime._timeSlow && _tsNow >= huntRuntime._timeSlow.endsAt) {
+        huntRuntime._timeSlow = null;
+        WG.Engine.emit('ability:time-slow-end', {});
+      }
       huntRuntime.elapsed += dt;
       // Player movement from input
       const inp = WG.Input.poll();
@@ -274,6 +304,12 @@
       s.huntProgress.highestUnlocked = Math.max(s.huntProgress.highestUnlocked, stageId + 1);
       // Bump highestStageCleared — gates Rebirth tier eligibility (SPEC §0).
       s.player.highestStageCleared = Math.max(s.player.highestStageCleared || 0, stageId);
+      // W-Stage-Zero-Tutorial: mark stage 0 cleared + flag tabs reveal for exitHunt
+      if (stageId === 0) {
+        if (!s.tutorial) s.tutorial = {};
+        s.tutorial.stage0Cleared = true;
+        _stage0JustCleared = true;
+      }
       WG.Engine.emit('hunt:stage-cleared', { stageId, mins, kills: huntRuntime.kills });
     } else {
       WG.Engine.emit('hunt:stage-failed', { stageId, mins, kills: huntRuntime.kills });
@@ -1407,12 +1443,49 @@
       '<div style="'+SL+'">ACCOUNT</div>' +
       '<button disabled style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a2818;background:#1a1208;color:#5a4028;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:not-allowed;opacity:0.5;">LOG OUT</button>' +
       '<div style="font-size:9px;color:#5a4028;text-align:center;margin-top:4px;letter-spacing:0.5px;">Account system — Phase 4</div>' +
+
+      '<div style="'+SL+'">ABILITY LOADOUT</div>' +
+      '<div id="cfg-ability-loadout" style="display:flex;flex-direction:column;gap:6px;margin-bottom:4px;"></div>' +
+
       '</div>';
 
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
     overlay.querySelector('#cfg-close').addEventListener('click', () => overlay.remove());
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // W-Special-Abilities: populate ability loadout section
+    (function() {
+      const loadoutEl = overlay.querySelector('#cfg-ability-loadout');
+      if (!loadoutEl || !window.WG || !WG.SpecialAbilities) return;
+      const SA = WG.SpecialAbilities;
+      for (let si = 0; si < 3; si++) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;background:#0a0604;border:1.5px solid #3a2818;border-radius:8px;padding:8px 10px;';
+        const slotState = SA.getState()[si];
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:10px;color:#7a6848;letter-spacing:1px;min-width:40px;';
+        label.textContent = 'SLOT ' + (si + 1);
+        const icon = document.createElement('div');
+        icon.style.cssText = 'font-size:20px;';
+        icon.textContent = slotState.locked ? '—' : slotState.icon;
+        const info = document.createElement('div');
+        info.style.cssText = 'flex:1;font-size:11px;color:#c8b898;';
+        info.textContent = slotState.locked ? '(empty)' : (slotState.name + ' · ' + (slotState.charges || 0) + ' charges');
+        const btn = document.createElement('button');
+        btn.style.cssText = 'padding:6px 12px;border-radius:7px;border:1.5px solid #5a4028;background:#1a1208;color:#f0d890;font-size:10px;font-weight:700;letter-spacing:1.5px;cursor:pointer;';
+        btn.textContent = 'CHANGE';
+        btn.addEventListener('click', function() {
+          overlay.remove();
+          SA.showLoadoutModal(si);
+        });
+        row.appendChild(label);
+        row.appendChild(icon);
+        row.appendChild(info);
+        row.appendChild(btn);
+        loadoutEl.appendChild(row);
+      }
+    })();
 
     // Audio sliders — update in real-time, persist to both wg_audio_v1 (via setBus) and wg_settings_v1.
     ['master','sfx','ambient','ui'].forEach(bus => {
@@ -1594,6 +1667,7 @@
     if (WG.Compliance && WG.Compliance.init) WG.Compliance.init(); // must follow Gacha — wraps pull()
     if (WG.Shop && WG.Shop.init) WG.Shop.init();
     if (WG.Buffs && WG.Buffs.init) WG.Buffs.init();
+    if (WG.SpecialAbilities && WG.SpecialAbilities.init) WG.SpecialAbilities.init();
     if (WG.Audio && WG.Audio.init) WG.Audio.init();
     // W-Settings-Modal-Wiring §C — apply wg_settings_v1 on cold-load.
     // wg_audio_v1 is already restored by WG.Audio.init(); this re-applies if settings ever diverge
@@ -1656,8 +1730,15 @@
 
     setupNav();
     syncTopStrip();
-    showHuntStageList();
-    if (WG.Onboarding) WG.Onboarding.maybeShow();
+    // W-Stage-Zero-Tutorial: auto-launch Stage 0 on first-ever boot before showing lobby
+    const _st0 = WG.State.get();
+    const _tut0 = _st0.tutorial || {};
+    if (_st0.firstLaunch === true && !_tut0.stage0Cleared) {
+      startHunt(0, 'day');
+    } else {
+      showHuntStageList();
+      if (WG.Onboarding) WG.Onboarding.maybeShow();
+    }
     initBossIntro();
   }
 

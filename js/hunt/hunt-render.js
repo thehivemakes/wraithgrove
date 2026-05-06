@@ -102,6 +102,47 @@
     _edgePulse = { color, opacity, start: performance.now(), end: performance.now() + durationMs };
   }
 
+  // W-Fever-Mode §E — full-screen orange tint while FEVER MODE is active.
+  // Uses SCREEN_TINT_RGBA from WG.HuntPlayer.FEVER_TUNABLES so designer can tune.
+  function drawFeverTint(ctx) {
+    if (!runtime || !runtime.player || !runtime.player.feverActive) return;
+    const tint = (window.WG && WG.HuntPlayer && WG.HuntPlayer.FEVER_TUNABLES)
+      ? WG.HuntPlayer.FEVER_TUNABLES.SCREEN_TINT_RGBA
+      : 'rgba(255,140,40,0.15)';
+    const W = D().width, H = D().height;
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // W-Wave1-God-Window — amber corner tint for first 10 seconds; fades out by t=15.
+  // Communicates power-fantasy window without breaking immersion. Hunt only; no Tower.
+  function drawGodWindowCue(ctx) {
+    if (!runtime || runtime.mode === 'tower') return;
+    const elapsed = runtime.elapsed || 0;
+    if (elapsed >= 15) return;
+    const w = D().width, h = D().height;
+    const alpha = elapsed < 10
+      ? 0.15
+      : 0.15 * (1 - (elapsed - 10) / 5);
+    if (alpha <= 0) return;
+    const cornerSize = Math.min(w, h) * 0.35;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // top-left corner
+    const tlGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, cornerSize);
+    tlGrad.addColorStop(0,   'rgba(255,180,0,1)');
+    tlGrad.addColorStop(1,   'rgba(255,180,0,0)');
+    ctx.fillStyle = tlGrad;
+    ctx.fillRect(0, 0, cornerSize, cornerSize);
+    // top-right corner
+    const trGrad = ctx.createRadialGradient(w, 0, 0, w, 0, cornerSize);
+    trGrad.addColorStop(0,   'rgba(255,180,0,1)');
+    trGrad.addColorStop(1,   'rgba(255,180,0,0)');
+    ctx.fillStyle = trGrad;
+    ctx.fillRect(w - cornerSize, 0, cornerSize, cornerSize);
+    ctx.restore();
+  }
+
   function drawEdgePulse(ctx) {
     if (!_edgePulse) return;
     const now = performance.now();
@@ -2020,8 +2061,15 @@
   }
 
   function drawCreatures(ctx) {
+    // W-Fever-Mode §B — apply orange glow filter to all enemies during fever.
+    const _feverActive = runtime && runtime.player && runtime.player.feverActive;
+    const _feverGlow = _feverActive
+      ? ((window.WG && WG.HuntPlayer && WG.HuntPlayer.FEVER_TUNABLES)
+          ? WG.HuntPlayer.FEVER_TUNABLES.ENEMY_GLOW : '#ff8040')
+      : null;
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
+      if (_feverGlow) { ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9; }
       const s = w2s(c.x, c.y);
       switch (c.type) {
         case 'pumpkin_lantern': drawPumpkin(ctx, s.x, s.y, c);   break;
@@ -2036,6 +2084,10 @@
           if (ENEMY_SPRITES[c.type]) drawSpriteCreature(ctx, s.x, s.y, c);
           else drawZombie(ctx, s.x, s.y, c);
       }
+      if (_feverGlow) ctx.shadowBlur = 0;
+    }
+    if (_feverGlow && runtime.boss && runtime.boss.hp > 0) {
+      ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9;
     }
     if (runtime.boss && runtime.boss.hp > 0) {
       const b = runtime.boss;
@@ -2065,6 +2117,7 @@
       ctx.fillText(b._typeData.name, w*0.5, 56);
       ctx.textAlign = 'left';
     }
+    if (_feverGlow) ctx.shadowBlur = 0;
   }
 
   // Projectile draw — supports an optional `_trail` array on the projectile
@@ -2435,6 +2488,59 @@
         skillBtn.textContent = Math.ceil(p.skillCd) + 's';
       }
     }
+
+    // W-Special-Abilities: ability slot DOM update (icon + cooldown + charge badge)
+    if (window.WG && WG.SpecialAbilities) {
+      const slots = WG.SpecialAbilities.getState();
+      for (let i = 0; i < 3; i++) {
+        const el = document.getElementById('hunt-ability-' + i);
+        if (!el) continue;
+        const slot = slots[i];
+        const iconEl  = el.querySelector('.as-icon');
+        const cdEl    = el.querySelector('.as-cd');
+        const badgeEl = el.querySelector('.as-badge');
+        const ringEl  = el.querySelector('.as-ring');
+
+        // Remove existing state classes
+        el.classList.remove('ready', 'on-cooldown', 'locked');
+
+        if (slot.locked || !slot.abilityId) {
+          el.classList.add('locked');
+          if (iconEl) iconEl.textContent = '+';
+          if (cdEl)   { cdEl.style.display = 'none'; }
+          if (badgeEl) badgeEl.remove();
+          if (ringEl) ringEl.style.background = '';
+        } else {
+          if (iconEl) iconEl.textContent = slot.icon;
+
+          // Charge badge
+          if (slot.charges > 0) {
+            let badge = badgeEl;
+            if (!badge) { badge = document.createElement('div'); badge.className = 'as-badge'; el.appendChild(badge); }
+            badge.textContent = 'x' + slot.charges;
+          } else if (badgeEl) {
+            badgeEl.remove();
+          }
+
+          // Cooldown overlay + ring sweep
+          if (slot.onCooldown) {
+            el.classList.add('on-cooldown');
+            let cd = cdEl;
+            if (!cd) { cd = document.createElement('div'); cd.className = 'as-cd'; el.appendChild(cd); }
+            cd.style.display = 'flex';
+            cd.textContent = Math.ceil(slot.cooldownRemainingSec) + 's';
+            // Conic sweep: fraction elapsed since cast = 1 - remaining/total
+            const frac = 1 - (slot.cooldownRemainingSec / slot.cooldownSec);
+            const deg = Math.round(frac * 360);
+            if (ringEl) ringEl.style.background = `conic-gradient(transparent ${deg}deg, rgba(0,0,0,0.55) ${deg}deg)`;
+          } else {
+            el.classList.add(slot.charges > 0 ? 'ready' : 'on-cooldown');
+            if (cdEl) cdEl.style.display = 'none';
+            if (ringEl) ringEl.style.background = '';
+          }
+        }
+      }
+    }
   }
 
   // DOM-based level-up modal — replaces canvas-drawn version for reliable taps.
@@ -2696,6 +2802,8 @@
       ctx.fillRect(0, 0, D().width, D().height);
     }
     drawEdgePulse(ctx);
+    drawGodWindowCue(ctx);
+    drawFeverTint(ctx);
     drawHud(ctx);
     drawLevelUpModal(ctx);
   }
@@ -2717,6 +2825,26 @@
     });
     const skillBtn = document.getElementById('hunt-skill-btn');
     if (skillBtn) skillBtn.addEventListener('click', () => WG.Input.triggerSkill());
+
+    // W-Special-Abilities: wire ability slot tap → cast or show-slot-modal
+    for (let _i = 0; _i < 3; _i++) {
+      (function(slotIdx) {
+        const slotEl = document.getElementById('hunt-ability-' + slotIdx);
+        if (!slotEl) return;
+        slotEl.addEventListener('click', function () {
+          if (!window.WG || !WG.SpecialAbilities) return;
+          const slotState = WG.SpecialAbilities.getState()[slotIdx];
+          if (slotState.locked || !slotState.abilityId) {
+            WG.SpecialAbilities.showLoadoutModal(slotIdx);
+            return;
+          }
+          // Try to cast; if can't (no charges / on cooldown) open charge modal
+          const castRuntime = window.WG && WG.Game && WG.Game.getHuntRuntime ? WG.Game.getHuntRuntime() : null;
+          const didCast = WG.SpecialAbilities.cast(slotIdx, castRuntime);
+          if (!didCast) WG.SpecialAbilities.showSlotModal(slotIdx);
+        });
+      })(_i);
+    }
     D().canvas.addEventListener('pointerdown', (e) => {
       if (WG.State.get().activeTab !== 'hunt') return;
       if (handleHuntTap(e.clientX, e.clientY)) e.stopImmediatePropagation();
@@ -2920,6 +3048,62 @@
     });
     // Hide on stage exit so it doesn't bleed into menus
     WG.Engine.on('hunt:stage-start', () => { _comboHud.style.display = 'none'; });
+
+    // W-Fever-Mode §E — FEVER label + countdown ring on combo HUD.
+    // §D — grief FX (gray flash + "FEVER LOST" text + descending tone) on broke.
+    const _comboLabel = _comboHud.querySelector('.combo-label');
+    let _feverCountdownInterval = null;
+    let _feverEndsAt = 0;
+
+    // Generates a descending WebAudio tone for fever break grief. Self-contained:
+    // creates a fresh AudioContext so it never conflicts with the main WG.Audio context.
+    function _playFeverBreakTone() {
+      try {
+        const AudioCtxCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtxCtor) return;
+        const ac = new AudioCtxCtor();
+        const osc  = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, ac.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ac.currentTime + 0.55);
+        gain.gain.setValueAtTime(0.28, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.65);
+        osc.start(ac.currentTime);
+        osc.stop(ac.currentTime + 0.65);
+        osc.onended = () => ac.close().catch(() => {});
+      } catch(e) {}
+    }
+
+    WG.Engine.on('fever:start', ({ endsAt }) => {
+      _feverEndsAt = endsAt;
+      if (_comboLabel) _comboLabel.textContent = 'FEVER';
+      // Countdown: update every 250ms while fever is active
+      if (_feverCountdownInterval) clearInterval(_feverCountdownInterval);
+      _feverCountdownInterval = setInterval(() => {
+        if (!_comboLabel) return;
+        const rem = Math.max(0, Math.ceil((_feverEndsAt - Date.now()) / 1000));
+        _comboLabel.textContent = 'FEVER ' + rem + 's';
+      }, 250);
+    });
+
+    WG.Engine.on('fever:end', ({ feverEndsBecause }) => {
+      if (_feverCountdownInterval) { clearInterval(_feverCountdownInterval); _feverCountdownInterval = null; }
+      if (_comboLabel) _comboLabel.textContent = 'COMBO';
+      if (feverEndsBecause === 'broke') {
+        // Gray flash
+        if (window.WG && WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#909090', 0.35, 200);
+        // "FEVER LOST" floating text at player position
+        const rt = window.WG && WG.Game && WG.Game.getHuntRuntime && WG.Game.getHuntRuntime();
+        if (rt && rt.player && window.WG && WG.HuntFXNumbers) {
+          WG.HuntFXNumbers.spawn(rt.player.x, rt.player.y - 30, 'FEVER LOST',
+            { color: '#ff3030', size: 20, duration: 1400, velocity: -30 });
+        }
+        _playFeverBreakTone();
+      }
+    });
   }
 
   // Expose getStageProps so hunt-player can damage stumps on swing.

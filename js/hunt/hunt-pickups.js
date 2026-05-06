@@ -337,6 +337,24 @@
     }
   }
 
+  // W-Fever-Mode §C — fever chest: bigger, gold-orange, guaranteed multi-item loot.
+  // lootItems: array of {kind, amount} built in hunt-player endFever('survived').
+  // Loot table is designer-tunable via WG.HuntPlayer.FEVER_TUNABLES (CHEST_GOLD_MIN/MAX).
+  function spawnFeverChest(runtime, x, y, lootItems) {
+    if (!runtime) return;
+    if (!runtime.chests) runtime.chests = [];
+    runtime._nextChestId = (runtime._nextChestId || 0) + 1;
+    runtime.chests.push({
+      id: runtime._nextChestId,
+      x, y,
+      state: 'closed',
+      stateTimer: 0,
+      _pulsePhase: Math.random() * Math.PI * 2,
+      feverChest: true,
+      feverLoot: lootItems,
+    });
+  }
+
   // W-Monetization-V2-Energy §D — chest spawning, tick, draw.
   function spawnChest(runtime, x, y) {
     if (!runtime) return;
@@ -369,18 +387,36 @@
       } else if (c.state === 'opening') {
         c.stateTimer -= dt;
         if (c.stateTimer <= 0) {
-          // Resolve loot
-          const s = WG.State.get();
-          s.meta.chestsOpenedSinceGuarantee = (s.meta.chestsOpenedSinceGuarantee || 0) + 1;
-          const force = (s.meta.chestsOpenedSinceGuarantee % TREASURE_TUNABLES.GUARANTEE_EVERY_N) === 0;
-          const loot = rollLoot(force);
-          grantLoot(loot);
-          const vis = LOOT_VISUALS[loot.kind] || LOOT_VISUALS.gold;
-          if (WG.HuntFXNumbers) {
-            WG.HuntFXNumbers.spawn(c.x, c.y - 12, vis.label + ' +' + loot.amount, { color: vis.color, size: 14, duration: 1100, velocity: -22 });
+          if (c.feverChest && c.feverLoot) {
+            // W-Fever-Mode §C — grant all fever loot items with per-item FX
+            for (let _li = 0; _li < c.feverLoot.length; _li++) {
+              const item = c.feverLoot[_li];
+              grantLoot(item);
+              const vis = LOOT_VISUALS[item.kind] || LOOT_VISUALS.gold;
+              if (WG.HuntFXNumbers) {
+                WG.HuntFXNumbers.spawn(
+                  c.x + (Math.random() - 0.5) * 18,
+                  c.y - 12 - _li * 14,
+                  vis.label + ' +' + item.amount,
+                  { color: vis.color, size: 14, duration: 1100, velocity: -22 }
+                );
+              }
+            }
+            WG.Engine.emit('chest:opened', { chest: c, fever: true });
+          } else {
+            // Standard treasure chest loot
+            const s = WG.State.get();
+            s.meta.chestsOpenedSinceGuarantee = (s.meta.chestsOpenedSinceGuarantee || 0) + 1;
+            const force = (s.meta.chestsOpenedSinceGuarantee % TREASURE_TUNABLES.GUARANTEE_EVERY_N) === 0;
+            const loot = rollLoot(force);
+            grantLoot(loot);
+            const vis = LOOT_VISUALS[loot.kind] || LOOT_VISUALS.gold;
+            if (WG.HuntFXNumbers) {
+              WG.HuntFXNumbers.spawn(c.x, c.y - 12, vis.label + ' +' + loot.amount, { color: vis.color, size: 14, duration: 1100, velocity: -22 });
+            }
+            pulseChip(vis.chip);
+            WG.Engine.emit('chest:opened', { chest: c, loot, guaranteed: force });
           }
-          pulseChip(vis.chip);
-          WG.Engine.emit('chest:opened', { chest: c, loot, guaranteed: force });
           runtime.chests.splice(i, 1);
         }
       }
@@ -393,39 +429,51 @@
       const s = worldToScreen(c.x, c.y);
       const opening = c.state === 'opening';
       const t = opening ? 1 - (c.stateTimer / TREASURE_TUNABLES.OPEN_DURATION_SEC) : 0;
-      const w = 22, h = 16;
+      // W-Fever-Mode §C — fever chest is 45% larger with gold-orange palette
+      const w = c.feverChest ? 32 : 22;
+      const h = c.feverChest ? 23 : 16;
       ctx.save();
       ctx.translate(s.x, s.y);
-      // Body (slightly wider than coin pickups per spec — 22 vs ~16)
-      ctx.fillStyle = '#5a3a1a';
-      ctx.strokeStyle = '#f0c060';
-      ctx.lineWidth = 1.2;
+      // W-Fever-Mode §C — fever chest uses orange-gold palette; normal chest uses brown.
+      const bodyColor   = c.feverChest ? '#7a3800' : '#5a3a1a';
+      const rimColor    = c.feverChest ? '#ff8040' : '#f0c060';
+      const bandColor   = c.feverChest ? '#c05820' : '#8a5a28';
+      const lidColor    = c.feverChest ? '#9a4800' : '#7a4a22';
+      const lockColor   = c.feverChest ? '#ff8040' : '#f0c060';
+      const glowColor   = c.feverChest ? '#ff6020' : '#ffd870';
+      const burstColor  = c.feverChest ? '#ff9040' : '#ffe080';
+      const glowRadius  = c.feverChest ? w/2 + 10 : w/2 + 6;
+      ctx.fillStyle = bodyColor;
+      ctx.strokeStyle = rimColor;
+      ctx.lineWidth = c.feverChest ? 1.8 : 1.2;
       ctx.fillRect(-w/2, -h/2, w, h);
       ctx.strokeRect(-w/2, -h/2, w, h);
       // Iron bands
-      ctx.fillStyle = '#8a5a28';
+      ctx.fillStyle = bandColor;
       ctx.fillRect(-w/2, -h/2 - 1, w, 3);
       ctx.fillRect(-w/2, h/2 - 2, w, 3);
       // Lid lift during opening (rotates up by t * 90deg)
       ctx.save();
       ctx.translate(0, -h/2);
       ctx.rotate(-t * Math.PI / 2);
-      ctx.fillStyle = '#7a4a22';
+      ctx.fillStyle = lidColor;
       ctx.fillRect(-w/2, -3, w, 4);
-      ctx.strokeStyle = '#f0c060';
+      ctx.strokeStyle = rimColor;
       ctx.strokeRect(-w/2, -3, w, 4);
       // Lock plate
-      ctx.fillStyle = '#f0c060';
+      ctx.fillStyle = lockColor;
       ctx.fillRect(-2, -2, 4, 3);
       ctx.restore();
-      // Glow ring while closed
+      // Glow ring while closed — fever chest glows stronger
       if (!opening) {
-        const alpha = 0.3 + 0.25 * Math.sin(c._pulsePhase);
+        const basePulse = c.feverChest ? 0.45 : 0.3;
+        const ampPulse  = c.feverChest ? 0.35 : 0.25;
+        const alpha = basePulse + ampPulse * Math.sin(c._pulsePhase);
         ctx.globalAlpha = alpha;
-        ctx.strokeStyle = '#ffd870';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = c.feverChest ? 3 : 2;
         ctx.beginPath();
-        ctx.arc(0, 0, w/2 + 6, 0, Math.PI * 2);
+        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
@@ -433,12 +481,13 @@
       if (opening && t > 0.3) {
         const burstA = (t - 0.3) / 0.7;
         ctx.globalAlpha = 1 - burstA;
-        ctx.fillStyle = '#ffe080';
-        for (let k = 0; k < 6; k++) {
-          const ang = k * (Math.PI / 3);
-          const r = 4 + burstA * 16;
+        ctx.fillStyle = burstColor;
+        const numBursts = c.feverChest ? 10 : 6;
+        for (let k = 0; k < numBursts; k++) {
+          const ang = k * (Math.PI * 2 / numBursts);
+          const r = (c.feverChest ? 6 : 4) + burstA * (c.feverChest ? 22 : 16);
           ctx.beginPath();
-          ctx.arc(Math.cos(ang) * r, Math.sin(ang) * r - h/2, 1.5, 0, Math.PI * 2);
+          ctx.arc(Math.cos(ang) * r, Math.sin(ang) * r - h/2, c.feverChest ? 2.5 : 1.5, 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.globalAlpha = 1;
@@ -474,5 +523,5 @@
     });
   }
 
-  window.WG.HuntPickups = { init, spawnForStage, draw: drawAll, tick: tickAll, rollSigilDrop, RIFT_TUNABLES, TREASURE_TUNABLES, spawnChest, rollLoot };
+  window.WG.HuntPickups = { init, spawnForStage, draw: drawAll, tick: tickAll, rollSigilDrop, RIFT_TUNABLES, TREASURE_TUNABLES, spawnChest, spawnFeverChest, rollLoot };
 })();

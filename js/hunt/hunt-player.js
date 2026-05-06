@@ -29,6 +29,18 @@
     bossDefeated: 280,
   });
 
+  // W-Fever-Mode §A — fever mode tunables. Frozen so render + pickup layers read
+  // without risk of mutation. CHEST_GOLD_MIN/MAX define the 1d4 gold range.
+  const FEVER_TUNABLES = Object.freeze({
+    THRESHOLD_COMBO: 20,
+    DURATION_SEC:    10,
+    DROP_RATE_MULT:  3.0,
+    ENEMY_GLOW:           '#ff8040',
+    SCREEN_TINT_RGBA:     'rgba(255,140,40,0.15)',
+    CHEST_GOLD_MIN:  1,
+    CHEST_GOLD_MAX:  4,
+  });
+
   let runtime = null;
 
   function place(x, y, rt) {
@@ -58,6 +70,10 @@
       // SPEC §0 — Night Mode torch (always initialized; tickTorch is mode-gated).
       torchAmount: TORCH_INITIAL,
       torchDecay:  TORCH_DECAY_PER_S,
+      // W-Fever-Mode §A — reset each stage entry
+      feverActive:   false,
+      feverEndsAt:   0,
+      feverDropMult: 1,
     };
   }
 
@@ -328,6 +344,13 @@
     // melee + turret damage. Read at hit-time so buff expiry is reflected
     // immediately mid-stage without a refresh cycle.
     if (window.WG && WG.Buffs && WG.Buffs.has && WG.Buffs.has('damage_x2')) d *= 2;
+    // W-Special-Abilities: shadow_strike — consumes stacks on hit
+    const sb = runtime && runtime.player && runtime.player._shadowBuff;
+    if (sb && sb.stacks > 0) {
+      d *= sb.mult;
+      sb.stacks--;
+      if (sb.stacks <= 0) { runtime.player._shadowBuff = null; WG.Engine.emit('ability:shadow-strike-end', {}); }
+    }
     return d;
   }
 
@@ -350,6 +373,15 @@
   function takeDamage(amount, source) {
     const p = runtime.player;
     if (!p) return;
+    // W-Special-Abilities: invuln_aoe + shield effects absorb damage
+    const now = Date.now();
+    if (runtime._invulnEndsAt && now < runtime._invulnEndsAt) return;
+    if (runtime._shieldEndsAt && now < runtime._shieldEndsAt) return;
+    // W-Stage-Zero-Tutorial: first invulnFirstSec seconds are damage-free
+    if (runtime.stage && runtime.stage.invulnFirstSec && runtime.elapsed < runtime.stage.invulnFirstSec) {
+      WG.Engine.emit('fx:shield-deflect', { x: p.x, y: p.y });
+      return;
+    }
     const ps = WG.State.get().player.stats;
     const reduced = Math.max(1, amount - Math.floor(ps.defense * 0.5));
     p.hp = Math.max(0, p.hp - reduced);
@@ -377,9 +409,19 @@
     const p = runtime.player;
     p.xp += c._typeData.xp;
     if (p.xp >= p.xpToNext) levelUp();
-    // 25% drop chance for orb (XP, picked up automatically within radius)
-    if (Math.random() < 0.25) {
-      runtime.drops.push({ x: c.x, y: c.y, type: 'orb', vx:0, vy:0 });
+    // 25% base orb drop; W-Fever-Mode §B multiplies roll count during fever.
+    // Multiple rolls = multiple orbs, each with slight arc for visual spread.
+    const orbRolls = (runtime.player && runtime.player.feverActive)
+      ? Math.round(FEVER_TUNABLES.DROP_RATE_MULT) : 1;
+    for (let _i = 0; _i < orbRolls; _i++) {
+      if (Math.random() < 0.25) {
+        const _ang = Math.random() * Math.PI * 2;
+        runtime.drops.push({
+          x: c.x, y: c.y, type: 'orb',
+          vx: orbRolls > 1 ? Math.cos(_ang) * 28 : 0,
+          vy: orbRolls > 1 ? Math.sin(_ang) * 28 : 0,
+        });
+      }
     }
     // W-Dopamine-P1 §A — combo tracking
     const combo = runtime.combo;
@@ -388,15 +430,64 @@
       combo.lastKillAt = performance.now();
       if (combo.count > combo.peak) combo.peak = combo.count;
       WG.Engine.emit('combo:step', { count: combo.count });
+      // W-Fever-Mode §B — trigger on first crossing of threshold
+      if (combo.count >= FEVER_TUNABLES.THRESHOLD_COMBO && !runtime.player.feverActive) {
+        startFever();
+      }
     }
   }
 
   function comboDecayTick() {
     const combo = runtime.combo;
     if (!combo || combo.count === 0) return;
+    const p = runtime.player;
+    // W-Fever-Mode §B — check fever timer expiry and combo-below-threshold break
+    if (p && p.feverActive) {
+      if (Date.now() >= p.feverEndsAt) {
+        endFever('survived');
+      } else if (combo.count < FEVER_TUNABLES.THRESHOLD_COMBO) {
+        endFever('broke');
+      }
+    }
     if (performance.now() - combo.lastKillAt > 2500) {
+      if (p && p.feverActive) endFever('broke');
       combo.count = 0;
       WG.Engine.emit('combo:reset', {});
+    }
+  }
+
+  // W-Fever-Mode §B — enter FEVER MODE when combo first crosses threshold.
+  function startFever() {
+    const p = runtime.player;
+    p.feverActive   = true;
+    p.feverEndsAt   = Date.now() + FEVER_TUNABLES.DURATION_SEC * 1000;
+    p.feverDropMult = FEVER_TUNABLES.DROP_RATE_MULT;
+    WG.Engine.emit('fever:start', { endsAt: p.feverEndsAt });
+  }
+
+  // W-Fever-Mode §B — exit FEVER MODE. cause: 'survived' | 'broke'.
+  // On survive: spawn FEVER CHEST + floating label. Render/audio handled via event.
+  function endFever(cause) {
+    const p = runtime.player;
+    p.feverActive   = false;
+    p.feverEndsAt   = 0;
+    p.feverDropMult = 1;
+    WG.Engine.emit('fever:end', { feverEndsBecause: cause });
+    if (cause === 'survived') {
+      const gold = FEVER_TUNABLES.CHEST_GOLD_MIN
+        + Math.floor(Math.random() * (FEVER_TUNABLES.CHEST_GOLD_MAX - FEVER_TUNABLES.CHEST_GOLD_MIN + 1));
+      const loot = [
+        { kind: 'fragment', amount: 1 },
+        { kind: 'gem',      amount: 1 },
+        { kind: 'gold',     amount: gold },
+      ];
+      if (window.WG && WG.HuntPickups && WG.HuntPickups.spawnFeverChest) {
+        WG.HuntPickups.spawnFeverChest(runtime, p.x, p.y, loot);
+      }
+      if (window.WG && WG.HuntFXNumbers) {
+        WG.HuntFXNumbers.spawn(p.x, p.y - 40, 'FEVER CHEST!',
+          { color: '#ffb040', size: 22, duration: 1800, velocity: -28 });
+      }
     }
   }
   function onBossKill() {
@@ -436,7 +527,10 @@
 
   function pickupTick(dt) {
     const p = runtime.player;
-    const r = p.pickupRadius;
+    // W-Special-Abilities: soul_magnet — extends radius to full screen + 2× XP
+    const _smActive = runtime._magnetXpEndsAt && Date.now() < runtime._magnetXpEndsAt;
+    const r = _smActive ? Math.max(p.pickupRadius, 800) : p.pickupRadius;
+    if (_smActive && Date.now() >= runtime._magnetXpEndsAt) runtime._magnetXpEndsAt = 0;
     for (let i = runtime.drops.length - 1; i >= 0; i--) {
       const d = runtime.drops[i];
 
@@ -466,7 +560,9 @@
         d.y += (p.y - d.y) * lerp;
         if (dist < 14) {
           if (d.type === 'orb') {
-            p.xp += 1;
+            // W-Special-Abilities: soul_magnet 2× XP mult
+            const _orbXpMult = (_smActive && runtime._magnetXpMult) ? runtime._magnetXpMult : 1;
+            p.xp += 1 * _orbXpMult;
             if (p.xp >= p.xpToNext) levelUp();
             WG.Engine.emit('pickup:orb', { x: d.x, y: d.y, amount: 1 });
           } else if (d.type === 'coin') {
@@ -712,6 +808,6 @@
   function init() {}
   window.WG.HuntPlayer = {
     init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice,
-    REPAIR_TUNABLES, CRIT_TUNABLES, HITSTOP_TIERS,
+    REPAIR_TUNABLES, CRIT_TUNABLES, HITSTOP_TIERS, FEVER_TUNABLES,
   };
 })();

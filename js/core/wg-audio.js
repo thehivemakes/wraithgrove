@@ -279,6 +279,13 @@
     });
     WG.Engine.on('engine:pause', () => { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); });
     WG.Engine.on('engine:resume', resumeContext);
+    // W-Fever-Mode §C/§D — triumphal sting on survive; break tone is in hunt-render
+    // (generated via WebAudio so it bypasses asset loading).
+    WG.Engine.on('fever:end', ({ feverEndsBecause }) => {
+      if (feverEndsBecause === 'survived') {
+        play('levelup_chime', { bus: 'sfx', vol: 1.0 });
+      }
+    });
   }
 
   function init() {

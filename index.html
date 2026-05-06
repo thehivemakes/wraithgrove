@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<title>Wraithgrove</title>
+<title>Unlimited Chaos</title>
 <!-- Stripe SDK — web IAP fallback (Concern 3) -->
 <script src="https://js.stripe.com/v3/"></script>
 <style>
@@ -226,6 +226,40 @@
   }
   #hunt-hud .joystick-vis.active { display: block; }
 
+  /* W-Special-Abilities: ability slots row (bottom-right, above skill button) */
+  #hunt-ability-row {
+    position: absolute; bottom: 90px; right: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+    pointer-events: auto;
+  }
+  .ability-slot {
+    position: relative; width: 48px; height: 48px; border-radius: 12px;
+    background: rgba(10,6,2,0.82); border: 1.5px solid #5a3a18;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; overflow: hidden; transition: border-color 120ms;
+    -webkit-tap-highlight-color: rgba(255,255,255,0.1);
+  }
+  .ability-slot.ready { border-color: #d0a030; box-shadow: 0 0 6px rgba(208,160,48,0.45); }
+  .ability-slot.on-cooldown { opacity: 0.65; }
+  .ability-slot.locked { border-color: #3a2818; opacity: 0.45; cursor: default; }
+  .ability-slot .as-icon { font-size: 22px; line-height: 1; pointer-events: none; }
+  .ability-slot .as-cd {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); font-size: 10px; color: #f0d890; font-weight: 700;
+    letter-spacing: 0.5px; pointer-events: none;
+  }
+  .ability-slot .as-badge {
+    position: absolute; top: 2px; right: 3px;
+    font-size: 9px; color: #f0e8b0; font-weight: 700;
+    background: rgba(0,0,0,0.6); padding: 0 2px; border-radius: 4px;
+    pointer-events: none;
+  }
+  /* Cooldown sweep ring — CSS conic-gradient animated via JS inline style */
+  .ability-slot .as-ring {
+    position: absolute; inset: 0; border-radius: 12px;
+    pointer-events: none;
+  }
+
   /* SPEC §0 — Navigation model: tabs+top-strip hidden when in a stage */
   body.in-stage #nav-bar { display: none; }
   body.in-stage #top-strip { display: none; }
@@ -290,6 +324,12 @@
           <div class="stage-banner" id="hunt-stage-banner">stage —</div>
           <div class="menu-btn" id="hunt-menu-btn">⚙</div>
           <div class="skill-btn" id="hunt-skill-btn">✦</div>
+          <!-- W-Special-Abilities: 3 ability slots -->
+          <div id="hunt-ability-row">
+            <div class="ability-slot locked" id="hunt-ability-0" data-slot="0"><span class="as-icon">·</span><div class="as-ring"></div></div>
+            <div class="ability-slot locked" id="hunt-ability-1" data-slot="1"><span class="as-icon">·</span><div class="as-ring"></div></div>
+            <div class="ability-slot locked" id="hunt-ability-2" data-slot="2"><span class="as-icon">·</span><div class="as-ring"></div></div>
+          </div>
           <div class="joystick-zone"></div>
           <div class="joystick-vis" id="hunt-joystick"><div class="knob"></div></div>
         </div>
@@ -325,7 +365,7 @@
 <div id="modal-root"></div>
 
 <div id="boot-overlay">
-  <div id="boot-title" data-i18n="boot.title">WRAITHGROVE</div>
+  <div id="boot-title" data-i18n="boot.title">UNLIMITED CHAOS</div>
   <div id="boot-sub" data-i18n="boot.sub">survive alone</div>
   <div id="boot-status" data-i18n="boot.status.awakening">awakening...</div>
   <div id="boot-tap" data-i18n="boot.tap">tap to begin</div>
@@ -337,7 +377,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Wraithgrove', version: '0.28.0-real-enemies-1778077603', built: '2026-04-27', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Unlimited Chaos', version: '0.29.0-unlimited-chaos-1778082810', built: '2026-04-27', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -402,6 +442,7 @@
       'js/core/wg-audio.js',
       'js/meta/meta-iap.js',
       'js/meta/meta-ads.js',
+      'js/meta/meta-special-abilities.js',
       'js/meta/meta-account.js',
       'js/meta/meta-leaderboard.js',
       'js/meta/meta-savesync.js',

@@ -300,12 +300,19 @@
     if (st.tutorial.completedFirstStage === undefined) {
       st.tutorial.completedFirstStage = !!st.tutorial.stage1Seen;
     }
+    // W-Stage-Zero-Tutorial: existing saves (firstLaunch=false) get stage0Cleared=true
+    // so they don't re-enter Stage 0 on next session.
+    if (st.tutorial.stage0Cleared === undefined) {
+      st.tutorial.stage0Cleared = !st.firstLaunch;
+    }
     ensureStyles();
   }
 
   function maybeStart(stageId) {
     if (stageId !== 1) return;
     var tut = WG.State.get().tutorial;
+    // W-Stage-Zero-Tutorial: suppress Stage 1 hints until Stage 0 is cleared
+    if (tut.stage0Cleared === false) return;
     if (tut.completedFirstStage || tut.stage1Seen) return;
 
     isActive       = true;

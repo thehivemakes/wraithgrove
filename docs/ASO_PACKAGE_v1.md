@@ -62,7 +62,7 @@ All title/subtitle/category/age data below was extracted directly from the live 
 - **Age:** 13+
 - **Publisher:** HABBY
 - **Description opener (verbatim):** *"Dangerous zombies are attacking the entire city! The city is in peril! Awakened by the trial of dreams, you've no choice but to take on the heroic mantle of saving the city!"*
-- **Hook structure:** All emergency, all the time. Emoji-density compensated by exclamation-density. This is the casual-mass-market register — *not* an Identity V or PGR register. We should not copy this for Wraithgrove — it would clash with the folk-horror tone.
+- **Hook structure:** All emergency, all the time. Emoji-density compensated by exclamation-density. This is the casual-mass-market register — *not* an Identity V or PGR register. We should not copy this for Unlimited Chaos — it would clash with the folk-horror tone.
 
 ### 1.6 Vampire Survivors (Poncle)
 - **App Store URL:** https://apps.apple.com/us/app/vampire-survivors/id6444525702
@@ -72,17 +72,17 @@ All title/subtitle/category/age data below was extracted directly from the live 
 - **Age:** 13+
 - **Publisher:** Poncle
 - **Description opener (verbatim):** *"Vampire Survivors is a roguelite time survival RPG game with minimalistic gameplay. The supernatural indie phenomenon that lets you be the bullet hell has arrived on mobile! The whole game is also playable in 1-4 player couch co-op in landscape."*
-- **Hook structure:** Genre-stack (roguelite + time survival + RPG + minimalist), then *credibility ping* ("supernatural indie phenomenon"). Vampire Survivors leans on its meme-tier brand recognition — Wraithgrove has none of that yet, so this template is not transferable.
+- **Hook structure:** Genre-stack (roguelite + time survival + RPG + minimalist), then *credibility ping* ("supernatural indie phenomenon"). Vampire Survivors leans on its meme-tier brand recognition — Unlimited Chaos has none of that yet, so this template is not transferable.
 
 ### 1.7 Convergence analysis (200 words)
 
 Across the six listings, three patterns hold consistently and one is interesting-by-its-absence.
 
-**Pattern 1 — subtitle is the keyword-density slot.** All six subtitles compress 2-4 genre tags into ~17-28 characters. Apple indexes the subtitle for search; players read it as the genre-promise. Wraithgrove's subtitle should pack folk-horror + survival + arena and stop there.
+**Pattern 1 — subtitle is the keyword-density slot.** All six subtitles compress 2-4 genre tags into ~17-28 characters. Apple indexes the subtitle for search; players read it as the genre-promise. Unlimited Chaos's subtitle should pack folk-horror + survival + arena and stop there.
 
-**Pattern 2 — first description sentence repeats the subtitle.** PGR and Vampire Survivors do this almost verbatim. Honkai uses a softer paraphrase. The repetition reinforces genre at the moment a player decides whether to swipe past or expand "more." Wraithgrove should follow this.
+**Pattern 2 — first description sentence repeats the subtitle.** PGR and Vampire Survivors do this almost verbatim. Honkai uses a softer paraphrase. The repetition reinforces genre at the moment a player decides whether to swipe past or expand "more." Unlimited Chaos should follow this.
 
-**Pattern 3 — cohort age rating is 13+ except Onmyoji (9+).** Onmyoji leans on mythology rather than horror; the 9+ rating is part of why it appeals to a wider Eastern-market audience. Wraithgrove targets ESRB Teen (13+), which puts it in the same trust-tier as Identity V / PGR / Honkai / Survivor.io.
+**Pattern 3 — cohort age rating is 13+ except Onmyoji (9+).** Onmyoji leans on mythology rather than horror; the 9+ rating is part of why it appeals to a wider Eastern-market audience. Unlimited Chaos targets ESRB Teen (13+), which puts it in the same trust-tier as Identity V / PGR / Honkai / Survivor.io.
 
 **Absence: none of the six lead with cinematic-heavy preview videos in their first screenshot slot** that I could verify directly via WebFetch. Third-party ASO blogs claim 95-100% of top-grossers have a preview video in slot 1; I cannot independently verify the count without paid Sensor Tower access. **Treat the "video boosts install rate by 25-40%" claim from §screenshot research as DIRECTIONAL not MEASURED — these numbers had a herd-fabrication signature in the source data.**
 
@@ -108,15 +108,15 @@ Confirmed via Perplexity Sonar with cited Apple/Google docs (2026-05-05 query):
 
 ---
 
-## §2 — Wraithgrove app title + subtitle (3 ranked options each)
+## §2 — Unlimited Chaos app title + subtitle (3 ranked options each)
 
 ### 2.1 Title options (Apple 30-char limit)
 
 | Rank | Option | Chars | Reasoning |
 |---|---|---|---|
-| **1** | `Wraithgrove: Veil of Lanterns` | 29 | Brand + atmospheric tagline. "Veil" signals folk-horror; "Lanterns" signals Eastern-folk visual register. Pattern matches PGR / Honkai (`Brand: Tagline`). Maximum keyword reach within 30 chars. **Recommended.** |
-| 2 | `Wraithgrove: Hollow Hunt` | 24 | Action-first signal. "Hunt" matches the in-game Hunt tab. Loses atmospheric weight but gains conversion-vector clarity. Use this if A/B testing shows the atmospheric variant under-converts. |
-| 3 | `Wraithgrove` | 11 | Bare brand. Identity V / Onmyoji / Vampire Survivors school. Forces subtitle to do all genre-signal work. Acceptable only if you commit hard to subtitle keywords AND screenshot 1 reads as "horror" within 1 second. **Reject for v1 launch — no brand equity yet.** |
+| **1** | `Unlimited Chaos` | 15 | Bare brand — **Architect ratified 2026-05-06.** Subtitle carries all genre-signal (see §2.2 / §2.3). |
+| 2 | `Unlimited Chaos: Hollow Hunt` | 28 | Brand + action tag. "Hunt" matches the in-game Hunt tab. 28/30 chars — within limit. Use if A/B testing shows bare brand under-converts. |
+| 3 | `Unlimited Chaos: Veil of Lanterns` | 34 | **OVER 30-CHAR LIMIT (34 chars).** Do not submit. Carried forward as concept reference only. |
 
 ### 2.2 Subtitle options (Apple 30-char limit)
 
@@ -128,9 +128,9 @@ Confirmed via Perplexity Sonar with cited Apple/Google docs (2026-05-05 query):
 
 ### 2.3 Recommended combination
 
-**Title:** `Wraithgrove: Veil of Lanterns` (29/30 chars)
-**Subtitle:** `Folk Horror Survival Arena` (26/30 chars)
-**Combined keyword surface:** wraithgrove, veil, lanterns, folk, horror, survival, arena — 7 indexed terms across the two top-priority slots.
+**Title:** `Unlimited Chaos` (15/30 chars)
+**Subtitle:** [ARCHITECT FILL — old subtitle options were designed for the Wraithgrove brand; Architect to choose new subtitle for Unlimited Chaos]
+**Combined keyword surface:** unlimited, chaos + subtitle terms (Architect to confirm after subtitle is selected).
 
 ---
 
@@ -157,7 +157,7 @@ Folk-horror survival arena. Hunt wraiths in the lantern-lit grove.
 The block below is **drafted to fit within 4000 chars** (Apple and Play both cap there). Total length is ~3,500 chars to leave 500 chars of structural room for the compliance worker (TASK 2) to insert gacha-rate disclosure language at the marker. **Do not ship without the compliance insert.**
 
 ```
-In the Wraithgrove, the lanterns lie. What walks the path beside you walks closer when you stop watching.
+In the Unlimited Chaos, the lanterns lie. What walks the path beside you walks closer when you stop watching.
 
 Step into a folk-horror arena where every stage you survive is one stage further from going home. The grove was a sanctuary once. The lantern-keepers said the light kept the wraiths at bay. They were lying. The light is what they're hunting by.
 
@@ -183,7 +183,7 @@ Test your Power against other walkers in async Duels — your loadout fights the
 Free track gives you progression rewards. Premium track adds cosmetics, currency, and one exclusive ukiyo-e character skin you can't earn any other way. Premium pass: $9.99 per season.
 
 ▣ WHAT MAKES THIS DIFFERENT
-Wraithgrove is built around a single principle: every stage you survive should feel less safe than the one before. Stage 1 welcomes you. Stage 4 turns. Stage 14 watches you. Stage 18 changes Stage 1 on replay. Hand-painted in ukiyo-e ink-wash. Lo-fi shamisen score that turns when the grove turns. Boss whispers in fragments of folk-Japanese.
+Unlimited Chaos is built around a single principle: every stage you survive should feel less safe than the one before. Stage 1 welcomes you. Stage 4 turns. Stage 14 watches you. Stage 18 changes Stage 1 on replay. Hand-painted in ukiyo-e ink-wash. Lo-fi shamisen score that turns when the grove turns. Boss whispers in fragments of folk-Japanese.
 
 ▣ FREE TO PLAY — HONESTLY
 Free to download. Daily energy refills naturally over time. Optional paid Path Pass and gem packs. Ad-removal upgrade carries across devices on the same account — buy it once, keep it forever, even if you switch phones.
@@ -194,7 +194,7 @@ The grove has been waiting for you.
 Walk in.
 Just don't trust the lanterns.
 
-Download Wraithgrove now.
+Download Unlimited Chaos now.
 ```
 
 **Char count of the above (measured):** 3,308 chars including the placeholder marker line; 3,085 chars excluding the placeholder. With a typical 500-char compliance insert replacing the marker: ~3,585 chars. Within the 4,000 cap with ~415 chars of headroom.
@@ -215,8 +215,8 @@ roguelike,gacha,arpg,yokai,demon,ghost,cursed,ritual,dark,fantasy,hunt,monster,s
 
 ### 5.2 Construction logic
 
-Words excluded because they appear in title (`Wraithgrove: Veil of Lanterns`) or subtitle (`Folk Horror Survival Arena`):
-- wraithgrove, veil, of, lanterns, folk, horror, survival, arena
+Words excluded because they appear in title (`Unlimited Chaos`) or subtitle (TBD — Architect to confirm):
+- unlimited, chaos + subtitle terms once subtitle is locked
 
 Words included, ranked by my confidence in their search-volume + relevance match:
 
@@ -273,7 +273,7 @@ Per ASO-blog convergence (see §1.7 caveat — directional not measured), gamepl
 | 0:04–0:07 | Stage 8 combat surge. Character throws a signature attack. Three wraiths shatter into ink-wash particles. | Combat hit-stop. Shamisen returns harder. |
 | 0:07–0:10 | Tower Gauntlet floor counter spinning up — Floor 12, 24, 47. Buff cards flash by. | Drum acceleration. Crowd-of-whispers building. |
 | 0:10–0:13 | Wraith Father reveal — silhouette rises behind torii gate. Player draws their lantern higher. | Silence. One long deep horn. |
-| 0:13–0:14 | Cut to logo: `Wraithgrove` in ukiyo-e brush stroke. Subtitle below. | Final shamisen note. |
+| 0:13–0:14 | Cut to logo: `Unlimited Chaos` in ukiyo-e brush stroke. Subtitle below. | Final shamisen note. |
 | 0:14–0:15 | Tagline overlay: `Don't trust the lanterns.` | Held note fades. |
 
 **Format:** 15 seconds, vertical 9:16 for App Store + 16:9 for Play Store landscape variant. **Audio note:** must work without sound — the App Store autoplays muted. Critical info is on-screen; audio is bonus.
@@ -284,11 +284,11 @@ Per ASO-blog convergence (see §1.7 caveat — directional not measured), gamepl
 
 **The moment to capture:** the Wraith Father silhouette looms in the upper-right two-thirds of the frame, partially veiled in ink-wash storm cloud. In the lower-left third, a small player character holds a single lit lantern — the lantern is the brightest pixel in the entire image. The contrast ratio between the lantern and the surrounding dark must be high enough that the lantern reads as a single point of warmth in a field of cold.
 
-**Text overlay:** `Wraithgrove` rendered in ukiyo-e brush-stroke font, centered on the horizon line where the player character meets the wraith silhouette. Subtitle below in smaller weight: `Veil of Lanterns`.
+**Text overlay:** `Unlimited Chaos` rendered in ukiyo-e brush-stroke font, centered on the horizon line where the player character meets the wraith silhouette. Subtitle below in smaller weight: `Veil of Lanterns`.
 
 **Palette:** ink-wash blacks, lantern-warm orange (single hot point), fog-pale silver-blue, accent of arterial red on the wraith's eye (the only color in its silhouette).
 
-**Composition principle:** the lantern is small, the wraith is huge, the player is alone. The image should convey "you have a tiny light against an enormous dark, and the light is what's drawing the dark to you." That single visual sentence is the Wraithgrove pitch in one frame.
+**Composition principle:** the lantern is small, the wraith is huge, the player is alone. The image should convey "you have a tiny light against an enormous dark, and the light is what's drawing the dark to you." That single visual sentence is the Unlimited Chaos pitch in one frame.
 
 **What to avoid:**
 - No bright character portraits (this is not a hero-collector graphic).

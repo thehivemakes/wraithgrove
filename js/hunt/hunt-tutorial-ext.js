@@ -136,6 +136,23 @@
     }
   }
 
+  // ── Stage 0: "Drag to move" callout (W-Stage-Zero-Tutorial) ─────────────────
+  // Single hint near joystick, auto-hides after 5s or on × tap.
+  // Fires only on stage 0 start, only when elapsed < 5s.
+
+  function onStage0Start() {
+    if (isDone('stage0MoveSeen')) return;
+    // Position above the joystick area (bottom-center of screen)
+    showHint(
+      'stage0-move',
+      'Drag to move',
+      'bottom:220px;left:50%;transform:translateX(-50%);z-index:220;',
+      false,
+      5000,
+      () => markDone('stage0MoveSeen')
+    );
+  }
+
   // ── Concern A: Tower tutorial ─────────────────────────────────────────────
   let _towerSessionActive = false;
 
@@ -295,12 +312,13 @@
     t.stage1Seen          = false;
     t.completedFirstStage = false;
     // Re-arm extension flags
-    t.towerTutorial = false;
-    t.forgeTutorial = false;
-    t.gachaTutorial = false;
+    t.towerTutorial  = false;
+    t.forgeTutorial  = false;
+    t.gachaTutorial  = false;
+    t.stage0MoveSeen = false;
     _towerSessionActive = false;
     // Dismiss any currently-showing extension hints
-    ['tower-intro','tower-buffhint','tower-death','forge-intro','gacha-intro','gacha-equip'].forEach(id => dismissHint(id));
+    ['stage0-move','tower-intro','tower-buffhint','tower-death','forge-intro','gacha-intro','gacha-equip'].forEach(id => dismissHint(id));
     setNavDot('relics', false);
     checkGachaDot();
   }
@@ -309,13 +327,15 @@
   function init() {
     const st = WG.State.get();
     if (!st.tutorial) st.tutorial = {};
-    if (st.tutorial.towerTutorial === undefined) st.tutorial.towerTutorial = false;
-    if (st.tutorial.forgeTutorial === undefined) st.tutorial.forgeTutorial = false;
-    if (st.tutorial.gachaTutorial === undefined) st.tutorial.gachaTutorial = false;
+    if (st.tutorial.towerTutorial  === undefined) st.tutorial.towerTutorial  = false;
+    if (st.tutorial.forgeTutorial  === undefined) st.tutorial.forgeTutorial  = false;
+    if (st.tutorial.gachaTutorial  === undefined) st.tutorial.gachaTutorial  = false;
+    if (st.tutorial.stage0MoveSeen === undefined) st.tutorial.stage0MoveSeen = false;
 
     ensureStyles();
     startBuffPickerWatch();
 
+    WG.Engine.on('hunt:stage-start',   (e) => { if (e.stageId === 0) onStage0Start(); });
     WG.Engine.on('tower:run-start',    ()  => onTowerRunStart());
     WG.Engine.on('tower:run-end',      (e) => onTowerRunEnd(e));
     WG.Engine.on('tab:change',         (e) => {

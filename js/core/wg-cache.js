@@ -68,7 +68,16 @@
       // Shallow-merge top-level keys
       Object.assign(s.currencies, data.currencies || {});
       if (data.energy) Object.assign(s.energy, data.energy);
-      if (data.player) Object.assign(s.player, data.player);
+      if (data.player) {
+        Object.assign(s.player, data.player);
+        // W-Special-Abilities: restore ability meta-state explicitly (Object.assign
+        // copies the whole .player, so these are already in; guard for older saves).
+        if (!s.player.abilitySlots)        s.player.abilitySlots        = [null, null, null];
+        if (!s.player.abilityCharges)      s.player.abilityCharges      = {};
+        if (!s.player.abilityCooldowns)    s.player.abilityCooldowns    = {};
+        if (!s.player.abilityAdWatchToday) s.player.abilityAdWatchToday = {};
+        if (!s.player.abilityAdWatchDay)   s.player.abilityAdWatchDay   = '';
+      }
       if (data.huntProgress) Object.assign(s.huntProgress, data.huntProgress);
       if (data.forge) {
         if (Array.isArray(data.forge.buildings)) s.forge.buildings = data.forge.buildings;

@@ -1,3 +1,23 @@
+# Decision 2026-05-06 — Wave 1 God Window: smooth cubic-out curve (replaces flat 50% snap)
+
+**Architect ratification 2026-05-06:** PIVOT_REPORT §4 proposed flat 50%→100% stat snap at t=45s. Architect rejected; mandated smooth scale-in over 60s so player doesn't hit a sudden wall.
+
+## Spec shipped (W-Wave1-God-Window)
+- `WG.HuntEnemies.GOD_WINDOW`: DURATION_SEC=60, START_MULT=0.60, END_MULT=1.00, EASE=cubic-out
+- Formula: `mult = 0.60 + 0.40 × (1 − (1 − t/60)³)` — accelerates as window closes
+- Applied at spawn time only; baked into entity stats (`hp`, `maxHp`, `damage`, `speed`)
+- Hunt stages only (`mode` `'day'`/`'night'`). Tower Gauntlet and bosses unaffected.
+- Visual cue: 0.15-alpha amber corner gradient t=0→10s, fades by t=15s
+
+## What changed vs PIVOT_REPORT
+| PIVOT_REPORT §4 | Ratified spec |
+|---|---|
+| 50% stats | 60% stats at t=0 |
+| flat snap at t=45s | cubic-out ramp over 60s |
+| no visual signal | amber corner tint for 10s |
+
+---
+
 # Decision 2026-05-06 — Path A monetization locked for launch
 
 **Architect ratification 2026-05-06:** *"path A"* — direct response to PIVOT_REPORT.md §"Ad Cadence Decision."

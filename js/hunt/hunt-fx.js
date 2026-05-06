@@ -62,6 +62,10 @@
     // green tones — louder than enemyHit, smaller than levelUp.
     repairBurst:    { count: 12, life: 0.70, sMin: 100, sMax: 180, gravity:  40, size: 2,
                       colors: ['#a8f0a0', '#80e088', '#fff0c0'], shape: 'square', ring: true },
+    // W-Stage-Zero-Tutorial — subtle shield deflect ring during invuln window.
+    // Small count + short life = readable but not distracting.
+    shieldDeflect:  { count: 8,  life: 0.35, sMin:  60, sMax: 100, gravity:   0, size: 2,
+                      colors: ['#a8d8ff', '#ffffff', '#c0e8ff'], shape: 'square', ring: true },
   };
 
   function _alloc() {
@@ -242,6 +246,11 @@
       if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
         WG.HuntFXNumbers.spawn(player.x, player.y - 18, 'USED', { color: '#fff0c0', size: 13, duration: 800 });
       }
+    });
+
+    // W-Stage-Zero-Tutorial — shield-deflect ring during invuln window
+    WG.Engine.on('fx:shield-deflect', ({ x, y }) => {
+      burst(x, y, 'shieldDeflect');
     });
   }
 

@@ -1,12 +1,20 @@
-# STATE_OF_BUILD.md — Wraithgrove
+# STATE_OF_BUILD.md — Unlimited Chaos
 
-**Last updated:** 2026-05-05 by W-Character-Animate-MJ (Wick)
+**Last updated:** 2026-05-06 by W-Progressive-Tab-Unlock
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### Progressive Tab Unlock (W-Progressive-Tab-Unlock 2026-05-06)
+- **`js/core/wg-state.js`** — `WG.State.TAB_UNLOCK_THRESHOLDS` frozen `{ ascend:0, forge:2, relics:5, duel:8 }`; `tabs: { hunt:true, ascend:false, forge:false, relics:false, duel:false }` in state; `WG.State.unlockAllTabs()` debug helper.
+- **`js/core/wg-cache.js`** — `data.tabs` restored on load; `tab:unlocked` marks save dirty.
+- **`js/wg-game.js`** — `applyNavVisibility()` hides locked nav tabs; `setupNav()` calls it on init; `checkTabUnlocksOnLoad()` silently re-unlocks earned tabs from prior sessions; `hunt:stage-cleared` listener emits `tab:unlocked`; `tab:unlocked` listener plays slide-in animation + red dot badge + toast. Red dot clears on first tab tap.
+- **`index.html`** — CSS: `.nav-tab-slide-in` keyframe, `.nav-red-dot`, `#tab-unlock-toast`, `position:relative` added to `.nav-tab`.
+- **Debug:** `WG.State.unlockAllTabs()` in console unlocks all 4 locked tabs with full animation.
+- **Syntax check:** `node --check` passes on all three JS files.
 
 ### Animated Character Portraits — Infrastructure (W-Character-Animate-MJ 2026-05-05, Wick)
 - **`images/portraits/anim/`** — destination for 9 animated WebP loops (created, empty until MJ Animate runs).
@@ -178,9 +186,9 @@
 - `hunt-enemies.js` — 5 enemy types (lurker, walker, sprite, brute_small, caller) with target-priority AI, contact damage, ranged caller projectiles.
 - `hunt-bosses.js` — 6 bosses with distinct attack patterns (summon, shards, area, charge, contact). Names: pale_bride / frozen_crone / autumn_lord / temple_warden / cave_mother / wraith_father.
 - `hunt-waves.js` — wave manager: spawn-rate ramp curve + boss spawn at 100%. **Night Mode multipliers** (W-DayNight-And-Torch 2026-05-01): `runtime.mode === 'night'` → spawn rate × `NIGHT_SPAWN_MUL` (1.6) and enemy + boss hp/maxHp/damage × `NIGHT_STAT_MUL` (1.4) at spawn-time. Day Mode is the existing baseline (mul=1).
-- `hunt-player.js` — auto-attack on cooldown ring, ranged + pet companion, level-up XP, in-stage skill, pickup magnet, level-up boon draft. cd/dmg/speed boons apply via `cooldownMul`, `bonusDmg`, `speedBonus`. **Torch system** (W-DayNight-And-Torch 2026-05-01): `player.torchAmount` (init 1.0) and `player.torchDecay` (0.012/s). `tickTorch(dt)` runs only when `runtime.mode === 'night'`; instant 1.0 reset inside any built campfire's `TORCH_RELIGHT_R` (100-unit) radius, otherwise linear decay. Stump-chop has `TORCH_DROP_CHANCE` (20%) replacement of second coin with a `'torch'` field drop in Night Mode; pickup sets torch to 1.0 + emits `pickup:torch`.
+- `hunt-player.js` — auto-attack on cooldown ring, ranged + pet companion, level-up XP, in-stage skill, pickup magnet, level-up boon draft. cd/dmg/speed boons apply via `cooldownMul`, `bonusDmg`, `speedBonus`. **Torch system** (W-DayNight-And-Torch 2026-05-01): `player.torchAmount` (init 1.0) and `player.torchDecay` (0.012/s). `tickTorch(dt)` runs only when `runtime.mode === 'night'`; instant 1.0 reset inside any built campfire's `TORCH_RELIGHT_R` (100-unit) radius, otherwise linear decay. Stump-chop has `TORCH_DROP_CHANCE` (20%) replacement of second coin with a `'torch'` field drop in Night Mode; pickup sets torch to 1.0 + emits `pickup:torch`. **FEVER MODE** (W-Fever-Mode 2026-05-06): `FEVER_TUNABLES` frozen (threshold=20 combo, 10s duration, 3× drop mult, enemy glow + screen tint colors, chest gold range 1–4). `player.feverActive/feverEndsAt/feverDropMult` on `runtime.player`. `startFever()` emits `fever:start`; `endFever(cause)` emits `fever:end` with `feverEndsBecause:'survived'|'broke'`. On survive: spawns FEVER CHEST via `WG.HuntPickups.spawnFeverChest()` + "FEVER CHEST!" HuntFXNumbers label. Enemy kill orb drop runs 3× during fever (multi-roll). `comboDecayTick` checks timer expiry and combo-below-threshold each frame.
 - `hunt-results.js` — end-of-stage modal with NEXT/RETRY/+2× ad button.
-- `hunt-render.js` — top-down camera follow, tile draw, sprites, level-up draft modal, HUD, particle hooks. **basic tile decoration only** — no biome-specific decoration sprites yet. HUD counter pulse on wood/gold/XP increments (DOPAMINE_DESIGN §1+§2). **Night Mode overlay** (W-DayNight-And-Torch 2026-05-01): `drawNightOverlay()` paints a screen-space indigo gradient with corner vignette modulated by `1 - torchAmount` (cubic in/out ease, not stair-step), then carves player + every-built-campfire light holes via `destination-out` radial gradients. Constants: `NIGHT_OVERLAY_TOP/_MID`, `NIGHT_MAX_ALPHA` (0.93), `NIGHT_PLAYER_LIGHT_R` (80), `NIGHT_CAMPFIRE_LIGHT_R` (140), two-frequency flicker on both. `drawDrops` `'torch'` case renders a flickering orange flame on a stick with warm-glow ring (per-drop `_flickerSeed`).
+- `hunt-render.js` — top-down camera follow, tile draw, sprites, level-up draft modal, HUD, particle hooks. **basic tile decoration only** — no biome-specific decoration sprites yet. HUD counter pulse on wood/gold/XP increments (DOPAMINE_DESIGN §1+§2). **Night Mode overlay** (W-DayNight-And-Torch 2026-05-01): `drawNightOverlay()` paints a screen-space indigo gradient with corner vignette modulated by `1 - torchAmount` (cubic in/out ease, not stair-step), then carves player + every-built-campfire light holes via `destination-out` radial gradients. Constants: `NIGHT_OVERLAY_TOP/_MID`, `NIGHT_MAX_ALPHA` (0.93), `NIGHT_PLAYER_LIGHT_R` (80), `NIGHT_CAMPFIRE_LIGHT_R` (140), two-frequency flicker on both. `drawDrops` `'torch'` case renders a flickering orange flame on a stick with warm-glow ring (per-drop `_flickerSeed`). **FEVER MODE visuals** (W-Fever-Mode 2026-05-06): `drawFeverTint(ctx)` full-screen orange overlay (rgba 255,140,40,0.15) while `runtime.player.feverActive`; `drawCreatures()` applies `ctx.shadowBlur=9` + ENEMY_GLOW orange to every enemy + boss during fever; combo HUD label switches to "FEVER Xs" countdown (250ms interval) on `fever:start`, restored to "COMBO" on `fever:end`; on `fever:end` 'broke': gray screen flash (200ms) + "FEVER LOST" red floating text + descending WebAudio oscillator (440→110Hz).
 - `hunt-fxnumbers.js` — floating-number FX layer (DOPAMINE_DESIGN §1, P0). World-anchored spawns wired to stump:hit/chopped, enemy:killed, boss:damaged, player:level, pickup:coin, relic:fragment-pickup. Easing: opacity easeOutQuad + scale 1→1.15→0.95.
 
 ### Ascend (`js/ascend/` — 5 modules)

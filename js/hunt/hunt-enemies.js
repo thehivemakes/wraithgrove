@@ -65,6 +65,49 @@
     memory_husk:     { name: 'Memory Husk',    hp:80, speed:16, damage:14, cooldown:1.7, size:22, color:'#5a3870', accent:'#a880c8', xp:10, mode:'both',  ai:'walker' },
   };
 
+  // W-Wave1-God-Window — smooth power-fantasy ramp over first 60s of every Hunt stage.
+  // Architect ratified 2026-05-06: cubic-out ease from 60%→100% (replaces flat 50% snap
+  // in PIVOT_REPORT §4). Applied at spawn time only; does NOT affect Tower Gauntlet or bosses.
+  const GOD_WINDOW = Object.freeze({
+    DURATION_SEC: 60,
+    START_MULT:   0.60,
+    END_MULT:     1.00,
+    EASE:         'cubic-out',
+  });
+
+  // Compute god-window multiplier for a given stage elapsed time.
+  // Returns a value in [START_MULT, END_MULT] following cubic-out.
+  function _godWindowMult(elapsed) {
+    const t01 = Math.min(1, elapsed / GOD_WINDOW.DURATION_SEC);
+    return GOD_WINDOW.START_MULT + (GOD_WINDOW.END_MULT - GOD_WINDOW.START_MULT) * (1 - Math.pow(1 - t01, 3));
+  }
+
+  // Apply god-window scaling to a freshly-spawned enemy entity.
+  // Hunt-only (mode 'day'/'night'). Tower Gauntlet and bosses bypass this.
+  // Stats are baked in at spawn; existing entities are never retroactively changed.
+  function applyGodWindowScaling(runtime, ent) {
+    if (!ent || !runtime || runtime.mode === 'tower') return ent;
+    // W-Stage-Zero-Tutorial — tutorial stages use fixed stage-level multipliers
+    if (runtime.stage && runtime.stage.isTutorial) {
+      const hm = runtime.stage.hpMult    || 1;
+      const dm = runtime.stage.damageMult || 1;
+      const sm = runtime.stage.speedMult  || 1;
+      ent.hp     = Math.max(1, Math.round(ent.hp    * hm));
+      ent.maxHp  = Math.max(1, Math.round(ent.maxHp * hm));
+      ent.damage = Math.max(1, Math.round(ent.damage * dm));
+      ent.speed  = ent.speed * sm;
+      return ent;
+    }
+    const mult = _godWindowMult(runtime.elapsed || 0);
+    if (mult >= GOD_WINDOW.END_MULT) return ent; // past window — skip
+    ent._spawnedAtElapsed = runtime.elapsed || 0;
+    ent.hp     = Math.round(ent.hp     * mult);
+    ent.maxHp  = Math.round(ent.maxHp  * mult);
+    ent.damage = Math.round(ent.damage * mult);
+    ent.speed  = ent.speed * mult;
+    return ent;
+  }
+
   let nextId = 1;
   // List lives in WG.Hunt.runtime.creatures (managed by hunt-stage runtime)
 
@@ -225,5 +268,5 @@
   }
 
   function init() {}
-  window.WG.HuntEnemies = { init, TYPES, spawn, tickOne, damage };
+  window.WG.HuntEnemies = { init, TYPES, GOD_WINDOW, spawn, tickOne, damage, applyGodWindowScaling };
 })();

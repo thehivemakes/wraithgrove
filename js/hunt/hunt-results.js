@@ -121,7 +121,9 @@
           ` : ''}
         </div>
         <div class="modal-btn-row">
-          ${opts.cleared ? '<button class="btn primary" id="hr-next">NEXT STAGE</button>' : '<button class="btn primary" id="hr-retry">RETRY</button>'}
+          ${opts.cleared && opts.stageId !== 0 ? '<button class="btn primary" id="hr-next">NEXT STAGE</button>' : ''}
+          ${opts.cleared && opts.stageId === 0  ? '<button class="btn primary" id="hr-next">ENTER THE HUNT</button>' : ''}
+          ${!opts.cleared ? '<button class="btn primary" id="hr-retry">RETRY</button>' : ''}
           <button class="btn" id="hr-2x">+2× (AD)</button>
           <button class="btn" id="hr-back">BACK</button>
         </div>
@@ -231,7 +233,10 @@
     });
     wrap.querySelector('#hr-back').addEventListener('click', () => { close(); WG.Game.exitHunt(); });
 
-    if (opts.cleared) {
+    if (opts.cleared && opts.stageId === 0) {
+      // W-Stage-Zero-Tutorial: after Stage 0, go to lobby (tabs reveal happens in exitHunt)
+      wrap.querySelector('#hr-next').addEventListener('click', () => { close(); WG.Game.exitHunt(); });
+    } else if (opts.cleared) {
       wrap.querySelector('#hr-next').addEventListener('click', () => {
         close();
         const nextId = Math.min(opts.stageId + 1, 18);

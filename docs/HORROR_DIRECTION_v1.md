@@ -1,5 +1,7 @@
 # HORROR_DIRECTION_v1.md
 
+**Public name: Unlimited Chaos** (registered 2026-05-06). "Wraithgrove" below is the internal project codename; keep in all historical references and design rationale. Customer-facing surfaces use "Unlimited Chaos."
+
 **Status:** RESEARCH-DRAFT — Architect ratification required before any character/genre work begins.
 **Author:** W-Horror-Direction-Research worker (scheduled task, fresh Sonnet, 2026-05-02).
 **Inputs:** 9x3x3 protocol — 27 queries across Gemini 2.5 Flash (Search grounding), Perplexity Sonar, Brave Search.

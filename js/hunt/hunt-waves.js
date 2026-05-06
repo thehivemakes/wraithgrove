@@ -150,6 +150,8 @@
     if (e) {
       applyWaveScaling(runtime, e);
       applyNightScaling(runtime, e);
+      // W-Wave1-God-Window — ramp from 60%→100% stats over first 60s. Hunt only; tower+boss excluded in applyGodWindowScaling.
+      WG.HuntEnemies.applyGodWindowScaling(runtime, e);
       runtime.creatures.push(e);
     }
     return e;

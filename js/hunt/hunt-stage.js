@@ -89,6 +89,18 @@
     //   night → pumpkin_lantern, jiangshi, samurai_grunt, wraith_fast, skull_swarmer + classic mix
     //   banshee is night-only rare — handled by 5% pre-roll in hunt-waves spawnOne,
     //   NOT listed here.
+
+    // ─── Tutorial pre-stage (W-Stage-Zero-Tutorial) ─────────────────────────
+    // Auto-launched on first boot. Tabs hidden until cleared. Single enemy type.
+    // hpMult/speedMult/damageMult applied by applyGodWindowScaling when isTutorial=true.
+    // invulnFirstSec: player cannot die for first 45s (shield deflect FX).
+    { id: 0, name: 'Lantern Wake', biome: 'forest_summer',
+      durationSec: 90, enemyMix: ['lurker'], bossId: null,
+      weaponPickups: ['charred_axe'],
+      notes: 'Tutorial pre-stage. Player is auto-launched into this. Tabs hidden until clear.',
+      isTutorial: true, hpMult: 0.4, speedMult: 0.6, damageMult: 0.2,
+      invulnFirstSec: 45 },
+
     { id:1,  name:'Lantern Vigil',    biome:'forest_summer', durationSec:150, enemyMix:['lurker','red_zombie','pumpkin_lantern','skull_swarmer','wraith_fast'],                                              bossId:null,             weaponPickups:['charred_axe'],                                 notes:'Tutorial encounter. Single enemy type. Fast clear to hook the player.' },
     { id:2,  name:'Pale Crossing',    biome:'forest_summer', durationSec:165, enemyMix:['lurker','sprite','red_zombie','pumpkin_lantern','jiangshi','skull_swarmer','wraith_fast'],                          bossId:null,             weaponPickups:['charred_axe','twin_blades'],                   notes:'Sprite introduced — fast but fragile; teaches dodge-priority vs swarm.' },
     { id:3,  name:'Hollow Shrine',    biome:'forest_summer', durationSec:195, enemyMix:['lurker','sprite','walker','red_zombie','samurai_grunt','pumpkin_lantern','jiangshi','skull_swarmer','wraith_fast'],  bossId:'pale_bride',     weaponPickups:['charred_axe','twin_blades'],                   notes:'Boss-stage. Walker + samurai grunt before Pale Bride enters.' },

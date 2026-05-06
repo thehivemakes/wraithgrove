@@ -56,6 +56,29 @@
     { id: 'battle_pass_s1', price: 9.99, type: 'entitlement',
       name: 'Whispering Pines Pass', display: 'Premium track unlock — 60-level Season 1 battle pass',
       grants: { battlePassPremium: 'wraithgrove_s1' } },
+
+    // W-Special-Abilities §D — individual ability charge packs
+    { id: 'ability_pack_wraith_banish',    price: 1.99, type: 'ability_pack',
+      name: 'Wraith Banish Pack',     display: '5× Wraith Banish charges',
+      grants: { abilityCharges: { wraith_banish: 5 } } },
+    { id: 'ability_pack_lantern_pulse',    price: 1.99, type: 'ability_pack',
+      name: 'Lantern Pulse Pack',     display: '5× Lantern Pulse charges',
+      grants: { abilityCharges: { lantern_pulse: 5 } } },
+    { id: 'ability_pack_time_slow',        price: 2.99, type: 'ability_pack',
+      name: 'Time Slow Pack',         display: '3× Time Slow charges',
+      grants: { abilityCharges: { time_slow: 3 } } },
+    { id: 'ability_pack_soul_magnet',      price: 1.99, type: 'ability_pack',
+      name: 'Soul Magnet Pack',       display: '5× Soul Magnet charges',
+      grants: { abilityCharges: { soul_magnet: 5 } } },
+    { id: 'ability_pack_shadow_strike',    price: 2.99, type: 'ability_pack',
+      name: 'Shadow Strike Pack',     display: '3× Shadow Strike charges',
+      grants: { abilityCharges: { shadow_strike: 3 } } },
+    { id: 'ability_pack_paper_charm_ward', price: 4.99, type: 'ability_pack',
+      name: 'Paper Charm Ward Pack',  display: '1× Paper Charm Ward charge',
+      grants: { abilityCharges: { paper_charm_ward: 1 } } },
+    { id: 'ability_starter_bundle',        price: 4.99, type: 'ability_pack', oneTimeOnly: true,
+      name: 'Ability Starter Bundle', display: '2× charges of each common ability (6 total)',
+      grants: { abilityCharges: { wraith_banish: 2, lantern_pulse: 2, soul_magnet: 2 } } },
   ];
 
   function bySKU(id) { return SKUS.find(s => s.id === id); }
@@ -104,6 +127,15 @@
     if (g.pullRare      && window.WG.Gacha) WG.Gacha.pullTiered('standard', 'rare');
     if (g.pullLegendary && window.WG.Gacha) WG.Gacha.pullTiered('standard', 'legendary');
     // Royal Pass subscription activation
+    // W-Special-Abilities: ability charge packs — WG.SpecialAbilities may not yet
+    // be initialised at stub call time (e.g. during restore); guard with optional chain.
+    if (g.abilityCharges) {
+      for (const abilityId in g.abilityCharges) {
+        if (window.WG && WG.SpecialAbilities && WG.SpecialAbilities.addCharge) {
+          WG.SpecialAbilities.addCharge(abilityId, g.abilityCharges[abilityId]);
+        }
+      }
+    }
     if (g.royalPassActive) {
       s.subscriptions.royalPass.active = true;
       s.subscriptions.royalPass.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;

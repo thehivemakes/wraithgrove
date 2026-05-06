@@ -32,6 +32,12 @@
       highestStageCleared: 0,           // gates Rebirth tier unlocks
       slots: { melee: 'branch_stick', ranged: null, pet: null },
       stats: { attack: 5, hpMax: 100, hp: 100, gatherRate: 0, critRate: 0.05, defense: 0 },
+      // W-Special-Abilities: 3 equip slots + charge/cooldown pools (meta, persist cross-run)
+      abilitySlots:         [null, null, null],
+      abilityCharges:       {},   // abilityId → integer charge count
+      abilityCooldowns:     {},   // abilityId → endsAtMs
+      abilityAdWatchToday:  {},   // abilityId → count today
+      abilityAdWatchDay:    '',   // YYYY-MM-DD of last reset
     },
     huntProgress: {
       currentStage: 1,         // 1..18
@@ -94,6 +100,9 @@
     towerProgress: {
       peakFloor: 0,                // personal best floor in Tower Gauntlet (persisted across runs)
     },
+    // W-Stage-Zero-Tutorial — tab visibility schema. Gating logic in W-Progressive-Tab-Unlock.
+    // hunt is always true; others unlock via stage clears.
+    tabs: { hunt: true, ascend: false, forge: false, relics: false, duel: false },
     settings: {
       soundOn: true,
       musicOn: true,
@@ -221,6 +230,8 @@
     if (state.meta.installTimeMs === 0) state.meta.installTimeMs = Date.now();
     state.meta.sessionsCount = (state.meta.sessionsCount || 0) + 1;
     if (!state.energy.lastRegenAt) state.energy.lastRegenAt = Date.now();
+    // W-Stage-Zero-Tutorial — ensure tabs schema exists on saves predating this worker
+    if (!state.tabs) state.tabs = { hunt: true, ascend: false, forge: false, relics: false, duel: false };
     // Restore VIP energy cap if Royal Pass was active on last save
     if (state.subscriptions && state.subscriptions.royalPass && state.subscriptions.royalPass.active) {
       state.energy.max = ENERGY_TUNABLES.MAX + 20;
