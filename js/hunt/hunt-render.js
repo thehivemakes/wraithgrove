@@ -37,6 +37,20 @@
   // Preloaded Image objects: _spriteCache[type][frameIdx] — populated by init().
   const _spriteCache = {};
 
+  // W-Player-Sprites-MJ-Chrome — 9 chibi player sprites (MJ-generated, rembg transparent).
+  const PLAYER_SPRITES = {
+    lantern_acolyte: 'art/players/lantern_acolyte/neutral.png',
+    sigil_student:   'art/players/sigil_student/neutral.png',
+    horned_oni:      'art/players/horned_oni/neutral.png',
+    paper_priest:    'art/players/paper_priest/neutral.png',
+    silent_seer:     'art/players/silent_seer/neutral.png',
+    scythe_widow:    'art/players/scythe_widow/neutral.png',
+    ash_brawler:     'art/players/ash_brawler/neutral.png',
+    fox_kabuki:      'art/players/fox_kabuki/neutral.png',
+    cap_apprentice:  'art/players/cap_apprentice/neutral.png',
+  };
+  const _playerSpriteCache = {};
+
   // SPEC §0 — Night Mode lighting. Overlay alpha eases with (1 - torchAmount).
   // Holes carved at player + every built campfire via destination-out compositing.
   // Constants in world units (radii) and seconds (time-bases).
@@ -2310,6 +2324,33 @@
     ctx.fillRect(sx + 1, sy - 11, 1, 1);
   }
 
+  function drawPlayerSprite(ctx, sx, sy, p) {
+    const id = (WG.State.get().player && WG.State.get().player.activeCharacter) || 'lantern_acolyte';
+    const img = _playerSpriteCache[id];
+    if (!img || !img.complete || img.naturalWidth === 0) {
+      drawAnimeGirl(ctx, sx, sy, p.weaponRange || 16);
+      return;
+    }
+    const vx = p.vx || 0, vy = p.vy || 0;
+    const speed = Math.sqrt(vx*vx + vy*vy);
+    const stretch = Math.min(1, speed / 80);
+    const sxScale = 1 - stretch * 0.06;
+    const syScale = 1 + stretch * 0.06;
+    const t = performance.now() / 1000;
+    const bob = Math.sin(t * 2.4) * 1.2;
+    const drawW = 40 * sxScale;
+    const drawH = 40 * syScale;
+    ctx.save();
+    if (p.facing === 'W') {
+      ctx.translate(sx, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -drawW/2, sy - drawH * 0.85 + bob, drawW, drawH);
+    } else {
+      ctx.drawImage(img, sx - drawW/2, sy - drawH * 0.85 + bob, drawW, drawH);
+    }
+    ctx.restore();
+  }
+
   function drawPlayer(ctx) {
     const p = runtime.player;
     if (!p) return;
@@ -2334,10 +2375,10 @@
       ctx.translate(s.x, s.y);
       ctx.scale(sxK, syK);
       ctx.translate(-s.x, -s.y);
-      drawAnimeGirl(ctx, s.x, s.y, visualRadius);
+      drawPlayerSprite(ctx, s.x, s.y, p);
       ctx.restore();
     } else {
-      drawAnimeGirl(ctx, s.x, s.y, visualRadius);
+      drawPlayerSprite(ctx, s.x, s.y, p);
     }
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
@@ -2852,6 +2893,12 @@
         return img;
       });
     });
+    // Preload player sprites — falls back to drawAnimeGirl if asset missing.
+    for (const [id, path] of Object.entries(PLAYER_SPRITES)) {
+      const im = new Image();
+      im.src = path;
+      _playerSpriteCache[id] = im;
+    }
     // Manual HUD pulse trigger — DOPAMINE_DESIGN §2: any module can ping a counter.
     WG.Engine.on('hud:pulse', ({ key }) => {
       if (_hudPulse[key]) _hudPulse[key].ts = performance.now();
