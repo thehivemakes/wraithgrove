@@ -643,15 +643,7 @@
       style: 'cursor:pointer;',
       onclick: () => showBuildingDetailModal(b),
     });
-    const _bImg = el('img', {
-      src: 'images/buildings/' + b.id + '.png',
-      style: 'width:96px;height:96px;object-fit:contain;display:block;margin:0 auto;',
-      loading: 'lazy',
-    });
-    _bImg.onerror = function() {
-      this.parentNode.replaceChild(el('div', { class: 'icon-box' }, def.icon || '?'), this);
-    };
-    tile.appendChild(_bImg);
+    tile.appendChild(el('div', { class: 'icon-box' }, def.icon || '?'));
     tile.appendChild(el('div', { class: 'name' }, def.name));
     tile.appendChild(el('div', { class: 'level' }, 'Lv.' + b.level));
     if (statLine) {

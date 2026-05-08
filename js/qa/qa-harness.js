@@ -987,3 +987,490 @@
   }
 
 })();
+
+// ── WG.QA.ASO — 8 screenshot-state recipes ───────────────────────────────────
+// Extends WG.QA with deterministic harness recipes that drive the game into
+// each of the 8 App Store screenshot states defined in docs/ASO_PACKAGE_v1.md §6.
+//
+// Each recipe:
+//   • Sets WG.State (currency, progression, character, tab)
+//   • Triggers the specific UI / combat moment
+//   • Returns a Promise<void> that resolves after a 3s hold at visual peak
+//     so any screenshot tool can capture without racing
+//
+// Recipes intentionally leave state dirty — refresh to resume normal play.
+//
+// Console usage:
+//   await WG.QA.ASO.shot1_combat_peak()
+//   await WG.QA.ASO.shot2_hero_lobby()
+//   await WG.QA.ASO.shot3_alliance_tab()
+//   await WG.QA.ASO.shot4_gacha_pull()
+//   await WG.QA.ASO.shot5_tower_floor()
+//   await WG.QA.ASO.shot6_boss_intro()
+//   await WG.QA.ASO.shot7_results_payoff()
+//   await WG.QA.ASO.shot8_relics_pinch()
+//   await WG.QA.ASO.runAll()   ← cycles all 8 with 5s gaps
+(function () { 'use strict';
+
+  var HOLD_MS = 3000;   // hold duration at visual peak before Promise resolves
+  var GAP_MS  = 5000;   // gap between shots in runAll()
+
+  function _w(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // ── Internal cleanup: remove ASO mock overlays + dismiss open modals ───────
+  function _clean() {
+    ['wg-aso-alliance', 'wg-aso-gacha-pull'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    var css = document.getElementById('wg-aso-gacha-css');
+    if (css) css.remove();
+    // Dismiss open hunt-results modal
+    var mr = document.getElementById('modal-root');
+    if (mr) mr.innerHTML = '';
+    // Remove any lingering boss-intro overlay
+    document.querySelectorAll('.wg-boss-intro').forEach(function (el) {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    // Exit any running hunt stage
+    if (window.WG && WG.Game && WG.Game.getHuntRuntime && WG.Game.getHuntRuntime()) {
+      WG.Game.exitHunt();
+    }
+  }
+
+  // ── shot1_combat_peak ─────────────────────────────────────────────────────
+  // Hunt tab · Stage 8 (Withering Grove, forest_autumn biome)
+  // FEVER MODE active (orange tint, enemy glow) · combo:25 · 3 lurkers nearly dead
+  async function shot1_combat_peak() {
+    _clean();
+    var s = WG.State.get();
+    s.currencies.coins    = 3200;
+    s.currencies.diamonds = 12;
+    s.currencies.gems     = 85;
+    s.huntProgress.highestUnlocked = Math.max(s.huntProgress.highestUnlocked, 8);
+    s.player.level = 12;
+    WG.State.grantEnergy(30, 'aso');
+    await _w(80);
+
+    WG.Game.startHunt(8, 'day');
+    await _w(200);
+
+    var rt = WG.Game.getHuntRuntime();
+    if (!rt || !rt.player) { console.warn('[WG.QA.ASO] shot1: no runtime after startHunt(8)'); return; }
+
+    // Recentre player; full HP
+    rt.player.x = rt.mapW * 0.5;
+    rt.player.y = rt.mapH * 0.5;
+    rt.player.hp = rt.player.maxHp;
+
+    // Activate FEVER MODE directly on the runtime (mirrors hunt-player.js startFever)
+    rt.player.feverActive   = true;
+    rt.player.feverEndsAt   = Date.now() + 30000;   // 30s — well past screenshot window
+    rt.player.feverDropMult = 3;
+    rt.combo.count = 25;
+    rt.combo.peak  = 25;
+    WG.Engine.emit('fever:start', { endsAt: rt.player.feverEndsAt });
+
+    // Place 3 lurkers in a triangle, each at 6% HP (death-glow visible in render)
+    [0.5, 1.17, 1.83].forEach(function (frac) {
+      var ang = frac * Math.PI;
+      var e = WG.HuntEnemies.spawn(
+        'lurker',
+        rt.player.x + Math.cos(ang) * 90,
+        rt.player.y + Math.sin(ang) * 90
+      );
+      if (e) { e.hp = Math.max(1, Math.ceil((e.maxHp || 40) * 0.06)); rt.creatures.push(e); }
+    });
+
+    WG.Game.syncTopStrip();
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot1_combat_peak — 3s hold complete');
+  }
+
+  // ── shot2_hero_lobby ──────────────────────────────────────────────────────
+  // Hunt lobby · Lantern Acolyte active · stage-select list visible
+  // No active stage — this is the menu hero tile + biome background state.
+  async function shot2_hero_lobby() {
+    _clean();
+    var s = WG.State.get();
+    s.currencies.coins    = 5800;
+    s.currencies.diamonds = 7;
+    s.currencies.gems     = 340;
+    // Ensure Lantern Acolyte is owned and active
+    s.player.activeCharacter = 'lantern_acolyte';
+    if (s.player.ownedCharacters.indexOf('lantern_acolyte') < 0)
+      s.player.ownedCharacters.push('lantern_acolyte');
+    s.player.level = 20;
+    s.huntProgress.highestUnlocked = Math.max(s.huntProgress.highestUnlocked, 12);
+
+    WG.Game.switchTab('hunt');
+    WG.Game.syncTopStrip();
+    await _w(120);
+
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot2_hero_lobby — 3s hold complete');
+  }
+
+  // ── shot3_alliance_tab ────────────────────────────────────────────────────
+  // Alliance / Coven tab · seeded coven roster · MOTD · 3 daily missions
+  // NOTE: The alliance feature is not yet shipped. This recipe injects a
+  // pixel-accurate screenshot-only mock overlay representing the target screen.
+  // The overlay dismisses on tap or is cleaned up by _clean() before the next shot.
+  async function shot3_alliance_tab() {
+    _clean();
+    WG.Game.switchTab('hunt');
+    await _w(80);
+
+    function mRow(icon, name, rank, pwr, rankCol) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;' +
+        'border-bottom:1px solid rgba(80,40,120,0.3);">' +
+        '<span style="font-size:16px;">' + icon + '</span>' +
+        '<div style="flex:1;"><div style="font-size:12px;color:#e8d8ff;">' + name + '</div>' +
+        '<div style="font-size:9px;color:' + rankCol + ';letter-spacing:1px;">' + rank + '</div></div>' +
+        '<div style="font-size:10px;color:#c0a0e0;">⚡ ' + pwr + '</div></div>';
+    }
+    function mMission(label, prog, total, barCol, done) {
+      var pct = Math.round((prog / total) * 100);
+      return '<div style="margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">' +
+        '<span style="color:#c8b8e8;">' + label + '</span>' +
+        '<span style="color:' + barCol + ';">' + prog + '/' + total + (done ? ' ✓' : '') + '</span></div>' +
+        '<div style="height:4px;background:rgba(80,40,120,0.4);border-radius:2px;">' +
+        '<div style="width:' + pct + '%;height:100%;background:' + barCol + ';border-radius:2px;"></div></div></div>';
+    }
+
+    var ov = document.createElement('div');
+    ov.id  = 'wg-aso-alliance';
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:8800;display:flex;flex-direction:column;overflow:hidden;' +
+      'background:linear-gradient(180deg,#0c0814 0%,#100c1c 65%,#0a0c10 100%);' +
+      'font-family:Georgia,serif;color:#d8c8f0;';
+
+    ov.innerHTML =
+      // Header
+      '<div style="background:linear-gradient(90deg,#1a0a30,#220a3a);padding:14px 18px;' +
+        'border-bottom:1.5px solid #4a2870;display:flex;align-items:center;gap:12px;flex-shrink:0;">' +
+        '<div style="font-size:18px;letter-spacing:2px;font-weight:700;color:#e8c8ff;text-transform:uppercase;">' +
+          '⚗ Coven of Hollow Lanterns</div>' +
+        '<div style="margin-left:auto;font-size:10px;color:#8060b0;letter-spacing:2px;">LV. 14</div>' +
+      '</div>' +
+      // MOTD
+      '<div style="background:rgba(60,20,90,0.45);border:1px solid #5a3080;' +
+        'margin:12px 14px 0;border-radius:8px;padding:10px 14px;">' +
+        '<div style="font-size:9px;letter-spacing:2px;color:#9060d0;margin-bottom:5px;">COVEN MESSAGE</div>' +
+        '<div style="font-size:13px;color:#f0d8ff;line-height:1.5;">' +
+          '“The Wraith Father stirs at Stage 18. Rally for tonight’s raid — 3 sigils required.”</div>' +
+        '<div style="font-size:9px;color:#6040a0;margin-top:5px;text-align:right;">— Elder Vorath · 2h ago</div>' +
+      '</div>' +
+      // Member list
+      '<div style="padding:10px 14px;flex-shrink:0;">' +
+        '<div style="font-size:9px;letter-spacing:2px;color:#8060b0;margin-bottom:8px;">MEMBERS ONLINE — 7 / 20</div>' +
+        mRow('🌙','Vorath','ELDER',   '18,820','#e8c8ff') +
+        mRow('🔥','Kessen','WARDEN',  '14,350','#ffd070') +
+        mRow('💫','Mirela','WARDEN',  '12,900','#ffd070') +
+        mRow('🌿','Ondrak','ACOLYTE', '8,420', '#a8d8a8') +
+        mRow('🌑','Thresh','ACOLYTE', '7,100', '#a8d8a8') +
+        mRow('❄','Soren', 'INITIATE','3,200', '#c0d8f0') +
+        mRow('🕯','Ash',   'INITIATE','2,880', '#c0d8f0') +
+      '</div>' +
+      // Daily coven missions
+      '<div style="background:rgba(20,10,40,0.7);border-top:1px solid #3a2060;padding:10px 14px;flex-shrink:0;">' +
+        '<div style="font-size:9px;letter-spacing:2px;color:#8060b0;margin-bottom:8px;">COVEN DAILY MISSIONS</div>' +
+        mMission('Hunt 3 stages',     3, 3,  '#60c860', true)  +
+        mMission('Defeat 60 wraiths', 48, 60,'#c0a0ff', false) +
+        mMission('Tower Floor 10+',   1, 1,  '#60c860', true)  +
+      '</div>';
+
+    document.body.appendChild(ov);
+    ov.addEventListener('pointerdown', function () {
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+    }, { once: true });
+
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot3_alliance_tab — 3s hold complete');
+  }
+
+  // ── shot4_gacha_pull ──────────────────────────────────────────────────────
+  // Mid-pull legendary reveal · Moonshear relic · portal rings + glow animations
+  // NOTE: The current game shows a text-only pull result. This recipe injects
+  // a cinematic mid-pull overlay matching the ASO §6 screenshot brief.
+  async function shot4_gacha_pull() {
+    _clean();
+    var s = WG.State.get();
+    s.currencies.gems = 1650;
+    WG.Game.syncTopStrip();
+    await _w(60);
+
+    var css = document.createElement('style');
+    css.id = 'wg-aso-gacha-css';
+    css.textContent =
+      '@keyframes wg-aso-spin{to{transform:rotate(360deg);}}' +
+      '@keyframes wg-aso-float{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-10px) scale(1.02);}}' +
+      '@keyframes wg-aso-glow{0%,100%{box-shadow:0 0 30px 8px rgba(255,204,64,.5);}50%{box-shadow:0 0 60px 20px rgba(255,204,64,.9);}}' +
+      '@keyframes wg-aso-ring{0%{opacity:.5;transform:scale(.9);}100%{opacity:.12;transform:scale(1.28);}}';
+    document.head.appendChild(css);
+
+    var ov = document.createElement('div');
+    ov.id = 'wg-aso-gacha-pull';
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:8900;display:flex;flex-direction:column;' +
+      'align-items:center;justify-content:center;overflow:hidden;' +
+      'background:radial-gradient(ellipse at center,#1a0840 0%,#08041c 65%,#040210 100%);';
+
+    ov.innerHTML =
+      // Outer portal ring
+      '<div style="position:absolute;width:min(80vw,360px);height:min(80vw,360px);border-radius:50%;' +
+        'border:3px solid rgba(160,80,255,.6);animation:wg-aso-ring 1.2s ease-in-out infinite alternate;' +
+        'box-shadow:0 0 60px 20px rgba(120,40,200,.5),inset 0 0 60px rgba(80,20,140,.3);"></div>' +
+      // Inner dashed ring (spinning)
+      '<div style="position:absolute;width:min(65vw,290px);height:min(65vw,290px);border-radius:50%;' +
+        'border:1px dashed rgba(200,160,255,.3);animation:wg-aso-spin 4s linear infinite;"></div>' +
+      // Cost chip — top-right corner
+      '<div style="position:absolute;top:14px;right:14px;background:rgba(20,8,40,.88);' +
+        'border:1px solid #5a3a90;border-radius:20px;padding:5px 12px;' +
+        'font-family:monospace;font-size:13px;color:#e0c8ff;">💎 270</div>' +
+      // Floating relic card
+      '<div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;' +
+        'animation:wg-aso-float 2.4s ease-in-out infinite;">' +
+        '<div style="width:min(52vw,220px);height:min(72vw,300px);border-radius:14px;' +
+          'background:linear-gradient(180deg,#2a0e50 0%,#160830 60%,#0c0420 100%);' +
+          'border:2.5px solid #ffcc40;animation:wg-aso-glow 2.4s ease-in-out infinite;' +
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;' +
+          'position:relative;overflow:hidden;">' +
+          '<div style="position:absolute;top:10px;right:10px;background:#ffcc40;color:#1a0a00;' +
+            'font-size:9px;font-weight:700;letter-spacing:2px;padding:2px 8px;border-radius:4px;' +
+            'font-family:monospace;">LEGENDARY</div>' +
+          '<div style="font-size:72px;filter:drop-shadow(0 0 12px rgba(255,204,64,.8));">🌙</div>' +
+          '<div style="font-family:Georgia,serif;font-size:18px;color:#ffcc40;' +
+            'letter-spacing:2px;font-weight:700;text-align:center;padding:0 10px;">MOONSHEAR</div>' +
+          '<div style="font-size:10px;color:#c0a070;letter-spacing:1px;">+38 ATTACK</div>' +
+        '</div>' +
+        '<div style="font-family:Georgia,serif;font-size:22px;font-weight:700;letter-spacing:4px;' +
+          'color:#ffcc40;text-shadow:0 0 12px rgba(255,204,64,.9),0 0 32px rgba(255,204,64,.5);">' +
+          '✶ LEGENDARY ✶</div>' +
+      '</div>' +
+      // Dismiss hint
+      '<div style="position:absolute;bottom:20px;font-size:10px;color:#4a3070;' +
+        'letter-spacing:2px;font-family:monospace;">TAP TO DISMISS</div>';
+
+    document.body.appendChild(ov);
+    ov.addEventListener('pointerdown', function () {
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+      var c = document.getElementById('wg-aso-gacha-css');
+      if (c) c.remove();
+    }, { once: true });
+
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot4_gacha_pull — 3s hold complete');
+  }
+
+  // ── shot5_tower_floor ─────────────────────────────────────────────────────
+  // Tower Gauntlet · floor 23 · mid-encounter · ad-buff pills + buff stack visible
+  async function shot5_tower_floor() {
+    _clean();
+    var s = WG.State.get();
+    s.currencies.coins         = 12400;
+    s.currencies.gems          = 220;
+    s.towerProgress.peakFloor  = 27;
+    WG.State.grantEnergy(30, 'aso');
+    await _w(80);
+
+    WG.Game.startTowerRun();
+    await _w(150);
+
+    var rt = WG.HuntTower.getRuntime();
+    if (!rt || !rt.player) { console.warn('[WG.QA.ASO] shot5: no tower runtime'); return; }
+
+    // Jump to floor 23 mid-encounter
+    rt.floor        = 23;
+    rt.floorElapsed = 20;
+    rt.floorDuration = 60;
+    rt.kills        = 88;
+    rt.player.hp    = Math.round(rt.player.maxHp * 0.72);   // battle-worn
+
+    // Seed the run's buff history stack (appears in run summary + used by apply())
+    rt.buffStack = [
+      'damage_plus_15', 'crit_plus_5',  'hp_plus_25',
+      'damage_plus_30', 'lifesteal_4',  'crit_dmg_plus_50',
+      'damage_plus_60', 'phantom_strike',
+    ];
+    // Apply three buffs to the runtime so player stats reflect them
+    WG.HuntTowerBuffs.apply('damage_plus_60', rt);
+    WG.HuntTowerBuffs.apply('lifesteal_4',    rt);
+    WG.HuntTowerBuffs.apply('phantom_strike',  rt);
+
+    // Activate ad-buffs so the HUD buff pills render (WG.Buffs.list() drives pills)
+    if (window.WG && WG.Buffs && WG.Buffs.activate) {
+      WG.Buffs.activate('damage_x2', 45000);
+      WG.Buffs.activate('wood_x2',   60000);
+    }
+
+    // Place 4 walkers at mid-distance — a live encounter, not an empty floor
+    var cx = rt.mapW * 0.5;
+    var cy = rt.mapH * 0.5;
+    [0, 0.5, 1, 1.5].forEach(function (frac) {
+      var ang = frac * Math.PI;
+      var e = WG.HuntEnemies.spawn('walker',
+        cx + Math.cos(ang) * 110, cy + Math.sin(ang) * 110);
+      if (e) rt.creatures.push(e);
+    });
+
+    // Fire tower:floor-start so the floor nameplate animates in
+    WG.Engine.emit('tower:floor-start', { floor: 23 });
+
+    WG.Game.syncTopStrip();
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot5_tower_floor — 3s hold complete');
+  }
+
+  // ── shot6_boss_intro ──────────────────────────────────────────────────────
+  // Boss arrival cinematic · Wraith Father name card visible + pulsing
+  // Starts Stage 18 so game canvas renders beneath the overlay, then emits
+  // boss:spawned to trigger wg-game.js showBossIntro (1600ms hitPause cycle).
+  // The cinematic auto-dismisses at 1.3s; re-emitting every 1200ms keeps it alive.
+  async function shot6_boss_intro() {
+    _clean();
+    WG.State.grantEnergy(30, 'aso');
+    await _w(80);
+
+    // Start Stage 18 (The Wraith Father stage) — canvas renders game content beneath
+    WG.Game.startHunt(18, 'day');
+    await _w(200);
+
+    // Build a Wraith Father runtime object for the cinematic
+    var boss = WG.HuntBosses.spawn('wraith_father', 360, 550);
+
+    // Re-emit every 1200ms: each call clears the prior 1300ms auto-hide timer
+    // and restarts the cinematic cycle — overlay stays visible indefinitely.
+    var _keepAlive = setInterval(function () {
+      WG.Engine.emit('boss:spawned', { boss: boss });
+    }, 1200);
+
+    WG.Engine.emit('boss:spawned', { boss: boss });
+
+    // Wait 600ms (past pre-darken at 0ms + show at 200ms + 300ms fade-in) so
+    // the name card is fully visible and pulsing before the screenshot window opens.
+    await _w(600);
+
+    await _w(HOLD_MS);
+    clearInterval(_keepAlive);
+    console.log('[WG.QA.ASO] shot6_boss_intro — 3s hold complete');
+  }
+
+  // ── shot7_results_payoff ──────────────────────────────────────────────────
+  // Post-stage results screen · currency count-up animation · "CLEARED" header
+  // Shows Stage 9 (Marrow Hollow, forest_autumn) clear with rich rewards.
+  async function shot7_results_payoff() {
+    _clean();
+    if (WG.Game.getHuntRuntime()) WG.Game.exitHunt();
+    WG.Game.switchTab('hunt');
+    await _w(80);
+
+    WG.HuntResults.show({
+      stageId:  9,
+      cleared:  true,
+      mins:     3.8,
+      kills:    47,
+      rewards: {
+        coins:           920,
+        diamonds:        4,
+        cards:           1,
+        fragments:       3,
+        energyRefund:    3,
+        firstClearBonus: 10,
+      },
+      peakCombo: 28,
+    });
+
+    // Count-up animation runs 800ms; capture during it for the live-animation frame
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot7_results_payoff — 3s hold complete');
+  }
+
+  // ── shot8_relics_pinch ────────────────────────────────────────────────────
+  // Relics tab · 6 legendary relics equipped · legendary-tier grid filter active
+  // The "glow" is the rarity-border highlight on equipped relic cards.
+  async function shot8_relics_pinch() {
+    _clean();
+    var s = WG.State.get();
+    s.currencies.coins = 9400;
+    s.currencies.gems  = 580;
+
+    // Grant 6 legendary + 2 mythic relics in state
+    ['r_moonshear','r_souldrift','r_marrowveil','r_paleforge','r_grimroot','r_ashtongue',
+     'r_wraithheart','r_voidlantern'].forEach(function (id) {
+      s.relics.owned[id] = { count: 1, level: 1 };
+    });
+
+    // Equip the 6 legendaries (clears prior equips first)
+    s.relics.equipped = [];
+    ['r_moonshear','r_souldrift','r_marrowveil','r_paleforge','r_grimroot','r_ashtongue']
+      .forEach(function (id) { WG.RelicsEquip.tryEquip(id); });
+
+    // Ensure relics tab is visible
+    if (s.tabs) s.tabs.relics = true;
+
+    WG.Game.switchTab('relics');
+    await _w(100);
+
+    // Set filter to legendary so equipped relics display with gold borders + glow
+    s.relics.activeRarityFilter = 'legendary';
+    WG.Engine.emit('tab:change', { tab: 'relics' });
+    WG.Game.syncTopStrip();
+    await _w(120);
+
+    await _w(HOLD_MS);
+    console.log('[WG.QA.ASO] shot8_relics_pinch — 3s hold complete');
+  }
+
+  // ── runAll: cycle all 8 recipes with 5s gaps ─────────────────────────────
+  async function runAll() {
+    var shots = [
+      ['shot1_combat_peak',    shot1_combat_peak],
+      ['shot2_hero_lobby',     shot2_hero_lobby],
+      ['shot3_alliance_tab',   shot3_alliance_tab],
+      ['shot4_gacha_pull',     shot4_gacha_pull],
+      ['shot5_tower_floor',    shot5_tower_floor],
+      ['shot6_boss_intro',     shot6_boss_intro],
+      ['shot7_results_payoff', shot7_results_payoff],
+      ['shot8_relics_pinch',   shot8_relics_pinch],
+    ];
+    for (var i = 0; i < shots.length; i++) {
+      var name = shots[i][0], fn = shots[i][1];
+      console.log('[WG.QA.ASO] ── ' + (i + 1) + '/8 ' + name + ' ──');
+      try { await fn(); } catch (e) { console.warn('[WG.QA.ASO]', name, 'threw:', e); }
+      if (i < shots.length - 1) {
+        console.log('[WG.QA.ASO] ' + (GAP_MS / 1000) + 's gap before next shot...');
+        await _w(GAP_MS);
+      }
+    }
+    console.log('[WG.QA.ASO] ══ all 8 shots complete ══');
+  }
+
+  // ── Mount: attach to WG.QA once the harness is ready ─────────────────────
+  function _mount() {
+    if (window.WG && window.WG.QA) {
+      window.WG.QA.ASO = {
+        shot1_combat_peak:    shot1_combat_peak,
+        shot2_hero_lobby:     shot2_hero_lobby,
+        shot3_alliance_tab:   shot3_alliance_tab,
+        shot4_gacha_pull:     shot4_gacha_pull,
+        shot5_tower_floor:    shot5_tower_floor,
+        shot6_boss_intro:     shot6_boss_intro,
+        shot7_results_payoff: shot7_results_payoff,
+        shot8_relics_pinch:   shot8_relics_pinch,
+        runAll:               runAll,
+      };
+      console.log('[WG.QA.ASO] 8 screenshot recipes installed — call WG.QA.ASO.shot1_combat_peak() etc. or WG.QA.ASO.runAll()');
+    } else {
+      requestAnimationFrame(_mount);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _mount);
+  } else {
+    _mount();
+  }
+
+})();

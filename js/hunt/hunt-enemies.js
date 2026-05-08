@@ -60,9 +60,8 @@
     // `mode:'both'` so it spawns in day and nightmare ascended runs.
     sigil_drone:     { name: 'Sigil Drone',    hp:25, speed:50, damage:7,  cooldown:1.2, size:13, color:'#3a1058', accent:'#c060ff', xp:5,  mode:'both',  ranged:true, projectileSpeed:155, projectileRange:280 },
 
-    // memory_husk: slow shambling walker. 80 HP. On death, splits into 2 lurkers.
-    // Split logic is in wg-game.js enemy:killed handler (needs runtime access).
-    memory_husk:     { name: 'Memory Husk',    hp:80, speed:16, damage:14, cooldown:1.7, size:22, color:'#5a3870', accent:'#a880c8', xp:10, mode:'both',  ai:'walker' },
+    // memory_husk: slow shambling walker. 80 HP. On death, splits per splitOnDeath catalog.
+    memory_husk:     { name: 'Memory Husk',    hp:80, speed:16, damage:14, cooldown:1.7, size:22, color:'#5a3870', accent:'#a880c8', xp:10, mode:'both',  ai:'walker', splitOnDeath:{ type:'lurker', count:2, spread:30 } },
   };
 
   // W-LevelUp-Storm-Tune §C — enemy HP scales with in-stage player level so early
@@ -93,6 +92,10 @@
     START_MULT:   0.60,
     END_MULT:     1.00,
     EASE:         'cubic-out',
+  });
+
+  const TUNABLES = Object.freeze({
+    SPLIT_FRAGMENT_HP_SCALE: 0.5,  // split-spawn lurkers start at 50% of base HP
   });
 
   // Compute god-window multiplier for a given stage elapsed time.
@@ -288,5 +291,5 @@
   }
 
   function init() {}
-  window.WG.HuntEnemies = { init, TYPES, GOD_WINDOW, LEVEL_SCALE_TUNABLES, spawn, tickOne, damage, applyGodWindowScaling, applyLevelScaling };
+  window.WG.HuntEnemies = { init, TYPES, GOD_WINDOW, LEVEL_SCALE_TUNABLES, TUNABLES, spawn, tickOne, damage, applyGodWindowScaling, applyLevelScaling };
 })();

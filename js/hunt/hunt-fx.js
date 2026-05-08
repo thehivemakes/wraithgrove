@@ -66,12 +66,6 @@
     // Small count + short life = readable but not distracting.
     shieldDeflect:  { count: 8,  life: 0.35, sMin:  60, sMax: 100, gravity:   0, size: 2,
                       colors: ['#a8d8ff', '#ffffff', '#c0e8ff'], shape: 'square', ring: true },
-    // W-Boss-Death-Payoff §A — main explosion: 60 gold+crimson radial, 1.4s, gravity 60.
-    bossDeathExplosion: { count: 60, life: 1.4, sMin: 100, sMax: 280, gravity: 60, size: 3,
-                          colors: ['#ffd870', '#ff8040', '#d03020', '#ffffff', '#ffa040'], shape: 'square' },
-    // W-Boss-Death-Payoff §A — ring pulse: 24 white-gold particles, expanding ring, 0.6s.
-    bossDeathRing:      { count: 24, life: 0.6, sMin: 200, sMax: 200, gravity:  0, size: 2,
-                          colors: ['#ffffff', '#ffe888', '#fff0c0'], shape: 'square', ring: true },
   };
 
   function _alloc() {
@@ -162,14 +156,8 @@
     WG.Engine.on('enemy:damaged', ({ creature }) => {
       if (creature) burst(creature.x, creature.y, 'enemyHit');
     });
-    // W-Boss-Death-Payoff §A — explosion + ring + trauma + hit-pause + gold screen-flash.
     WG.Engine.on('boss:defeated', ({ boss }) => {
-      if (!boss) return;
-      burst(boss.x, boss.y, 'bossDeathExplosion');
-      burst(boss.x, boss.y, 'bossDeathRing');
-      if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.65);
-      if (window.WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(280);
-      if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('rgba(255,224,144,1)', 0.4, 700);
+      if (boss) burst(boss.x, boss.y, 'bossKill');
     });
     WG.Engine.on('pickup:coin', ({ x, y }) => {
       if (x != null && y != null) burst(x, y, 'pickupCoin');

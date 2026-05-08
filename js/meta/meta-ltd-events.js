@@ -152,7 +152,7 @@
   }
 
   function _refreshBanner() {
-    if (!_bannerEl) return;
+    if (!_bannerEl || !_bannerEl.isConnected) return;
     _bannerEl.innerHTML = '';
     var active = activeEvents();
     if (!active.length) {

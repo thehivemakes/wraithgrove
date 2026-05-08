@@ -35,10 +35,6 @@
     { event: 'boss:damaged',          id: 'boss_hit',      bus: 'sfx', throttleMs: 120, vol: 0.6 },
     { event: 'enemy:crit',           id: 'boss_hit',      bus: 'sfx', throttleMs:  60, vol: 0.85 }, // W-Dopamine-P1 §B
     { event: 'boss:defeated',         id: 'boss_die',      bus: 'sfx', throttleMs: 0,   vol: 1.0 },
-    // W-Boss-Death-Payoff §C — triumphant drum stinger. Falls back to boss_intro_drone
-    // loud-mode if boss_defeat_drum.mp3 absent (see wireEvents fallback). ENGINE-CONFIRMED:
-    // boss:defeated emitted by hunt-player.js onBossKill().
-    { event: 'boss:defeated',         id: 'boss_defeat_drum', bus: 'sfx', throttleMs: 0, vol: 1.0 },
     // Pickups (require Concern B emits — fail-silent until then)
     { event: 'pickup:orb',            id: 'orb_pickup',    bus: 'sfx', throttleMs: 40,  vol: 0.4 },
     { event: 'pickup:coin',           id: 'coin_pickup',   bus: 'sfx', throttleMs: 60,  vol: 0.5 },
@@ -264,13 +260,6 @@
         play(row.id, { bus: row.bus, vol: row.vol, throttleMs: row.throttleMs });
       });
     });
-    // W-Boss-Death-Payoff §C — fallback: boss_defeat_drum absent → play boss_intro_drone loud.
-    // The EVENT_MAP row above handles the happy path (play() fail-silents if file missing).
-    // This extra listener fires the fallback once the missing-flag is confirmed.
-    WG.Engine.on('boss:defeated', () => {
-      if (missing['boss_defeat_drum']) play('boss_intro_drone', { bus: 'sfx', vol: 1.0 });
-    });
-
     // Ambient: stage:enter passes { biome }, stage:exit clears.
     WG.Engine.on('stage:enter', payload => {
       const biome = payload && payload.biome;
