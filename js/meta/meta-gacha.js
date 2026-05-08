@@ -105,6 +105,44 @@
     return relic;
   }
 
+  // ─── Jurisdiction disclosure text ────────────────────────────────────────
+  // JP/KR/EU per-jurisdiction gacha probability text.
+  // Rates mirror GACHA_POOLS.standard.rates + .pity — update both if changing rates.
+  // See docs/GACHA_COMPLIANCE.md for legal basis per jurisdiction.
+  const JURISDICTION_DISCLOSURE = {
+    ja: [
+      '【確率型アイテム情報】',
+      'ミシック: 1.0%（100回以内に確定）',
+      'レジェンダリー: 9.0%（30回以内に確定）',
+      'レア: 25.0% ／ コモン: 65.0%',
+      'ゲームアイテムに現金価値はありません。',
+      'コンプリートガチャは採用していません。',
+    ],
+    ko: [
+      '【확률형 아이템 확률 공개】',
+      '게임산업진흥에 관한 법률 제33조 준수',
+      '신화 등급: 1.0% (100회 이내 보장)',
+      '전설 등급: 9.0% (30회 이내 보장)',
+      '희귀 등급: 25.0% ／ 일반 등급: 65.0%',
+      '게임 아이템에는 현금 가치가 없습니다.',
+    ],
+    eu: [
+      'Gacha probability disclosure — EU / EEA',
+      'Mythic: 1.0% (guaranteed within 100 pulls)',
+      'Legendary: 9.0% (guaranteed within 30 pulls)',
+      'Rare: 25.0% · Common: 65.0%',
+      'Virtual items carry no real-world monetary value.',
+      'Belgian players: see Privacy Policy §4a for additional regional disclosures.',
+      'BeGambleAware.org · GamCare.org.uk',
+    ],
+  };
+
+  // Returns string[] for locale-specific pre-pull overlay, or null for EN fallback.
+  // Called by WG.Compliance.showGachaDisclosure() when navigator.language matches.
+  function getJurisdictionDisclosure(jurisdiction) {
+    return JURISDICTION_DISCLOSURE[jurisdiction] || null;
+  }
+
   // ─── Public API ───────────────────────────────────────────────────────────
 
   function getPool(poolId) { return GACHA_POOLS[poolId] || null; }
@@ -187,5 +225,5 @@
     });
   }
 
-  window.WG.Gacha = { init, getPool, getRates, getPityDisplay, pull, pullTiered, GACHA_POOLS };
+  window.WG.Gacha = { init, getPool, getRates, getPityDisplay, pull, pullTiered, GACHA_POOLS, getJurisdictionDisclosure };
 })();
