@@ -1,0 +1,29 @@
+{
+  "name": "unlimited-chaos",
+  "version": "0.2.0",
+  "description": "Unlimited Chaos — top-down auto-attack arena ARPG (Wraithgrove project)",
+  "private": true,
+  "main": "index.html",
+  "scripts": {
+    "build": "mkdir -p www && rsync -a --exclude=ios --exclude=android --exclude=node_modules --exclude=www --exclude=workers --exclude=docs --exclude=.git . www/",
+    "ios:open": "npx cap open ios",
+    "android:open": "npx cap open android",
+    "sync": "npm run build && npx cap sync",
+    "doctor": "npx cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/app": "^5.0.0",
+    "@capacitor/core": "^5.7.0",
+    "@capacitor/haptics": "^5.0.0",
+    "@capacitor/ios": "^5.7.0",
+    "@capacitor/splash-screen": "^5.0.0",
+    "@capacitor/in-app-purchases": "^5.0.0",
+    "@capacitor/status-bar": "^5.0.0",
+    "@capacitor-community/admob": "^5.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^5.7.0",
+    "typescript": "^6.0.3"
+  }
+}

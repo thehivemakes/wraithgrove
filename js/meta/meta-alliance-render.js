@@ -303,8 +303,8 @@
       const badge = isLeader ? '<span style="color:#f0c040;font-size:9px;"> ♛</span>'
                   : isOfficer ? '<span style="color:#a080c0;font-size:9px;"> ◆</span>' : '';
       return [
-        '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;',
-          'border-bottom:1px solid rgba(255,255,255,0.04);">',
+        '<div data-memberid="' + _esc(id) + '" style="display:flex;align-items:center;gap:8px;padding:6px 0;',
+          'border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;">',
           '<div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;',
             'background:' + (online ? '#60d080' : '#4a3828') + '"></div>',
           '<span style="flex:1;font-size:12px;color:' + (isMe ? '#f0d890' : '#c0a870') + ';">',
@@ -372,8 +372,9 @@
         // Top row: banner + name + count + points
         '<div style="display:flex;align-items:center;gap:10px;padding:12px;',
           'background:rgba(255,255,255,0.03);border:1px solid #3a2818;border-radius:8px;margin-bottom:10px;">',
-          '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:' + _esc(a.banner) + ';',
-            'border:2px solid rgba(255,255,255,0.2);"></div>',
+          '<div id="wg-al-banner-dot" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:' + _esc(a.banner) + ';',
+            'border:2px solid rgba(255,255,255,0.2);',
+            (WG.Alliance.canEditBanner && WG.Alliance.canEditBanner(myId) ? 'cursor:pointer;' : '') + '"></div>',
           '<div style="flex:1;">',
             '<div style="font-size:14px;color:#f0d890;font-weight:700;">' + _esc(a.name) + '</div>',
             '<div style="font-size:10px;color:#706040;">' + memberIds.length + ' / ' + (a.memberCap || 30) + ' members</div>',
@@ -384,17 +385,26 @@
           '</div>',
         '</div>',
 
-        // MOTD card
-        a.msgOfDay
-          ? '<div style="background:rgba(80,40,8,0.3);border:1px solid #5a3018;border-radius:6px;' +
-              'padding:8px 12px;font-size:11px;color:#c0a060;margin-bottom:10px;' +
-              'letter-spacing:0.3px;font-style:italic;">' + _esc(a.msgOfDay) + '</div>'
+        // MOTD card — leader sees edit button even when empty
+        (a.msgOfDay || (WG.Alliance.canSetMOTD && WG.Alliance.canSetMOTD(myId)))
+          ? '<div style="display:flex;align-items:flex-start;gap:8px;' +
+              'background:rgba(80,40,8,0.3);border:1px solid #5a3018;border-radius:6px;' +
+              'padding:8px 12px;margin-bottom:10px;">' +
+              '<div style="flex:1;font-size:11px;color:#c0a060;letter-spacing:0.3px;font-style:italic;">' +
+                (a.msgOfDay ? _esc(a.msgOfDay) : '<span style="color:#5a4828;">No message set.</span>') +
+              '</div>' +
+              ((WG.Alliance.canSetMOTD && WG.Alliance.canSetMOTD(myId))
+                ? '<button id="wg-al-motd-edit" style="flex-shrink:0;padding:3px 8px;border-radius:4px;' +
+                    'border:1px solid #5a3a18;background:transparent;color:#907858;' +
+                    'font-size:10px;cursor:pointer;" title="Edit MOTD">✏</button>'
+                : '') +
+            '</div>'
           : '',
 
         // Roster section
         '<div style="font-size:9px;color:#705840;letter-spacing:1.5px;text-transform:uppercase;',
           'margin-bottom:6px;">Members</div>',
-        '<div style="background:rgba(255,255,255,0.02);border:1px solid #2e1e0c;border-radius:8px;',
+        '<div id="wg-al-roster" style="background:rgba(255,255,255,0.02);border:1px solid #2e1e0c;border-radius:8px;',
           'padding:4px 10px;margin-bottom:12px;">',
           rosterHtml,
         '</div>',
@@ -447,14 +457,14 @@
             'color:#f0d890;font-size:11px;font-weight:700;cursor:pointer;">SEND</button>',
         '</div>',
 
-        // Alliance shop button
-        '<button id="wg-al-shop-btn" style="',
-          'width:100%;padding:12px;border-radius:8px;border:1px solid #a08040;',
-          'background:linear-gradient(to bottom,#5a3c10,#3a2408);',
-          'color:#f0d890;font-size:12px;font-weight:700;letter-spacing:2px;',
-          'text-transform:uppercase;cursor:pointer;margin-bottom:6px;">',
-          '⚑ Alliance Shop',
-        '</button>',
+        // Alliance shop button — leader-only (canSpendPoints)
+        (WG.Alliance.canSpendPoints && WG.Alliance.canSpendPoints(myId))
+          ? '<button id="wg-al-shop-btn" style="' +
+              'width:100%;padding:12px;border-radius:8px;border:1px solid #a08040;' +
+              'background:linear-gradient(to bottom,#5a3c10,#3a2408);' +
+              'color:#f0d890;font-size:12px;font-weight:700;letter-spacing:2px;' +
+              'text-transform:uppercase;cursor:pointer;margin-bottom:6px;">⚑ Alliance Shop</button>'
+          : '',
 
         // Leave button
         '<button id="wg-al-leave-btn" style="',
@@ -733,8 +743,258 @@
     }, 1000);
   }
 
+  // ── Member action modal ──────────────────────────────────────────────────────
+  function _npcPowerHash(id) {
+    var h = 0;
+    for (var i = 0; i < id.length; i++) h = (Math.imul(31, h) + id.charCodeAt(i)) | 0;
+    return 200 + Math.abs(h) % 301;
+  }
+
+  function _openMemberModal(memberId, myId) {
+    const existing = document.getElementById('wg-al-member-modal');
+    if (existing) existing.remove();
+
+    const a   = WG.Alliance.get();
+    const npc = WG.Alliance.getNPCMember && WG.Alliance.getNPCMember(memberId);
+    const isMe = memberId === myId;
+    const name = isMe ? 'You' : (npc ? npc.name : memberId.slice(0, 8));
+
+    const isTargetLeader  = memberId === a.leaderId;
+    const isTargetOfficer = (a.officerIds || []).includes(memberId);
+    const roleBadge = isTargetLeader ? 'LEADER' : isTargetOfficer ? 'OFFICER' : 'MEMBER';
+    const roleColor = isTargetLeader ? '#f0c040' : isTargetOfficer ? '#a080c0' : '#907858';
+
+    const cPromote  = WG.Alliance.canPromote  && WG.Alliance.canPromote(myId, memberId);
+    const cKick     = WG.Alliance.canKick     && WG.Alliance.canKick(myId, memberId);
+    const cDemote   = WG.Alliance.canDemote   && WG.Alliance.canDemote(myId, memberId);
+    const cTransfer = a.leaderId === myId && isTargetOfficer;
+
+    let power = '—';
+    if (isMe && WG.State && WG.State.recomputePower) {
+      power = WG.State.recomputePower();
+    } else if (npc) {
+      power = _npcPowerHash(memberId);
+    }
+
+    const boss    = WG.AllianceBoss && WG.AllianceBoss.getCurrentBoss && WG.AllianceBoss.getCurrentBoss();
+    const contrib = boss && boss.contributions && (boss.contributions[memberId] || 0);
+
+    const BTN = 'padding:9px 14px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;width:100%;text-align:left;';
+    let actionBtns = '';
+    if (cPromote)  actionBtns += '<button class="wg-al-mm-promote" style="' + BTN + 'border:1px solid #806040;background:linear-gradient(to bottom,#4a3220,#2e1c0c);color:#d0a060;">Promote to Officer</button>';
+    if (cDemote)   actionBtns += '<button class="wg-al-mm-demote"  style="' + BTN + 'border:1px solid #605030;background:rgba(40,24,8,0.8);color:#c0a050;">Demote to Member</button>';
+    if (cTransfer) actionBtns += '<button class="wg-al-mm-transfer" style="' + BTN + 'border:1px solid #a040c0;background:rgba(40,0,60,0.8);color:#d080f0;">Transfer Leadership</button>';
+    if (cKick)     actionBtns += '<button class="wg-al-mm-kick" style="' + BTN + 'border:1px solid #802020;background:rgba(40,8,8,0.8);color:#e06060;">Kick</button>';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wg-al-member-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.82);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = [
+      '<div style="background:linear-gradient(to bottom,#2a1c10,#1a1006);',
+        'border:2px solid #604020;border-radius:12px;padding:20px;',
+        'width:min(300px,100%);box-shadow:0 8px 32px rgba(0,0,0,0.7);">',
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">',
+          '<div style="font-size:13px;color:#f0d890;font-weight:700;">' + _esc(name) + '</div>',
+          '<span style="font-size:9px;color:' + roleColor + ';font-weight:700;letter-spacing:1.5px;',
+            'border:1px solid ' + roleColor + ';padding:2px 6px;border-radius:4px;">' + roleBadge + '</span>',
+        '</div>',
+        '<div style="display:flex;gap:12px;margin-bottom:' + (actionBtns ? '14px' : '6px') + ';">',
+          '<div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid #2e1e0c;',
+            'border-radius:6px;padding:8px;text-align:center;">',
+            '<div style="font-size:16px;color:#e0b870;font-weight:700;">' + power + '</div>',
+            '<div style="font-size:9px;color:#705840;letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Power</div>',
+          '</div>',
+          '<div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid #2e1e0c;',
+            'border-radius:6px;padding:8px;text-align:center;">',
+            '<div style="font-size:16px;color:#e0b870;font-weight:700;">' + (contrib ? _fmt(contrib) : '—') + '</div>',
+            '<div style="font-size:9px;color:#705840;letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Boss Dmg</div>',
+          '</div>',
+        '</div>',
+        actionBtns
+          ? '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">' + actionBtns + '</div>'
+          : '',
+        '<button id="wg-al-mm-close" style="width:100%;padding:9px;border-radius:6px;',
+          'border:1px solid #3a2818;background:transparent;color:#705840;',
+          'font-size:10px;letter-spacing:1px;cursor:pointer;">CLOSE</button>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#wg-al-mm-close').addEventListener('click', function(){ overlay.remove(); });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+
+    const promBtn = overlay.querySelector('.wg-al-mm-promote');
+    if (promBtn) promBtn.addEventListener('click', function() {
+      WG.Alliance && WG.Alliance.promote(memberId);
+      overlay.remove(); refresh();
+    });
+    const demBtn = overlay.querySelector('.wg-al-mm-demote');
+    if (demBtn) demBtn.addEventListener('click', function() {
+      WG.Alliance && WG.Alliance.demote(memberId);
+      overlay.remove(); refresh();
+    });
+    const trBtn = overlay.querySelector('.wg-al-mm-transfer');
+    if (trBtn) trBtn.addEventListener('click', function() {
+      overlay.remove();
+      _openTransferConfirmModal(memberId, name, myId);
+    });
+    const kickBtn = overlay.querySelector('.wg-al-mm-kick');
+    if (kickBtn) kickBtn.addEventListener('click', function() {
+      WG.Alliance && WG.Alliance.kick(memberId);
+      overlay.remove();
+      _toast(name + ' kicked');
+      refresh();
+    });
+  }
+
+  function _openTransferConfirmModal(targetId, targetName, myId) {
+    const existing = document.getElementById('wg-al-transfer-modal');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'wg-al-transfer-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:401;background:rgba(0,0,0,0.88);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = [
+      '<div style="background:linear-gradient(to bottom,#2a1c10,#1a1006);',
+        'border:2px solid #a040c0;border-radius:12px;padding:20px;',
+        'width:min(300px,100%);box-shadow:0 8px 32px rgba(0,0,0,0.8);">',
+        '<div style="font-size:13px;color:#d080f0;font-weight:700;letter-spacing:1.5px;',
+          'text-transform:uppercase;margin-bottom:10px;">Transfer Leadership</div>',
+        '<div style="font-size:12px;color:#c0a870;line-height:1.6;margin-bottom:18px;">',
+          'Hand leadership to <strong style="color:#f0d890;">' + _esc(targetName) + '</strong>?',
+          '<br><span style="font-size:10px;color:#705840;">You will become an Officer.</span>',
+        '</div>',
+        '<div style="display:flex;gap:8px;">',
+          '<button id="wg-al-transfer-cancel" style="flex:1;padding:10px;border-radius:6px;',
+            'border:1px solid #3a2818;background:transparent;color:#705840;',
+            'font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">CANCEL</button>',
+          '<button id="wg-al-transfer-confirm" style="flex:2;padding:10px;border-radius:6px;',
+            'border:1px solid #a040c0;background:rgba(60,0,80,0.8);color:#d080f0;',
+            'font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">CONFIRM TRANSFER</button>',
+        '</div>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+    overlay.querySelector('#wg-al-transfer-cancel').addEventListener('click', function(){ overlay.remove(); });
+    overlay.querySelector('#wg-al-transfer-confirm').addEventListener('click', function() {
+      const r = WG.Alliance && WG.Alliance.transferLeadership(myId, targetId);
+      overlay.remove();
+      if (r && r.ok) { _toast('Leadership transferred to ' + targetName); refresh(); }
+      else _toast('Transfer failed');
+    });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+  }
+
+  function _openMOTDModal(currentMOTD) {
+    const existing = document.getElementById('wg-al-motd-modal');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'wg-al-motd-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.82);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = [
+      '<div style="background:linear-gradient(to bottom,#2a1c10,#1a1006);',
+        'border:2px solid #604020;border-radius:12px;padding:20px;',
+        'width:min(320px,100%);box-shadow:0 8px 32px rgba(0,0,0,0.7);">',
+        '<div style="font-size:13px;color:#f0d890;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">Edit MOTD</div>',
+        '<textarea id="wg-al-motd-ta" maxlength="120" rows="3" placeholder="Message of the Day..." style="',
+          'width:100%;padding:9px 12px;background:#0a0604;border:1px solid #5a3a18;',
+          'border-radius:6px;color:#f0d890;font-size:12px;outline:none;resize:none;',
+          'box-sizing:border-box;margin-bottom:14px;">' + _esc(currentMOTD || '') + '</textarea>',
+        '<div style="display:flex;gap:8px;">',
+          '<button id="wg-al-motd-cancel" style="flex:1;padding:10px;border-radius:6px;',
+            'border:1px solid #5a3a18;background:transparent;color:#907858;',
+            'font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">CANCEL</button>',
+          '<button id="wg-al-motd-save" style="flex:2;padding:10px;border-radius:6px;',
+            'border:1px solid #b08840;background:linear-gradient(to bottom,#806020,#5a3c0a);',
+            'color:#fff0c8;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE</button>',
+        '</div>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+    const ta = overlay.querySelector('#wg-al-motd-ta');
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    overlay.querySelector('#wg-al-motd-cancel').addEventListener('click', function(){ overlay.remove(); });
+    overlay.querySelector('#wg-al-motd-save').addEventListener('click', function() {
+      WG.Alliance && WG.Alliance.setMOTD(ta ? ta.value : '');
+      overlay.remove(); refresh();
+    });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+  }
+
+  function _openBannerPickerModal(currentBanner) {
+    const existing = document.getElementById('wg-al-banner-modal');
+    if (existing) existing.remove();
+    const COLORS = ['#a040ff','#d04020','#2080d0','#f0a020','#208040','#c08020','#e04080','#40a080','#e08000'];
+    let chosenColor = currentBanner || COLORS[0];
+    let colorDots = COLORS.map(function(c) {
+      return '<div class="wg-al-bp-color" data-color="' + c + '" style="' +
+        'width:28px;height:28px;border-radius:50%;background:' + c + ';cursor:pointer;flex-shrink:0;' +
+        'border:2px solid ' + (c === chosenColor ? '#f0d890' : 'transparent') + ';"></div>';
+    }).join('');
+    const overlay = document.createElement('div');
+    overlay.id = 'wg-al-banner-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.82);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = [
+      '<div style="background:linear-gradient(to bottom,#2a1c10,#1a1006);',
+        'border:2px solid #604020;border-radius:12px;padding:20px;',
+        'width:min(300px,100%);box-shadow:0 8px 32px rgba(0,0,0,0.7);">',
+        '<div style="font-size:13px;color:#f0d890;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">Banner Color</div>',
+        '<div id="wg-al-bp-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' + colorDots + '</div>',
+        '<div style="display:flex;gap:8px;">',
+          '<button id="wg-al-bp-cancel" style="flex:1;padding:10px;border-radius:6px;',
+            'border:1px solid #5a3a18;background:transparent;color:#907858;',
+            'font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">CANCEL</button>',
+          '<button id="wg-al-bp-save" style="flex:2;padding:10px;border-radius:6px;',
+            'border:1px solid #b08840;background:linear-gradient(to bottom,#806020,#5a3c0a);',
+            'color:#fff0c8;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE</button>',
+        '</div>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('.wg-al-bp-color').forEach(function(dot) {
+      dot.addEventListener('click', function() {
+        overlay.querySelectorAll('.wg-al-bp-color').forEach(function(d){ d.style.border = '2px solid transparent'; });
+        dot.style.border = '2px solid #f0d890';
+        chosenColor = dot.dataset.color;
+      });
+    });
+    overlay.querySelector('#wg-al-bp-cancel').addEventListener('click', function(){ overlay.remove(); });
+    overlay.querySelector('#wg-al-bp-save').addEventListener('click', function() {
+      WG.Alliance && WG.Alliance.setBanner && WG.Alliance.setBanner(chosenColor);
+      overlay.remove(); refresh();
+    });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   function _wireFullButtons(panel) {
+    const myId = (window.WG && WG.Account && WG.Account.getDeviceId) ? WG.Account.getDeviceId() : 'local';
     _wireSubTabNav(panel);
+
+    // Roster row tap → member modal
+    const roster = panel.querySelector('#wg-al-roster');
+    if (roster) roster.addEventListener('click', function(e) {
+      const row = e.target.closest('[data-memberid]');
+      if (row) _openMemberModal(row.dataset.memberid, myId);
+    });
+
+    // MOTD edit (leader-only)
+    const motdEditBtn = panel.querySelector('#wg-al-motd-edit');
+    if (motdEditBtn) motdEditBtn.addEventListener('click', function() {
+      _openMOTDModal(WG.Alliance.get().msgOfDay);
+    });
+
+    // Banner color picker (leader-only)
+    const bannerDot = panel.querySelector('#wg-al-banner-dot');
+    if (bannerDot && WG.Alliance.canEditBanner && WG.Alliance.canEditBanner(myId)) {
+      bannerDot.addEventListener('click', function() {
+        _openBannerPickerModal(WG.Alliance.get().banner);
+      });
+    }
+
     // Claim individual mission
     panel.addEventListener('click', function(e) {
       const btn = e.target.closest('.wg-al-claim-btn');

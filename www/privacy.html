@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unlimited Chaos — Privacy Policy</title>
+<style>
+  :root {
+    --bg: #0c0a08;
+    --bg-panel: #14100c;
+    --border: #5a4028;
+    --border-light: #7a5838;
+    --gold: #f0d890;
+    --gold-dim: #c8a060;
+    --text: #d4c49a;
+    --text-muted: #8a7860;
+    --accent: #a06828;
+    --link: #d4a040;
+    --fill-bg: #2a1c0c;
+    --fill-border: #a06020;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0 0 48px 0;
+  }
+
+  /* Ukiyo-e accent: top border band with wave motif */
+  .page-header {
+    background: linear-gradient(to bottom, #1a1208, #0c0a08);
+    border-bottom: 2px solid var(--border);
+    padding: 28px 24px 24px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--gold-dim) 0px, var(--gold-dim) 8px,
+      var(--accent) 8px, var(--accent) 12px,
+      transparent 12px, transparent 16px
+    );
+  }
+  .page-header::after {
+    content: '⛩ ❧ ⛩';
+    display: block;
+    text-align: center;
+    color: var(--border-light);
+    font-size: 18px;
+    letter-spacing: 12px;
+    margin-top: 12px;
+    opacity: 0.5;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .effective {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  .content {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 32px;
+    padding: 10px 14px;
+    background: var(--bg-panel);
+    border-left: 3px solid var(--gold-dim);
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold-dim);
+    letter-spacing: 1px;
+    margin-top: 20px;
+    margin-bottom: 6px;
+  }
+
+  p {
+    font-size: 14px;
+    margin-top: 10px;
+  }
+
+  ul, ol {
+    margin-top: 10px;
+    padding-left: 22px;
+  }
+  li {
+    font-size: 14px;
+    margin-top: 6px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    margin-top: 14px;
+  }
+  th {
+    background: #1a1208;
+    border: 1px solid var(--border);
+    padding: 7px 10px;
+    text-align: left;
+    color: var(--gold-dim);
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-size: 12px;
+  }
+  td {
+    border: 1px solid var(--border);
+    padding: 7px 10px;
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  code {
+    background: var(--fill-bg);
+    border: 1px solid var(--fill-border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--gold-dim);
+  }
+
+  .fill {
+    background: var(--fill-bg);
+    border: 1px solid var(--fill-border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: #e8a040;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+
+  a { color: var(--link); }
+
+  .no-collect {
+    background: #0a1408;
+    border: 1px solid #2a4820;
+    border-left: 3px solid #4a8840;
+    padding: 10px 14px;
+    margin-top: 12px;
+    border-radius: 0 4px 4px 0;
+  }
+  .no-collect li { color: #a8c890; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0 0 0;
+    opacity: 0.5;
+  }
+
+  /* Page footer */
+  .page-footer {
+    text-align: center;
+    padding: 24px 20px 0 20px;
+    margin-top: 32px;
+    border-top: 2px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .page-footer::before {
+    content: '⛩ ❧ ⛩';
+    display: block;
+    font-size: 16px;
+    letter-spacing: 10px;
+    opacity: 0.4;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 18px; letter-spacing: 2px; }
+    table { font-size: 12px; }
+    th, td { padding: 5px 7px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Unlimited Chaos — Privacy Policy</h1>
+  <p class="effective">Version 1.0 &nbsp;·&nbsp; Effective: 2026-05-05</p>
+</div>
+
+<div class="content">
+
+<h2>1. Who We Are</h2>
+<p>Unlimited Chaos is a mobile game published by <span class="fill">[ARCHITECT FILL: legal entity name]</span>, registered in <span class="fill">[ARCHITECT FILL: jurisdiction / state / country]</span>. Questions about this policy or your personal data can be sent to <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a>.</p>
+
+<h2>2. What We Collect</h2>
+<p>We collect only what is needed to run the game across devices, enforce the purchases you have made, and serve ads. We do not collect everything we technically could.</p>
+
+<h3>Collected automatically (all players)</h3>
+<ul>
+  <li><strong>Anonymous device identifier</strong> — a random ID generated locally and stored in app data. Used for: save-file persistence across sessions, ad-removal entitlement enforcement. It is not linked to your name, email, or identity.</li>
+  <li><strong>Gameplay events</strong> — stage starts, stage clears, level-ups, ad views, IAP attempts. Sent to our own server only (not to any third-party analytics vendor). Used to balance difficulty and detect abuse. No third-party analytics SDK (e.g., Firebase Analytics, Adjust, AppsFlyer) is installed.</li>
+  <li><strong>Ad-related identifiers</strong> — Google AdMob reads device advertising IDs (IDFA on iOS, GAID on Android) to serve and personalize ads. You can limit this via OS settings (see §6 below). We do not control what AdMob collects; their privacy policy governs that data.</li>
+</ul>
+
+<h3>Collected only if you opt in</h3>
+<ul>
+  <li><strong>Email address</strong> — only if you use the Account Upgrade feature for cross-device sync. We do not ask for email just to play the game.</li>
+  <li><strong>In-App Purchase records</strong> — SKU ID, price, and transaction ID for purchases you make. Required for entitlement enforcement and refund handling. Payment card numbers are never stored by us (processed by Apple, Google, or Stripe).</li>
+</ul>
+
+<h2>3. Third-Party SDKs — Named</h2>
+<p>We name every SDK that has a data-collection role. We do not embed SDKs whose data practices we cannot describe.</p>
+
+<table>
+  <tr>
+    <th>SDK / Service</th>
+    <th>Purpose</th>
+    <th>Data they receive</th>
+  </tr>
+  <tr>
+    <td><strong>Capacitor (Ionic)</strong></td>
+    <td>iOS / Android native shell</td>
+    <td>None to Ionic. Provides plugin bridge only.</td>
+  </tr>
+  <tr>
+    <td><strong>Apple StoreKit</strong></td>
+    <td>iOS In-App Purchases</td>
+    <td>Purchase receipts → Apple. Governed by Apple's Privacy Policy.</td>
+  </tr>
+  <tr>
+    <td><strong>Google Play Billing</strong></td>
+    <td>Android In-App Purchases</td>
+    <td>Purchase tokens → Google. Governed by Google's Privacy Policy.</td>
+  </tr>
+  <tr>
+    <td><strong>Stripe Checkout</strong></td>
+    <td>Web / PWA In-App Purchases</td>
+    <td>Payment information → Stripe. Stripe is PCI-DSS compliant. Governed by Stripe's Privacy Policy.</td>
+  </tr>
+  <tr>
+    <td><strong>Google AdMob</strong></td>
+    <td>Rewarded video + interstitial ads (max 50 rewarded videos/day)</td>
+    <td>Device advertising ID, country-level geolocation, session metadata. Ad personalization can be limited via OS settings. Governed by Google's Privacy Policy.</td>
+  </tr>
+</table>
+
+<p>We restrict AdMob creative categories to block: ads that auto-redirect to other apps, ads that deep-link without a user tap, and ads that simulate system alerts. If you encounter an ad that does any of those things, report it to <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a> and we will escalate to Google.</p>
+
+<h2>4. What We Do Not Collect</h2>
+<div class="no-collect">
+  <ul>
+    <li>We do not collect your contacts, photos, microphone audio, or precise location.</li>
+    <li>We do not sell your personal data to third parties.</li>
+    <li>We do not share gameplay data or save state with advertising partners.</li>
+    <li>We do not use third-party analytics SDKs (Firebase Analytics, Adjust, AppsFlyer, etc.).</li>
+    <li>We do not require an account to play the game. Email is optional.</li>
+    <li>We do not collect payment card numbers. Payment processing is handled entirely by Apple, Google, or Stripe.</li>
+  </ul>
+</div>
+
+<h2>5. Children Under 13 (COPPA)</h2>
+<p>Unlimited Chaos is rated 9+ on iOS and Teen (13+) on Google Play. We target players aged 13 and older.</p>
+<p>We do not knowingly collect personal data from children under 13. If you are a parent or guardian and believe your child has submitted personal information to us, email <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a> with the subject line "COPPA — Data Deletion Request" and we will delete the information within 30 days.</p>
+<p>We do not direct behavioral advertising to users we know to be under 13.</p>
+
+<h2>6. Your Rights</h2>
+
+<h3>EU residents — GDPR</h3>
+<p>If you are located in the European Economic Area, you have the following rights regarding your personal data:</p>
+<ul>
+  <li><strong>Right to access</strong> — request a copy of the data we hold about you.</li>
+  <li><strong>Right to rectification</strong> — ask us to correct inaccurate data.</li>
+  <li><strong>Right to erasure</strong> — ask us to delete your data ("right to be forgotten").</li>
+  <li><strong>Right to restrict processing</strong> — ask us to pause processing while a dispute is resolved.</li>
+  <li><strong>Right to data portability</strong> — receive your data in a machine-readable format.</li>
+  <li><strong>Right to object</strong> — object to processing for direct marketing or legitimate-interests purposes.</li>
+</ul>
+<p>To exercise any of these rights, email <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a> with the subject "GDPR Request" and your account email or in-app device ID (visible in Settings → About). We respond within 30 days.</p>
+
+<h3>California residents — CCPA / CPRA</h3>
+<p>California residents have the right to know what personal information we collect, the right to delete it, and the right to opt out of the "sale or sharing" of personal information. We do not sell your personal information. We do share device advertising IDs with Google AdMob for ad purposes, which may constitute "sharing" under the CPRA.</p>
+<p>To opt out of ad-based sharing: email <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a> with the subject "CCPA Opt-Out," or use the OS-level controls below. We will not discriminate against you for exercising your rights.</p>
+
+<h3>Opt out of ad personalization (all users)</h3>
+<ul>
+  <li><strong>iOS:</strong> Settings → Privacy &amp; Security → Tracking → disable for Unlimited Chaos. AdMob will serve non-personalized ads.</li>
+  <li><strong>Android:</strong> Settings → Google → Ads → opt out of ads personalization. AdMob will serve non-personalized ads.</li>
+</ul>
+
+<h2>7. Access, Export, and Deletion</h2>
+<p>Email <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a> with the subject "Data Request" and either your account email (if you used Account Upgrade) or your in-app device ID. We will:</p>
+<ul>
+  <li>Within 30 days — send you a JSON export of all data we hold tied to your account or device ID.</li>
+  <li>Within 30 days — permanently delete it, on your confirmation. Note: deleting account data also removes IAP entitlements we track (ad removal, battle pass, etc.). Apple, Google, and Stripe retain their own records per their policies; we cannot delete those.</li>
+</ul>
+
+<h2>8. Data Storage</h2>
+<p>Save state and IAP records are stored on <span class="fill">[ARCHITECT FILL: hosting provider and region — e.g., Cloudflare Workers KV, US/EU region]</span>. Stripe payment processing is PCI-DSS compliant; we do not store payment card numbers. Analytics events are stored on our own server; we do not forward them to third-party analytics vendors.</p>
+
+<h2>9. Policy Updates</h2>
+<p>If we materially change this policy, we will post a notice in-game at least 30 days before the change takes effect. The effective date at the top of this page reflects the most recent update. Continued use of the game after the effective date constitutes acceptance of the updated policy.</p>
+
+<h2>10. Contact</h2>
+<p>Privacy inquiries: <a href="mailto:privacy@thehivemakes.com">privacy@thehivemakes.com</a></p>
+<p>Publisher: <span class="fill">[ARCHITECT FILL: legal entity name and address]</span></p>
+
+<hr class="divider">
+
+<div class="page-footer">
+  <p>Unlimited Chaos &nbsp;·&nbsp; Privacy Policy v1.0 &nbsp;·&nbsp; Effective 2026-05-05</p>
+  <p style="margin-top:6px;"><a href="terms.html">Terms of Service</a></p>
+</div>
+
+</div><!-- .content -->
+</body>
+</html>

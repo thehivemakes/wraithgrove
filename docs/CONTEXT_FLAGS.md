@@ -46,3 +46,31 @@
 - Real questions are the rare ones — the ones genuinely outside my context (their preferences for tone/branding/lore — yes those are questions; mechanic numbers are not).
 
 ---
+
+## CF-003 — WORKERS/ MUST NOT SHIP TO PUBLIC DEPLOYS
+**Date:** 2026-05-08
+**Caught by:** GitHub push protection — *"Push cannot contain secrets... GitHub Personal Access Token in workers/W-Player-Sprites-MJ-Chrome.md:227."*
+
+**The bias:** I was copying the entire `workers/` dir to deploy repos when pushing live. Worker prompts contain PATs (for git push commands inline), API keys (for MJ/DALL-E/etc), and full project context. Public deploy repos make this visible.
+
+**Truth:** `workers/` is internal documentation for orchestrator + Sonnet workflow. It belongs ONLY in the source repo, NEVER in deploy mirrors. Source-repo also benefits from sanitization (replace literal PATs with `<read-from-api.rtf-at-runtime>` placeholder + reference).
+
+**Correct posture:**
+- Deploy file allowlist: audio, js, index.html, STATE_OF_BUILD.md, docs, images, art, legal — never workers/
+- Source repo: replace inline secrets in worker prompts with run-time reference
+- Update spawn_sonnet_worker.sh templates so future workers can't accidentally bake secrets into prompts (V2 — track separately)
+
+---
+
+## CF-004 — WORKERS WRITE TO DEPLOY PATHS DIRECTLY, ORPHAN SOURCE REPO
+**Date:** 2026-05-08
+**Caught by:** Mode5 marker landed but `git log` showed no commits — files only existed at `/tmp/dark-magic-deploy/wraithgrove/`.
+
+**The bias:** I assumed CLI-spawned Sonnet workers run with cwd at the source repo + commit there + then push to deploy. Empirical truth: at least some workers (Mode1, Mode5) wrote files directly into the deploy clone at `/tmp/dark-magic-deploy/`, committed there, pushed there, never touched source repo. Marker lands at the source repo's `workers/done/` (it's the only dir reliably referenced) but the actual code is orphaned in /tmp.
+
+**Truth:** /tmp gets nuked by macOS — these workers' work is at risk every reboot.
+
+**Correct posture:**
+- After every Sonnet wave: scan `/tmp/wraithgrove-deploy` and `/tmp/dark-magic-deploy/wraithgrove` for files newer than the source repo's last commit. If found, copy back + commit + this becomes orchestrator boilerplate.
+- Worker prompts should explicitly state the cwd convention. spawn_sonnet_worker.sh should set cwd to source repo, not deploy clone.
+- Until then: orchestrator does post-wave reconciliation. Auto-mint markers if work shipped but marker missing.

@@ -144,6 +144,70 @@
     WG.Engine.emit('alliance:changed', {});
   }
 
+  function demote(memberId) {
+    const a = _ensureState();
+    a.officerIds = (a.officerIds || []).filter(function(id){ return id !== memberId; });
+    WG.Engine.emit('alliance:changed', {});
+  }
+
+  function transferLeadership(actorId, newLeaderId) {
+    const a = _ensureState();
+    if (a.leaderId !== actorId)                       return { ok: false, reason: 'not_leader' };
+    if (!(a.memberIds || []).includes(newLeaderId))   return { ok: false, reason: 'not_member' };
+    if (!a.officerIds.includes(actorId)) a.officerIds.push(actorId);
+    a.officerIds = a.officerIds.filter(function(id){ return id !== newLeaderId; });
+    a.leaderId   = newLeaderId;
+    WG.Engine.emit('alliance:changed', {});
+    return { ok: true };
+  }
+
+  function setBanner(color) {
+    const a = _ensureState();
+    if (!a.id) return;
+    a.banner = color || '#a040ff';
+    WG.Engine.emit('alliance:changed', {});
+  }
+
+  // ── Permission gates ─────────────────────────────────────────────────────────
+  function _isLeader(actorId) {
+    const a = _ensureState();
+    return !!(a.id && a.leaderId === actorId);
+  }
+
+  function _isOfficer(actorId) {
+    const a = _ensureState();
+    return !!(a.id && (a.officerIds || []).includes(actorId));
+  }
+
+  function canPromote(actorId, targetId) {
+    if (!_isLeader(actorId)) return false;
+    const a = _ensureState();
+    if (a.leaderId === targetId) return false;
+    if ((a.officerIds || []).includes(targetId)) return false;
+    return (a.memberIds || []).includes(targetId);
+  }
+
+  function canKick(actorId, targetId) {
+    const a = _ensureState();
+    if (!a.id || actorId === targetId) return false;
+    if (a.leaderId === actorId) return true;
+    if (_isOfficer(actorId)) {
+      return !((a.officerIds || []).includes(targetId)) && a.leaderId !== targetId;
+    }
+    return false;
+  }
+
+  function canDemote(actorId, targetId) {
+    if (!_isLeader(actorId)) return false;
+    const a = _ensureState();
+    return (a.officerIds || []).includes(targetId);
+  }
+
+  function canSetMOTD(actorId)    { return _isLeader(actorId); }
+  function canEditBanner(actorId) { return _isLeader(actorId); }
+  function canSpendPoints(actorId){ return _isLeader(actorId); }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   function setMOTD(text) {
     const a = _ensureState();
     a.msgOfDay = (text || '').slice(0, 120);
@@ -270,8 +334,9 @@
 
   window.WG.Alliance = {
     init, get, isUnlocked, isInAlliance,
-    create, join, leave, kick, promote, setMOTD,
+    create, join, leave, kick, promote, demote, transferLeadership, setMOTD, setBanner,
     addPoints, spend, sendGift, claimGift,
+    canPromote, canKick, canDemote, canSetMOTD, canEditBanner, canSpendPoints,
     findAlliances, getNPCMember, getNPCMembers,
     EARN_RATES, SPEND_POOL, CREATE_COST_COINS,
     NPC_MEMBERS,

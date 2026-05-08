@@ -62,6 +62,7 @@
         { id: 'bow_range',      level: 1, unlocked: true, slot: 5 },
         { id: 'barracks',       level: 1, unlocked: true, slot: 6 },
         { id: 'wall_workshop',  level: 1, unlocked: true, slot: 7 },
+        { id: 'trap_workshop',  level: 1, unlocked: true, slot: 8 },
       ],
       // Category C raid stockpiles
       stocks: {
@@ -69,6 +70,7 @@
         archer_squads:  0,   // 0 or 1 (full squad or none)
         footman_squads: 0,   // 0 or 1
         walls:          [],  // array of { hp, variant }
+        trap_stocks:    [],  // array of trap type IDs (from trap_workshop)
       },
       // Category B enchantment scroll inventory (Anvil)
       enchantmentScrolls: {
@@ -80,7 +82,7 @@
       // Cannon Battery: player-selected pre-raid loadout (3 of up to 6 types)
       cannon_loadout: ['stone_shot', null, null],
       // Refill timestamps for Category C buildings
-      nextRefillAt: { cannon_shots: 0, archer_squads: 0, footman_squads: 0, walls: 0 },
+      nextRefillAt: { cannon_shots: 0, archer_squads: 0, footman_squads: 0, walls: 0, trap_stocks: 0 },
       craftFragments: 30,
       craftDailyUsed: 0,
       craftDailyMax: 1,      // L1 Forge = 1 craft slot/day; updated by tryUpgrade
@@ -132,6 +134,10 @@
     },
     // W-Alliance-Foundation: alliance state — null until WG.Alliance._ensureState() first call
     alliance: null,
+    // W-Mode5-Alliance-Boss: boss event state — initialized by WG.AllianceBoss.init()
+    allianceBoss: null,
+    // W-Mode1-Base-Raid-Foundation: raid state
+    raid: null,  // bootstrapped by initRaidState() on first access
     meta: {
       installTimeMs: 0,
       sessionsCount: 0,
@@ -250,6 +256,23 @@
     return rp.active;
   }
 
+  // W-Mode1-Base-Raid-Foundation: bootstrap raid sub-state on first access
+  function initRaidState() {
+    if (!state.raid) {
+      state.raid = {
+        savedLayouts:   [],
+        activeLayout:   { slots: new Array(14).fill(null) },
+        layoutHistory:  [],
+        lastRaidResult: null,
+      };
+    }
+    if (!state.raid.activeLayout) state.raid.activeLayout = { slots: new Array(14).fill(null) };
+    if (!Array.isArray(state.raid.activeLayout.slots) || state.raid.activeLayout.slots.length !== 14) {
+      state.raid.activeLayout.slots = new Array(14).fill(null);
+    }
+    return state.raid;
+  }
+
   function init(){
     if (state.meta.installTimeMs === 0) state.meta.installTimeMs = Date.now();
     state.meta.sessionsCount = (state.meta.sessionsCount || 0) + 1;
@@ -260,6 +283,7 @@
     if (state.subscriptions && state.subscriptions.royalPass && state.subscriptions.royalPass.active) {
       state.energy.max = ENERGY_TUNABLES.MAX + 20;
     }
+    initRaidState();
     processEnergyRegen(Date.now());
     startEnergyRegenTick();
     WG.Engine.emit('state:init', { state });
@@ -268,7 +292,7 @@
   window.WG.State = {
     get, init, setActiveTab, spend, grant, recomputePower,
     getEnergy, spendEnergy, grantEnergy, processEnergyRegen, nextRegenMs,
-    isRoyalPassActive,
+    isRoyalPassActive, initRaidState,
     ENERGY_TUNABLES,
   };
 })();
