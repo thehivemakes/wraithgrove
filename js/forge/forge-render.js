@@ -661,13 +661,13 @@
     }
     if (refillLine) {
       tile.appendChild(el('div', {
-        style: 'font-size:8px;color:#808060;margin-top:1px;text-align:center;',
+        style: 'font-size:10px;color:#808060;margin-top:1px;text-align:center;',
       }, refillLine));
     }
     // Collect button on Gold Mine tile when there's stored coin
     if (isGoldMine && (f.mineStored || 0) > 0) {
       const btn = el('button', {
-        style: 'margin-top:3px;font-size:8px;padding:2px 5px;background:#5a3a08;border:1px solid #c8a020;' +
+        style: 'margin-top:3px;font-size:10px;padding:2px 5px;background:#5a3a08;border:1px solid #c8a020;' +
                'color:#fff0a0;border-radius:3px;cursor:pointer;width:100%;',
         onclick: (e) => {
           e.stopPropagation();
@@ -762,10 +762,10 @@
         'border-radius:4px;padding:4px 2px;text-align:center;' +
         (isCurrent ? 'box-shadow:0 0 8px rgba(255,216,112,0.7);' : '')
       });
-      pip.appendChild(el('div', { style:'font-size:8px;color:#a89878;letter-spacing:1px;' }, 'DAY ' + i));
+      pip.appendChild(el('div', { style:'font-size:10px;color:#a89878;letter-spacing:1px;' }, 'DAY ' + i));
       pip.appendChild(el('div', { style:'font-size:11px;color:' + (isCurrent ? '#fff0c8' : isClaimed ? '#80a060' : '#7a6848') + ';' },
         i === 7 ? '★' : '🪙'));
-      pip.appendChild(el('div', { style:'font-size:8px;color:' + (isCurrent ? '#fff0c8' : '#7a6848') + ';' },
+      pip.appendChild(el('div', { style:'font-size:10px;color:' + (isCurrent ? '#fff0c8' : '#7a6848') + ';' },
         i === 7 ? def.diamonds + '💎' : '' + def.coins));
       strip.appendChild(pip);
     }

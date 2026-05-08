@@ -113,14 +113,14 @@
             el.appendChild(iconSpan);
           }
           var nameLbl = document.createElement('span');
-          nameLbl.style.cssText = 'font-size:8px;color:#c0b0d8;letter-spacing:0.5px;margin-top:2px;';
+          nameLbl.style.cssText = 'font-size:10px;color:#c0b0d8;letter-spacing:0.5px;margin-top:2px;';
           nameLbl.textContent = def ? def.name.split(' ')[0].toUpperCase() : entry.defenseId.toUpperCase();
           el.appendChild(nameLbl);
           el.style.background = 'linear-gradient(135deg,' + typeColor + '44,' + typeColor + '22)';
           el.style.border = '1.5px solid ' + typeColor;
           el.style.boxShadow = '0 0 8px ' + typeColor + '44';
         } else {
-          el.innerHTML = '<span style="font-size:13px;color:#40304a;font-weight:700;">+</span><span style="font-size:7px;color:#40304a;letter-spacing:1px;margin-top:2px;">' + SLOT_LABEL[slot.type] + '</span>';
+          el.innerHTML = '<span style="font-size:13px;color:#40304a;font-weight:700;">+</span><span style="font-size:11px;color:#40304a;letter-spacing:1px;margin-top:2px;">' + SLOT_LABEL[slot.type] + '</span>';
           el.style.background = 'rgba(20,12,32,0.7)';
           el.style.border = '1.5px dashed #3a2048';
           el.style.boxShadow = 'none';
@@ -199,7 +199,7 @@
   function _railCard(parent, id, def, slotType) {
     const card = document.createElement('div');
     card.style.cssText = 'flex-shrink:0;width:56px;padding:7px 4px;border-radius:8px;border:1.5px solid ' + SLOT_COLOR[slotType] + '66;background:' + SLOT_COLOR[slotType] + '22;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:grab;user-select:none;transition:transform 80ms;';
-    card.innerHTML = '<span style="font-size:22px;">' + def.icon + '</span><span style="font-size:8px;color:#c0b0d8;letter-spacing:0.5px;text-align:center;line-height:1.2;">' + def.name.split(' ')[0] + '</span>';
+    card.innerHTML = '<span style="font-size:22px;">' + def.icon + '</span><span style="font-size:10px;color:#c0b0d8;letter-spacing:0.5px;text-align:center;line-height:1.2;">' + def.name.split(' ')[0] + '</span>';
     card.draggable = true;
     card.addEventListener('dragstart', function(e) {
       _dragId = id; _dragType = slotType;
@@ -218,7 +218,7 @@
   function _railCardComingSoon(parent, trap) {
     const card = document.createElement('div');
     card.style.cssText = 'flex-shrink:0;width:56px;padding:7px 4px;border-radius:8px;border:1.5px dashed #3a2840;background:#140c1c;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:0.45;pointer-events:none;';
-    card.innerHTML = '<span style="font-size:22px;">' + trap.icon + '</span><span style="font-size:7px;color:#7a6888;letter-spacing:0.5px;text-align:center;">SOON</span>';
+    card.innerHTML = '<span style="font-size:22px;">' + trap.icon + '</span><span style="font-size:11px;color:#7a6888;letter-spacing:0.5px;text-align:center;">SOON</span>';
     parent.appendChild(card);
   }
 

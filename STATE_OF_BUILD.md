@@ -1,12 +1,19 @@
 # STATE_OF_BUILD.md — Unlimited Chaos
 
-**Last updated:** 2026-05-08 by W-Alliance-War-Scheduling
+**Last updated:** 2026-05-08 by W-Boss-Procedural-Refine
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
 ---
 
 ## What's on disk + verified working
+
+### Boss Procedural Drawing — Richer Visuals + Nameplate (W-Boss-Procedural-Refine 2026-05-08)
+- **`js/hunt/hunt-render.js`** — All 6 boss draw functions replaced with richer canvas compositions. animTime-driven floating bob per boss (`sy -= Math.sin(t * rate) * sz * amp`). Per-boss additions: pale_bride (bezier hair, scythe, veil, radial halo, kimono gradient), frozen_crone (8 crystals, hunched robe, breath vapor, pulsing eyes), autumn_lord (10 leaf auras, bezier cloak, antlers, pumpkin face), temple_warden (stone armor, bishop cap, staff orb, sigil ring), cave_mother (4 ceiling tendrils, 4 side arms bezier, 7 eyes), wraith_father (4 aura rings, 8 wisps, void cloak bezier, near-void face, crown gem pulse).
+- **`js/hunt/hunt-render.js`** (Concern B) — `BOSS_TITLES` display-only lookup (6 bosses). `_bossBarSlide` state reset on `boss:spawned`. Sparse HP draw replaced with `drawBossNameplate(ctx, b)`: easeOutCubic slide-in 420ms, dark horizontal gradient panel, gold gradient name (13px Georgia bold), italic 9px title subtitle, gradient HP bar.
+- **`js/wg-game.js`** — `BOSS_INTRO_TITLES` const (6 entries). Intro card CSS: `translateY(40px) scale(0.94)` + `cubic-bezier(.15,.85,.25,1.05)` overshoot. New `.wg-bi-title` element (italic 12px Georgia, gold-amber). `showBossIntro()` populates title from lookup.
+- **Cache-bust:** `0.47.0-boss-procedural-1778255057`
+- **Syntax check:** `node --check` passes on both JS files. Pure visual layer — stat catalog untouched.
 
 ### Progressive Tab Unlock (W-Progressive-Tab-Unlock 2026-05-06)
 - **`js/core/wg-state.js`** — `WG.State.TAB_UNLOCK_THRESHOLDS` frozen `{ ascend:0, forge:2, relics:5, duel:8 }`; `tabs: { hunt:true, ascend:false, forge:false, relics:false, duel:false }` in state; `WG.State.unlockAllTabs()` debug helper.
@@ -167,7 +174,8 @@
 - `WG.Config` initialized as `{}` if absent (safe default in stub mode, swapped for real config in Phase 4).
 
 ### Alliance War (W-Alliance-War-Scheduling 2026-05-08)
-- **`js/meta/meta-alliance-war.js`** — `WG.AllianceWar`: weekly phase state machine (idle → matchmaking → attack → results → idle). Schedule: Fri 22:00 matchmaking open; Sat 18:00–Sun 18:00 attack window (24 h); Sun 18:00–Mon 00:00 results. Phase computed purely from wall-clock (no stored transitions). `OPPONENT_POOL` 5 NPC alliances (Shadow Claw 800 → Void Covenant 7000) matched by cumulative alliance power (playerPower × memberCount), ±1 tier weekly hash variation. 4-attacker cap: `selectAttackers(memberIds)` callable by alliance leader (or player if NPC-led). Deterministic raid simulation: xorshift32 seeded from `attackerId|weekKey|captainIndex` → power-ratio base damage 20–85% ± 15% variance. War resolution: player avg damage% vs NPC seeded score 30–65%. Rewards: WIN 200 coins + 20 alliancePoints; LOSE 50 coins + 5 alliancePoints. Public API: `init()`, `getState()`, `selectAttackers()`, `launchRaid(captainIndex)`, `grantRewards()`. History: last 5 war outcomes stored in state.
+- **`js/meta/meta-alliance-war.js`** — `WG.AllianceWar`: weekly phase state machine (idle → matchmaking → attack → results → idle). Schedule: Fri 22:00 matchmaking open; Sat 18:00–Sun 18:00 attack window (24 h); Sun 18:00–Mon 00:00 results. Phase computed purely from wall-clock (no stored transitions). `OPPONENT_POOL` 5 NPC alliances (Shadow Claw 800 → Void Covenant 7000) matched by cumulative alliance power (playerPower × memberCount), ±1 tier weekly hash variation. 4-attacker cap: `selectAttackers(memberIds)` callable by alliance leader (or player if NPC-led). Deterministic raid simulation: xorshift32 seeded from `attackerId|weekKey|captainIndex` → power-ratio base damage 20–85% ± 15% variance. War resolution: player avg damage% vs NPC seeded score 30–65%. Rewards: WIN 200 coins + 20 alliancePoints; LOSE 50 coins + 5 alliancePoints. **Concern A glue:** loss sets `revengeWindow` (24 h, opponentAllianceId, expiresAt); `getRevengeWindow()` / `launchRevengeRaid()` public; emits `alliance-war:attacked`. **Concern C glue:** win sets `activeBuff {id:'war_victors_might', bossDamageMul:1.5, 24 h}`; `getActiveBuff()` public; emits `alliance-war:win`. Cross-mode init listeners: daily `mission:claimed` → +1 alliance point; `alliance:mission-claimed` → +5 coins once/day + `alliance-mission-complete` emit. Public API: `init()`, `getState()`, `selectAttackers()`, `launchRaid(captainIndex)`, `grantRewards()`, `getRevengeWindow()`, `launchRevengeRaid()`, `getActiveBuff()`.
+- **`js/meta/meta-alliance-notifications.js`** — `WG.AllianceNotifications` (NEW, W-Alliance-Cross-Mode-Glue Concern B): badge state module. Tracks `{ applications, warStartingIn, bossActive, giftsToOpen, warPendingResults }`. Count badge on Alliance nav tab (red dot); sub-dots on roster + boss sub-tab buttons. Hooks: `recruitment:application-received`, `alliance-war:attacked`, `allianceWar:revengeRaid`, `alliance:gift-claimed`, `allianceWar:changed`, `tab:change`, `daily:reset`, `alliance:changed`. Public: `getBadges()`.
 - **`js/meta/meta-alliance-render.js`** (extended) — "⚔ War" sub-tab added to alliance panel. 4 phase UIs: idle (countdown + history table); matchmaking (opponent card + captain tap-to-select list, ⚔ badge on selected); attack (raid slot cards, RAID button per captain, damage% circle on completion); results (WIN/LOSS banner + score comparison + CLAIM button). War captain ⚔ badge shown in roster for `currentMatch.attackers` members. `_startWarCountdown()` helper drives 1-second interval countdowns per phase.
 - `wg-game.js` — `WG.AllianceWar.init()` added after `AllianceRecruitment.init()`, before `AllianceRender.init()`.
 - `index.html` — `'js/meta/meta-alliance-war.js'` added to MODULES after `meta-alliance-recruitment.js`. Cache-bust bumped to `0.39.5-alliance-war-1746720000`.

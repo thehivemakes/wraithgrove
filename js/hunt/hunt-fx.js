@@ -5,6 +5,7 @@
 // not a replacement. World-space spawn; world→screen at draw time.
 (function(){'use strict';
 
+  const _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const POOL_CAP = 200;
   const pool = new Array(POOL_CAP);
   for (let i = 0; i < POOL_CAP; i++) {
@@ -82,6 +83,7 @@
   }
 
   function burst(worldX, worldY, type, opts) {
+    if (_prefersReducedMotion) return;
     const def = TYPES[type];
     if (!def) return;
     opts = opts || {};

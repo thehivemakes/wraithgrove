@@ -71,6 +71,7 @@
   }
   // Trauma-based screen shake (DOPAMINE_DESIGN §9 / Eiserloh GDC 2016).
   // shake = trauma², decays ~1.4/sec, max 18px offset + 0.04 rad rotation.
+  const _prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let _trauma = 0;
   let _shakeLastMs = performance.now();
   // Player swing squash timestamp (DOPAMINE_DESIGN §9 sprite techniques).
@@ -124,7 +125,7 @@
     return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
   }
 
-  function addTrauma(amt) { _trauma = Math.min(1, _trauma + amt); }
+  function addTrauma(amt) { if (_prefersReducedMotion) return; _trauma = Math.min(1, _trauma + amt); }
 
   // W-FX-Polish-Pass — gap 2: HUD pill ghost track. When a buff expires or is
   // consumed, push a ghost entry that desaturates and fades over 280ms instead
@@ -192,7 +193,7 @@
   // W-Wave1-God-Window — amber corner tint for first 10 seconds; fades out by t=15.
   // Communicates power-fantasy window without breaking immersion. Hunt only; no Tower.
   function drawGodWindowCue(ctx) {
-    if (!runtime || runtime.mode === 'tower') return;
+    if (!runtime || runtime.mode === 'tower' || runtime.mode === 'capture_hill') return;
     const elapsed = runtime.elapsed || 0;
     if (elapsed >= 15) return;
     const w = D().width, h = D().height;
@@ -1038,7 +1039,22 @@
   // accessory (sash / crown / antlers / staff / many-eyes / aura). All bosses
   // share the same hit-flash + wobble FX as regular enemies, plus their per-
   // identity drawBossAura halo. Caller passes `t = performance.now()/1000`.
+  // animTime drives per-boss breathing/float idle motion.
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // Display-only titles — not in stat catalog (locked).
+  const BOSS_TITLES = {
+    pale_bride:     'The White Widow',
+    frozen_crone:   'Keeper of the Glacier Gate',
+    autumn_lord:    'Lord of the Dying Season',
+    temple_warden:  'Guardian of the Inner Sanctum',
+    cave_mother:    'She Who Fills the Dark',
+    wraith_father:  'The Unending',
+  };
+
+  // Nameplate slide-in state — reset on boss:spawned.
+  let _bossBarSlide = { startMs: 0 };
+
   function _bossHitFx(b) {
     // Bosses use the same _lastDamageAt timestamp the enemy:damaged emit sets.
     return _creatureHitFx(b);
@@ -1057,370 +1073,690 @@
     ctx.restore();
   }
 
-  // Pale Bride — long white wedding-veil silhouette, dark eyes, red bridal sash.
+  // Boss nameplate — polished panel with golden text, title, HP bar, slide-in.
+  function drawBossNameplate(ctx, b) {
+    const W = D().width;
+    const pct = Math.max(0, b.hp / b.maxHp);
+    // Slide-in easeOutCubic over 420ms
+    const elapsed = performance.now() - (_bossBarSlide.startMs || 0);
+    const tEase = Math.min(elapsed / 420, 1);
+    const ease = 1 - Math.pow(1 - tEase, 3);
+    const yOff = -46 * (1 - ease);
+    const panelY = Math.round(44 + yOff);
+    const panelH = 36;
+    const panelX = W * 0.08;
+    const panelW = W * 0.84;
+    // Background
+    const bg = ctx.createLinearGradient(panelX, 0, panelX + panelW, 0);
+    bg.addColorStop(0, 'rgba(10,4,14,0.82)');
+    bg.addColorStop(0.5, 'rgba(20,8,28,0.90)');
+    bg.addColorStop(1, 'rgba(10,4,14,0.82)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(panelX, panelY, panelW, panelH, 4);
+    else ctx.rect(panelX, panelY, panelW, panelH);
+    ctx.fill();
+    // Gold border
+    ctx.strokeStyle = 'rgba(220,178,76,0.52)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(panelX, panelY, panelW, panelH, 4);
+    else ctx.rect(panelX, panelY, panelW, panelH);
+    ctx.stroke();
+    // Boss name — gold gradient
+    const nameGrad = ctx.createLinearGradient(0, panelY + 6, 0, panelY + 20);
+    nameGrad.addColorStop(0, '#ffe8a0');
+    nameGrad.addColorStop(1, '#c89040');
+    ctx.save();
+    ctx.fillStyle = nameGrad;
+    ctx.font = 'bold 13px Georgia,serif';
+    ctx.textAlign = 'center';
+    ctx.fillText((b._typeData && b._typeData.name) || b.type, W * 0.5, panelY + 16);
+    // Boss title — smaller italic
+    ctx.fillStyle = 'rgba(200,160,100,0.70)';
+    ctx.font = 'italic 9px Georgia,serif';
+    ctx.fillText(BOSS_TITLES[b.type] || '', W * 0.5, panelY + 27);
+    ctx.restore();
+    // HP bar
+    const barX = panelX + 6;
+    const barW = panelW - 12;
+    const barY = panelY + 28;
+    const barH = 6;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(barX, barY, barW, barH);
+    if (pct > 0) {
+      const fillW = barW * pct;
+      const hpGrad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+      hpGrad.addColorStop(0, '#c03030');
+      hpGrad.addColorStop(0.6, '#e05050');
+      hpGrad.addColorStop(1, '#c03030');
+      ctx.fillStyle = hpGrad;
+      ctx.fillRect(barX, barY, fillW, barH);
+    }
+    ctx.strokeStyle = 'rgba(160,70,40,0.50)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(barX, barY, barW, barH);
+  }
+
+  // Pale Bride — kimono silhouette, flowing hair, scythe, pale glow halo.
   function drawBoss_pale_bride(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Gentle float bob
+    const ty = Math.sin(t * 0.85) * sz * 0.025;
+    sy -= ty;
+
+    // Pale glow halo — large radial gradient behind figure
+    const haloR = sz * 1.1 + Math.sin(t * 1.2) * sz * 0.08;
+    const halo = ctx.createRadialGradient(sx, sy - sz * 0.1, 0, sx, sy - sz * 0.1, haloR);
+    halo.addColorStop(0, 'rgba(255,248,240,0.22)');
+    halo.addColorStop(0.5, 'rgba(220,200,180,0.10)');
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.1, haloR, 0, Math.PI * 2); ctx.fill();
+
     drawBossAura(ctx, sx, sy, sz, 'rgba(248, 240, 224, 0.28)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Long bridal gown — wide bottom trapezoid in cream
-    ctx.fillStyle = '#e8e0c8';
+
+    // Long flowing hair — bezier curves behind figure
+    ctx.fillStyle = 'rgba(20,16,12,0.88)';
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.22, sy - sz * 0.46);
+    ctx.bezierCurveTo(sx - sz * 0.55, sy - sz * 0.10, sx - sz * 0.65, sy + sz * 0.30, sx - sz * 0.30, sy + sz * 0.60);
+    ctx.lineTo(sx - sz * 0.15, sy + sz * 0.60);
+    ctx.bezierCurveTo(sx - sz * 0.40, sy + sz * 0.20, sx - sz * 0.28, sy - sz * 0.05, sx, sy - sz * 0.52);
     ctx.closePath(); ctx.fill();
-    // Subtle vertical pleats in shadow tone
-    ctx.strokeStyle = '#c8c0a8'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx + sz * 0.22, sy - sz * 0.46);
+    ctx.bezierCurveTo(sx + sz * 0.55, sy - sz * 0.10, sx + sz * 0.62, sy + sz * 0.28, sx + sz * 0.28, sy + sz * 0.60);
+    ctx.lineTo(sx + sz * 0.15, sy + sz * 0.60);
+    ctx.bezierCurveTo(sx + sz * 0.36, sy + sz * 0.18, sx + sz * 0.26, sy - sz * 0.08, sx, sy - sz * 0.52);
+    ctx.closePath(); ctx.fill();
+
+    // Scythe — vertical staff to upper-right with curved blade
+    const scX = sx + sz * 0.62;
+    ctx.strokeStyle = '#3a2818'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(scX, sy - sz * 0.72);
+    ctx.lineTo(scX + sz * 0.04, sy + sz * 0.55);
+    ctx.stroke();
+    ctx.strokeStyle = '#c8c0b0'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(scX, sy - sz * 0.72);
+    ctx.bezierCurveTo(scX + sz * 0.38, sy - sz * 0.80, scX + sz * 0.28, sy - sz * 0.40, scX, sy - sz * 0.55);
+    ctx.stroke();
+    ctx.strokeStyle = '#888080'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(scX, sy - sz * 0.72);
+    ctx.lineTo(scX, sy - sz * 0.55);
+    ctx.stroke();
+
+    // Translucent veil — bezier-curved drape behind figure
+    ctx.fillStyle = 'rgba(248, 244, 236, 0.38)';
+    ctx.beginPath();
+    ctx.moveTo(sx - sz * 0.32, sy - sz * 0.44);
+    ctx.bezierCurveTo(sx - sz * 0.48, sy - sz * 0.10, sx - sz * 0.52, sy + sz * 0.28, sx - sz * 0.40, sy + sz * 0.52);
+    ctx.lineTo(sx + sz * 0.40, sy + sz * 0.52);
+    ctx.bezierCurveTo(sx + sz * 0.52, sy + sz * 0.28, sx + sz * 0.48, sy - sz * 0.10, sx + sz * 0.32, sy - sz * 0.44);
+    ctx.closePath(); ctx.fill();
+
+    // Kimono — gradient fill, bezier hem
+    const kimonoGrad = ctx.createLinearGradient(sx - sz * 0.30, 0, sx + sz * 0.30, 0);
+    kimonoGrad.addColorStop(0, '#c8c0b0');
+    kimonoGrad.addColorStop(0.5, '#f0ece0');
+    kimonoGrad.addColorStop(1, '#c8c0b0');
+    ctx.fillStyle = kimonoGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz * 0.28, sy - sz * 0.10);
+    ctx.lineTo(sx + sz * 0.28, sy - sz * 0.10);
+    ctx.bezierCurveTo(sx + sz * 0.38, sy + sz * 0.20, sx + sz * 0.52, sy + sz * 0.45, sx + sz * 0.50, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.50, sy + sz * 0.55);
+    ctx.bezierCurveTo(sx - sz * 0.52, sy + sz * 0.45, sx - sz * 0.38, sy + sz * 0.20, sx - sz * 0.28, sy - sz * 0.10);
+    ctx.closePath(); ctx.fill();
+    // Pleats
+    ctx.strokeStyle = '#b8b0a0'; ctx.lineWidth = 0.8;
     for (let i = -2; i <= 2; i++) {
       ctx.beginPath();
-      ctx.moveTo(sx + i * sz*0.10, sy - sz*0.05);
-      ctx.lineTo(sx + i * sz*0.18, sy + sz*0.50);
+      ctx.moveTo(sx + i * sz * 0.09, sy - sz * 0.05);
+      ctx.lineTo(sx + i * sz * 0.17, sy + sz * 0.50);
       ctx.stroke();
     }
-    // Red bridal sash diagonal across torso
-    ctx.fillStyle = '#a01818';
+
+    // Red bridal sash — gradient
+    const sashGrad = ctx.createLinearGradient(sx - sz * 0.28, 0, sx + sz * 0.28, 0);
+    sashGrad.addColorStop(0, '#880808');
+    sashGrad.addColorStop(0.5, '#c82020');
+    sashGrad.addColorStop(1, '#880808');
+    ctx.fillStyle = sashGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.30, sy + sz*0.05);
-    ctx.lineTo(sx + sz*0.30, sy - sz*0.06);
-    ctx.lineTo(sx + sz*0.32, sy + sz*0.02);
-    ctx.lineTo(sx - sz*0.28, sy + sz*0.13);
+    ctx.moveTo(sx - sz * 0.30, sy + sz * 0.02);
+    ctx.lineTo(sx + sz * 0.30, sy - sz * 0.08);
+    ctx.lineTo(sx + sz * 0.30, sy + sz * 0.02);
+    ctx.lineTo(sx - sz * 0.30, sy + sz * 0.12);
     ctx.closePath(); ctx.fill();
-    // Pale face
-    ctx.fillStyle = '#f4ecd8';
-    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.28, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
+
+    // Pale face — radial gradient
+    const faceGrad = ctx.createRadialGradient(sx - sz * 0.04, sy - sz * 0.32, 0, sx, sy - sz * 0.28, sz * 0.20);
+    faceGrad.addColorStop(0, '#fff8f0');
+    faceGrad.addColorStop(1, '#d8ccc0');
+    ctx.fillStyle = faceGrad;
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz * 0.28, sz * 0.15, sz * 0.19, 0, 0, Math.PI * 2); ctx.fill();
     // Dark hollow eyes
-    ctx.fillStyle = '#1a0828';
-    ctx.fillRect(sx - sz*0.09, sy - sz*0.32, sz*0.06, sz*0.05);
-    ctx.fillRect(sx + sz*0.03, sy - sz*0.32, sz*0.06, sz*0.05);
-    // Long flowing veil — translucent white drape behind, 2 layers
-    ctx.fillStyle = 'rgba(248, 240, 224, 0.55)';
-    ctx.beginPath();
-    ctx.moveTo(sx - sz*0.34, sy - sz*0.34);
-    ctx.lineTo(sx + sz*0.34, sy - sz*0.34);
-    ctx.lineTo(sx + sz*0.50, sy + sz*0.40);
-    ctx.lineTo(sx - sz*0.50, sy + sz*0.40);
-    ctx.closePath(); ctx.fill();
-    // Crown of white blossoms at brow line
+    ctx.fillStyle = '#100018';
+    ctx.fillRect(sx - sz * 0.09, sy - sz * 0.32, sz * 0.06, sz * 0.05);
+    ctx.fillRect(sx + sz * 0.03, sy - sz * 0.32, sz * 0.06, sz * 0.05);
+    // Red tear marks
+    ctx.fillStyle = 'rgba(180,20,20,0.70)';
+    ctx.fillRect(sx - sz * 0.06, sy - sz * 0.27, sz * 0.014, sz * 0.10);
+    ctx.fillRect(sx + sz * 0.055, sy - sz * 0.27, sz * 0.014, sz * 0.10);
+
+    // Crown of white blossoms
     ctx.fillStyle = '#ffffff';
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath(); ctx.arc(sx + i * sz*0.10, sy - sz*0.46, 2.5, 0, Math.PI*2); ctx.fill();
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath(); ctx.arc(sx + i * sz * 0.09, sy - sz * 0.46 - Math.abs(i) * sz * 0.01, 2.2, 0, Math.PI * 2); ctx.fill();
     }
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
-  // Frozen Crone — ice-blue robe, jagged ice-crown.
+  // Frozen Crone — hunched silhouette, ice crystals, breath-vapor, gradient robe.
   function drawBoss_frozen_crone(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Hunched creature barely bobs
+    sy -= Math.sin(t * 0.6) * sz * 0.010;
+
     drawBossAura(ctx, sx, sy, sz, 'rgba(168, 200, 232, 0.32)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Robe — pale ice-blue trapezoid
-    ctx.fillStyle = '#7090b0';
-    ctx.beginPath();
-    ctx.moveTo(sx - sz*0.28, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.28, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.50, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.50, sy + sz*0.55);
-    ctx.closePath(); ctx.fill();
-    // Robe shadow side
-    ctx.fillStyle = '#506880';
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.28, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.50, sy + sz*0.55);
-    ctx.lineTo(sx, sy + sz*0.55);
-    ctx.closePath(); ctx.fill();
-    // Frost-rimed hem (lighter blue-white sparkle line)
-    ctx.fillStyle = '#d8e8ff';
-    ctx.fillRect(sx - sz*0.50, sy + sz*0.50, sz*1.0, sz*0.05);
-    // Hunched arms — wide cuff sleeves coming forward
-    ctx.fillStyle = '#506880';
-    ctx.fillRect(sx - sz*0.40, sy - sz*0.05, sz*0.16, sz*0.30);
-    ctx.fillRect(sx + sz*0.24, sy - sz*0.05, sz*0.16, sz*0.30);
-    // Pale gnarled face under the hood-shadow
-    ctx.fillStyle = '#c8d8e8';
-    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.30, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
-    // Glowing ice-blue eyes
-    ctx.fillStyle = '#a8e0ff';
-    ctx.fillRect(sx - sz*0.09, sy - sz*0.32, sz*0.05, sz*0.04);
-    ctx.fillRect(sx + sz*0.04, sy - sz*0.32, sz*0.05, sz*0.04);
-    // Jagged ice crown — 5 sharp shards rising from the head
-    ctx.fillStyle = '#e8f0ff';
-    for (let i = -2; i <= 2; i++) {
-      const cx = sx + i * sz*0.12;
-      const ch = sz * (0.32 + Math.abs(i) * 0.04);
+
+    // Ice crystal spray — 8 shards radiating from body
+    const crystalAngles = [0.2, 0.6, 1.1, 1.7, 2.0, 2.6, -0.4, -0.9];
+    for (let i = 0; i < 8; i++) {
+      const ang = crystalAngles[i] + Math.sin(t * 0.4 + i) * 0.06;
+      const dist = sz * (0.38 + (i % 3) * 0.10);
+      const cx = sx + Math.cos(ang) * dist;
+      const cy = sy + Math.sin(ang) * dist * 0.5;
+      const len = sz * (0.10 + (i % 2) * 0.05);
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(200,228,255,0.82)' : 'rgba(160,196,240,0.65)';
       ctx.beginPath();
-      ctx.moveTo(cx - 2, sy - sz*0.42);
-      ctx.lineTo(cx + 2, sy - sz*0.42);
-      ctx.lineTo(cx,     sy - sz*0.42 - ch);
+      ctx.moveTo(cx, cy - len);
+      ctx.lineTo(cx + 2, cy);
+      ctx.lineTo(cx, cy + len * 0.3);
+      ctx.lineTo(cx - 2, cy);
       ctx.closePath(); ctx.fill();
     }
-    // Crown base band
+
+    // Robe — hunched posture, gradient fill
+    const robeGrad = ctx.createLinearGradient(sx - sz * 0.50, 0, sx + sz * 0.50, 0);
+    robeGrad.addColorStop(0, '#4a6880');
+    robeGrad.addColorStop(0.45, '#8ab0cc');
+    robeGrad.addColorStop(1, '#3a5060');
+    ctx.fillStyle = robeGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz * 0.28, sy - sz * 0.18);
+    ctx.lineTo(sx + sz * 0.20, sy - sz * 0.06); // hunched — right shoulder lower
+    ctx.lineTo(sx + sz * 0.48, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.50, sy + sz * 0.55);
+    ctx.closePath(); ctx.fill();
+    // Shadow side
+    ctx.fillStyle = 'rgba(40,56,72,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz * 0.08);
+    ctx.lineTo(sx + sz * 0.20, sy - sz * 0.06);
+    ctx.lineTo(sx + sz * 0.48, sy + sz * 0.55);
+    ctx.lineTo(sx, sy + sz * 0.55);
+    ctx.closePath(); ctx.fill();
+
+    // Frost sparkle hem
+    ctx.fillStyle = 'rgba(220, 240, 255, 0.72)';
+    for (let i = 0; i < 12; i++) {
+      const fx2 = sx - sz * 0.48 + i * sz * 0.08 + Math.sin(t * 2 + i) * sz * 0.01;
+      ctx.beginPath(); ctx.arc(fx2, sy + sz * 0.53, 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Wide cuff sleeves — hunched forward
+    ctx.fillStyle = '#3a5060';
+    ctx.fillRect(sx - sz * 0.42, sy - sz * 0.08, sz * 0.16, sz * 0.30);
+    ctx.fillRect(sx + sz * 0.22, sy - sz * 0.04, sz * 0.16, sz * 0.28);
+
+    // Pale gnarled face — offset forward for hunched look, gradient
+    const faceGrad = ctx.createRadialGradient(sx + sz * 0.04, sy - sz * 0.34, 0, sx + sz * 0.04, sy - sz * 0.30, sz * 0.20);
+    faceGrad.addColorStop(0, '#dce8f4');
+    faceGrad.addColorStop(1, '#8aaccc');
+    ctx.fillStyle = faceGrad;
+    ctx.beginPath(); ctx.ellipse(sx + sz * 0.04, sy - sz * 0.30, sz * 0.15, sz * 0.18, -0.15, 0, Math.PI * 2); ctx.fill();
+    // Glowing ice-blue eyes
+    const eyeGlow = 0.75 + Math.sin(t * 2.8) * 0.25;
+    ctx.fillStyle = `rgba(148, 216, 255, ${eyeGlow})`;
+    ctx.fillRect(sx - sz * 0.06, sy - sz * 0.32, sz * 0.05, sz * 0.04);
+    ctx.fillRect(sx + sz * 0.06, sy - sz * 0.32, sz * 0.05, sz * 0.04);
+
+    // Jagged ice crown — 5 asymmetric shards
+    ctx.fillStyle = '#e8f2ff';
+    for (let i = -2; i <= 2; i++) {
+      const cx = sx + sz * 0.04 + i * sz * 0.11;
+      const sh = sz * (0.28 + Math.abs(i) * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, sy - sz * 0.42);
+      ctx.lineTo(cx + 2, sy - sz * 0.42);
+      ctx.lineTo(cx + (i > 0 ? 1 : -1), sy - sz * 0.42 - sh);
+      ctx.closePath(); ctx.fill();
+    }
     ctx.fillStyle = '#a8c8e8';
-    ctx.fillRect(sx - sz*0.30, sy - sz*0.44, sz*0.60, 3);
+    ctx.fillRect(sx - sz * 0.28, sy - sz * 0.44, sz * 0.60, 2);
+
+    // Breath vapor — 3 translucent ovals drifting upward at different phases
+    for (let i = 0; i < 3; i++) {
+      const phase = (t * 0.8 + i * 0.5) % 2.0;
+      if (phase > 1.2) continue;
+      const alpha = (1.2 - phase) * 0.30;
+      const vy = sy - sz * 0.18 - phase * sz * 0.28;
+      const vx = sx - sz * 0.22 + i * sz * 0.06;
+      ctx.fillStyle = `rgba(220, 238, 255, ${alpha})`;
+      ctx.beginPath(); ctx.ellipse(vx, vy, sz * 0.06, sz * 0.035, -0.4, 0, Math.PI * 2); ctx.fill();
+    }
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
-  // Autumn Lord — orange-brown cloak, antlered crown, pumpkin-mask face.
+  // Autumn Lord — tall regal figure, leaf-cloak aura, pumpkin-mask, gradient robe.
   function drawBoss_autumn_lord(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Stately float
+    sy -= Math.sin(t * 0.90) * sz * 0.032;
+
+    // Animated leaf-aura — 10 leaves orbiting at varying radii
+    for (let i = 0; i < 10; i++) {
+      const ang = t * (0.4 + i * 0.06) + i * (Math.PI * 2 / 10);
+      const r = sz * (0.55 + (i % 3) * 0.14);
+      const lx = sx + Math.cos(ang) * r;
+      const ly = sy - sz * 0.1 + Math.sin(ang) * r * 0.45;
+      const leafColors = ['#c06020', '#e08030', '#d04010', '#a84018'];
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(ang + Math.PI * 0.5);
+      ctx.fillStyle = leafColors[i % 4];
+      ctx.globalAlpha = 0.70;
+      ctx.beginPath();
+      ctx.moveTo(0, -sz * 0.07);
+      ctx.quadraticCurveTo(sz * 0.04, -sz * 0.02, 0, sz * 0.07);
+      ctx.quadraticCurveTo(-sz * 0.04, -sz * 0.02, 0, -sz * 0.07);
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
     drawBossAura(ctx, sx, sy, sz, 'rgba(232, 128, 56, 0.30)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Heavy cloak — deep orange-brown layered trapezoid
-    ctx.fillStyle = '#8a3a18';
+
+    // Outer cloak — gradient, bezier hem
+    const cloakGrad = ctx.createLinearGradient(sx - sz * 0.55, 0, sx + sz * 0.55, 0);
+    cloakGrad.addColorStop(0, '#5a2010');
+    cloakGrad.addColorStop(0.5, '#a03820');
+    cloakGrad.addColorStop(1, '#5a2010');
+    ctx.fillStyle = cloakGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.32, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.32, sy - sz*0.15);
-    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.32, sy - sz * 0.18);
+    ctx.lineTo(sx + sz * 0.32, sy - sz * 0.18);
+    ctx.bezierCurveTo(sx + sz * 0.44, sy + sz * 0.15, sx + sz * 0.56, sy + sz * 0.44, sx + sz * 0.52, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.52, sy + sz * 0.55);
+    ctx.bezierCurveTo(sx - sz * 0.56, sy + sz * 0.44, sx - sz * 0.44, sy + sz * 0.15, sx - sz * 0.32, sy - sz * 0.18);
     ctx.closePath(); ctx.fill();
-    // Orange under-robe peeking through
-    ctx.fillStyle = '#d06820';
+
+    // Orange under-robe — gradient
+    const underGrad = ctx.createLinearGradient(sx - sz * 0.22, 0, sx + sz * 0.22, 0);
+    underGrad.addColorStop(0, '#903218');
+    underGrad.addColorStop(0.5, '#d86820');
+    underGrad.addColorStop(1, '#903218');
+    ctx.fillStyle = underGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.20, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.20, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.32, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.32, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.20, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.20, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.30, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.30, sy + sz * 0.55);
     ctx.closePath(); ctx.fill();
-    // Leather belt
-    ctx.fillStyle = '#3a1808';
-    ctx.fillRect(sx - sz*0.28, sy + sz*0.10, sz*0.56, sz*0.06);
-    // Sleeves — dark with orange cuffs
-    ctx.fillStyle = '#5a2810';
-    ctx.fillRect(sx - sz*0.42, sy - sz*0.05, sz*0.16, sz*0.30);
-    ctx.fillRect(sx + sz*0.26, sy - sz*0.05, sz*0.16, sz*0.30);
+
+    // Leather belt + gold buckle
+    ctx.fillStyle = '#281008';
+    ctx.fillRect(sx - sz * 0.28, sy + sz * 0.08, sz * 0.56, sz * 0.06);
+    ctx.fillStyle = '#c88020';
+    ctx.fillRect(sx - sz * 0.04, sy + sz * 0.07, sz * 0.08, sz * 0.08);
+
+    // Sleeves with cuffs
+    ctx.fillStyle = '#5a2010';
+    ctx.fillRect(sx - sz * 0.42, sy - sz * 0.06, sz * 0.16, sz * 0.30);
+    ctx.fillRect(sx + sz * 0.26, sy - sz * 0.06, sz * 0.16, sz * 0.30);
     ctx.fillStyle = '#d06820';
-    ctx.fillRect(sx - sz*0.42, sy + sz*0.20, sz*0.16, sz*0.05);
-    ctx.fillRect(sx + sz*0.26, sy + sz*0.20, sz*0.16, sz*0.05);
-    // Pumpkin-mask face — round orange head with carved triangle eyes
-    ctx.fillStyle = '#e07820';
-    ctx.beginPath(); ctx.arc(sx, sy - sz*0.30, sz*0.20, 0, Math.PI*2); ctx.fill();
-    // Pumpkin rib lines
-    ctx.strokeStyle = '#a04810'; ctx.lineWidth = 1;
+    ctx.fillRect(sx - sz * 0.42, sy + sz * 0.20, sz * 0.16, sz * 0.04);
+    ctx.fillRect(sx + sz * 0.26, sy + sz * 0.20, sz * 0.16, sz * 0.04);
+
+    // Pumpkin-mask face — radial gradient fill
+    const pumpGrad = ctx.createRadialGradient(sx - sz * 0.05, sy - sz * 0.34, 0, sx, sy - sz * 0.30, sz * 0.24);
+    pumpGrad.addColorStop(0, '#f09028');
+    pumpGrad.addColorStop(0.7, '#c05808');
+    pumpGrad.addColorStop(1, '#803010');
+    ctx.fillStyle = pumpGrad;
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.30, sz * 0.20, 0, Math.PI * 2); ctx.fill();
+    // Pumpkin rib lines — quadratic curves
+    ctx.strokeStyle = '#90380a'; ctx.lineWidth = 1;
     for (let i = -1; i <= 1; i++) {
       ctx.beginPath();
-      ctx.moveTo(sx + i * sz*0.08, sy - sz*0.46);
-      ctx.lineTo(sx + i * sz*0.08, sy - sz*0.14);
+      ctx.moveTo(sx + i * sz * 0.08, sy - sz * 0.48);
+      ctx.quadraticCurveTo(sx + i * sz * 0.11, sy - sz * 0.30, sx + i * sz * 0.08, sy - sz * 0.12);
       ctx.stroke();
     }
-    // Triangle glowing eyes
-    ctx.fillStyle = '#ffe040';
+    // Triangle glowing eyes — pulsing
+    const eyeAlpha = 0.8 + Math.sin(t * 2.1) * 0.2;
+    ctx.fillStyle = `rgba(255, 220, 40, ${eyeAlpha})`;
+    ctx.beginPath(); ctx.moveTo(sx-sz*0.10, sy-sz*0.28); ctx.lineTo(sx-sz*0.04, sy-sz*0.28); ctx.lineTo(sx-sz*0.07, sy-sz*0.36); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx+sz*0.04, sy-sz*0.28); ctx.lineTo(sx+sz*0.10, sy-sz*0.28); ctx.lineTo(sx+sz*0.07, sy-sz*0.36); ctx.closePath(); ctx.fill();
+
+    // Antlers — quadratic bezier branches (more organic)
+    ctx.strokeStyle = '#2a1408'; ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.10, sy - sz*0.28);
-    ctx.lineTo(sx - sz*0.04, sy - sz*0.28);
-    ctx.lineTo(sx - sz*0.07, sy - sz*0.36);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(sx + sz*0.04, sy - sz*0.28);
-    ctx.lineTo(sx + sz*0.10, sy - sz*0.28);
-    ctx.lineTo(sx + sz*0.07, sy - sz*0.36);
-    ctx.closePath(); ctx.fill();
-    // Antlers — branching brown silhouettes either side of head
-    ctx.strokeStyle = '#3a1c08'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(sx - sz*0.16, sy - sz*0.42);
-    ctx.lineTo(sx - sz*0.34, sy - sz*0.62);
-    ctx.moveTo(sx - sz*0.26, sy - sz*0.52);
-    ctx.lineTo(sx - sz*0.40, sy - sz*0.50);
-    ctx.moveTo(sx - sz*0.30, sy - sz*0.56);
-    ctx.lineTo(sx - sz*0.42, sy - sz*0.64);
+    ctx.moveTo(sx - sz * 0.16, sy - sz * 0.46);
+    ctx.quadraticCurveTo(sx - sz * 0.28, sy - sz * 0.58, sx - sz * 0.36, sy - sz * 0.70);
     ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.24, sy - sz*0.54); ctx.lineTo(sx - sz*0.40, sy - sz*0.52); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.30, sy - sz*0.62); ctx.lineTo(sx - sz*0.44, sy - sz*0.68); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(sx + sz*0.16, sy - sz*0.42);
-    ctx.lineTo(sx + sz*0.34, sy - sz*0.62);
-    ctx.moveTo(sx + sz*0.26, sy - sz*0.52);
-    ctx.lineTo(sx + sz*0.40, sy - sz*0.50);
-    ctx.moveTo(sx + sz*0.30, sy - sz*0.56);
-    ctx.lineTo(sx + sz*0.42, sy - sz*0.64);
+    ctx.moveTo(sx + sz * 0.16, sy - sz * 0.46);
+    ctx.quadraticCurveTo(sx + sz * 0.28, sy - sz * 0.58, sx + sz * 0.36, sy - sz * 0.70);
     ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + sz*0.24, sy - sz*0.54); ctx.lineTo(sx + sz*0.40, sy - sz*0.52); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + sz*0.30, sy - sz*0.62); ctx.lineTo(sx + sz*0.44, sy - sz*0.68); ctx.stroke();
+
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
-  // Temple Warden — gold ceremonial robes, pillar staff in hand.
+  // Temple Warden — armored stone figure, wide stance, pulsing sigil, glowing staff orb.
   function drawBoss_temple_warden(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Stone micro-bob
+    sy -= Math.sin(t * 0.55) * sz * 0.008;
+
     drawBossAura(ctx, sx, sy, sz, 'rgba(232, 192, 96, 0.32)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Long ceremonial robe — deep red base
-    ctx.fillStyle = '#8a2820';
+
+    // Armored body — wide stance, stone grey + gold gradient
+    const armorGrad = ctx.createLinearGradient(sx - sz * 0.56, 0, sx + sz * 0.56, 0);
+    armorGrad.addColorStop(0, '#2a2420');
+    armorGrad.addColorStop(0.4, '#4a4038');
+    armorGrad.addColorStop(0.6, '#4a4038');
+    armorGrad.addColorStop(1, '#2a2420');
+    ctx.fillStyle = armorGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.55, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.55, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.38, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.38, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.56, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.56, sy + sz * 0.55);
     ctx.closePath(); ctx.fill();
-    // Gold trim hem + center seam
-    ctx.fillStyle = '#ffd848';
-    ctx.fillRect(sx - sz*0.55, sy + sz*0.50, sz*1.10, sz*0.05);
-    ctx.fillRect(sx - 1.5, sy - sz*0.05, 3, sz*0.55);
-    // Gold sash crossing torso
-    ctx.fillStyle = '#ffd848';
+    // Horizontal armor plate bands
+    ctx.strokeStyle = 'rgba(90,76,60,0.70)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.36, sy + sz*0.05); ctx.lineTo(sx + sz*0.36, sy + sz*0.05); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.44, sy + sz*0.25); ctx.lineTo(sx + sz*0.44, sy + sz*0.25); ctx.stroke();
+
+    // Gold hem + center seam
+    ctx.fillStyle = '#e8c048';
+    ctx.fillRect(sx - sz * 0.56, sy + sz * 0.50, sz * 1.12, sz * 0.05);
+    ctx.fillRect(sx - 1.5, sy - sz * 0.08, 3, sz * 0.58);
+    // Gold sash
+    ctx.fillStyle = '#e8c048';
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.32, sy);
-    ctx.lineTo(sx + sz*0.32, sy + sz*0.06);
-    ctx.lineTo(sx + sz*0.32, sy + sz*0.14);
-    ctx.lineTo(sx - sz*0.32, sy + sz*0.08);
+    ctx.moveTo(sx - sz * 0.32, sy - sz * 0.02);
+    ctx.lineTo(sx + sz * 0.32, sy + sz * 0.04);
+    ctx.lineTo(sx + sz * 0.32, sy + sz * 0.12);
+    ctx.lineTo(sx - sz * 0.32, sy + sz * 0.06);
     ctx.closePath(); ctx.fill();
-    // Sleeves — wide gold-trimmed
-    ctx.fillStyle = '#8a2820';
-    ctx.fillRect(sx - sz*0.42, sy - sz*0.05, sz*0.18, sz*0.30);
-    ctx.fillRect(sx + sz*0.24, sy - sz*0.05, sz*0.18, sz*0.30);
-    ctx.fillStyle = '#ffd848';
-    ctx.fillRect(sx - sz*0.42, sy + sz*0.22, sz*0.18, sz*0.05);
-    ctx.fillRect(sx + sz*0.24, sy + sz*0.22, sz*0.18, sz*0.05);
-    // Bald golden-mask head
-    ctx.fillStyle = '#f0c860';
-    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.30, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
-    // Forehead jewel — red dot
+
+    // Wide armored sleeves
+    ctx.fillStyle = '#383028';
+    ctx.fillRect(sx - sz * 0.48, sy - sz * 0.06, sz * 0.18, sz * 0.32);
+    ctx.fillRect(sx + sz * 0.30, sy - sz * 0.06, sz * 0.18, sz * 0.32);
+    ctx.fillStyle = '#e8c048';
+    ctx.fillRect(sx - sz * 0.48, sy + sz * 0.24, sz * 0.18, sz * 0.04);
+    ctx.fillRect(sx + sz * 0.30, sy + sz * 0.24, sz * 0.18, sz * 0.04);
+
+    // Golden-mask head — radial gradient
+    const headGrad = ctx.createRadialGradient(sx - sz * 0.04, sy - sz * 0.34, 0, sx, sy - sz * 0.30, sz * 0.20);
+    headGrad.addColorStop(0, '#f4d878');
+    headGrad.addColorStop(1, '#c09030');
+    ctx.fillStyle = headGrad;
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz * 0.30, sz * 0.16, sz * 0.20, 0, 0, Math.PI * 2); ctx.fill();
+    // Forehead sigil — pulsing glow + red center
+    const sigilAlpha = 0.6 + Math.sin(t * 2.0) * 0.4;
+    ctx.fillStyle = `rgba(255, 200, 40, ${sigilAlpha})`;
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.40, 3.0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#c81818';
-    ctx.beginPath(); ctx.arc(sx, sy - sz*0.40, 2, 0, Math.PI*2); ctx.fill();
-    // Slit eyes — narrow dark lines
-    ctx.fillStyle = '#1a0808';
-    ctx.fillRect(sx - sz*0.10, sy - sz*0.30, sz*0.07, 1.5);
-    ctx.fillRect(sx + sz*0.03, sy - sz*0.30, sz*0.07, 1.5);
-    // Golden cap (bishop-style with finial)
-    ctx.fillStyle = '#ffd848';
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.40, 2.0, 0, Math.PI * 2); ctx.fill();
+    // Slit eyes
+    ctx.fillStyle = '#0a0404';
+    ctx.fillRect(sx - sz * 0.10, sy - sz * 0.30, sz * 0.07, 1.5);
+    ctx.fillRect(sx + sz * 0.03, sy - sz * 0.30, sz * 0.07, 1.5);
+
+    // Bishop cap with flanged wings
+    ctx.fillStyle = '#e8c048';
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.18, sy - sz*0.42);
-    ctx.lineTo(sx + sz*0.18, sy - sz*0.42);
-    ctx.lineTo(sx + sz*0.10, sy - sz*0.58);
-    ctx.lineTo(sx - sz*0.10, sy - sz*0.58);
+    ctx.moveTo(sx - sz * 0.18, sy - sz * 0.44);
+    ctx.lineTo(sx + sz * 0.18, sy - sz * 0.44);
+    ctx.lineTo(sx + sz * 0.10, sy - sz * 0.62);
+    ctx.lineTo(sx - sz * 0.10, sy - sz * 0.62);
     ctx.closePath(); ctx.fill();
-    ctx.fillRect(sx - 1.5, sy - sz*0.66, 3, sz*0.10);
-    // Pillar staff — held to the right side, vertical with stylized capital
+    ctx.beginPath(); ctx.moveTo(sx - sz*0.18, sy-sz*0.44); ctx.lineTo(sx-sz*0.24, sy-sz*0.50); ctx.lineTo(sx-sz*0.12, sy-sz*0.50); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx + sz*0.18, sy-sz*0.44); ctx.lineTo(sx+sz*0.24, sy-sz*0.50); ctx.lineTo(sx+sz*0.12, sy-sz*0.50); ctx.closePath(); ctx.fill();
+    ctx.fillRect(sx - 1.5, sy - sz * 0.70, 3, sz * 0.10);
+
+    // Staff with glowing orb tip
     ctx.fillStyle = '#c8a040';
-    ctx.fillRect(sx + sz*0.50, sy - sz*0.58, sz*0.08, sz*1.10);
-    // Capital block at top of staff
-    ctx.fillStyle = '#ffd848';
-    ctx.fillRect(sx + sz*0.46, sy - sz*0.62, sz*0.16, sz*0.06);
-    // Base of staff
-    ctx.fillRect(sx + sz*0.46, sy + sz*0.46, sz*0.16, sz*0.06);
+    ctx.fillRect(sx + sz * 0.50, sy - sz * 0.58, sz * 0.08, sz * 1.10);
+    ctx.fillStyle = '#e8c048';
+    ctx.fillRect(sx + sz * 0.46, sy - sz * 0.60, sz * 0.16, sz * 0.04);
+    ctx.fillRect(sx + sz * 0.46, sy + sz * 0.48, sz * 0.16, sz * 0.04);
+    const orbAlpha = 0.55 + Math.sin(t * 1.5 + 1) * 0.45;
+    ctx.fillStyle = `rgba(255,200,60,${orbAlpha})`;
+    ctx.beginPath(); ctx.arc(sx + sz * 0.54, sy - sz * 0.66, sz * 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffe860';
+    ctx.beginPath(); ctx.arc(sx + sz * 0.54, sy - sz * 0.66, sz * 0.04, 0, Math.PI * 2); ctx.fill();
+
+    // Chest sigil ring — pulsing glyph
+    const cSigil = 0.35 + Math.sin(t * 1.8 + 0.5) * 0.35;
+    ctx.strokeStyle = `rgba(255,200,60,${cSigil})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.04, sz * 0.08, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx, sy-sz*0.12); ctx.lineTo(sx, sy+sz*0.04); ctx.moveTo(sx-sz*0.08, sy-sz*0.04); ctx.lineTo(sx+sz*0.08, sy-sz*0.04); ctx.stroke();
+
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
-  // Cave Mother — dark earth-tone hooded figure, MANY-eyes inside the hood.
+  // Cave Mother — elongated horror, multi-armed bezier tendrils, deep purple gradient.
   function drawBoss_cave_mother(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
+    // Undulating ceiling-creature motion
+    sy -= Math.sin(t * 0.75) * sz * 0.035;
+
     drawBossAura(ctx, sx, sy, sz, 'rgba(40, 20, 30, 0.42)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Massive earth-tone cloak — wider than other bosses (motherly bulk)
-    ctx.fillStyle = '#2a1a14';
-    ctx.beginPath();
-    ctx.moveTo(sx - sz*0.40, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.40, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.62, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.62, sy + sz*0.55);
-    ctx.closePath(); ctx.fill();
-    // Cloak shadow side
-    ctx.fillStyle = '#1a0e0a';
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.40, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.62, sy + sz*0.55);
-    ctx.lineTo(sx, sy + sz*0.55);
-    ctx.closePath(); ctx.fill();
-    // Tattered hem — irregular triangle cuts
-    ctx.fillStyle = '#0a0604';
-    for (let i = -3; i <= 3; i++) {
-      const ex = sx + i * sz*0.16;
+
+    // Cave ceiling tendrils — 4 bezier curves extending upward
+    const tendrilColors = ['rgba(80,20,60,0.72)', 'rgba(60,10,50,0.60)', 'rgba(100,30,70,0.55)', 'rgba(50,10,40,0.65)'];
+    const tendrilPivots = [-sz * 0.22, -sz * 0.08, sz * 0.08, sz * 0.22];
+    for (let i = 0; i < 4; i++) {
+      const ox = sx + tendrilPivots[i];
+      const sway = Math.sin(t * 0.8 + i * 1.3) * sz * 0.10;
+      ctx.strokeStyle = tendrilColors[i]; ctx.lineWidth = 4 - i * 0.5;
       ctx.beginPath();
-      ctx.moveTo(ex - sz*0.06, sy + sz*0.50);
-      ctx.lineTo(ex + sz*0.06, sy + sz*0.50);
-      ctx.lineTo(ex,           sy + sz*0.62);
+      ctx.moveTo(ox, sy - sz * 0.55);
+      ctx.bezierCurveTo(ox + sway, sy - sz * 1.0, ox - sway, sy - sz * 1.4, ox + sway * 0.6, sy - sz * 1.8);
+      ctx.stroke();
+    }
+
+    // Side arms — 4 bezier-curved appendages (2 per side)
+    for (let side = -1; side <= 1; side += 2) {
+      for (let j = 0; j < 2; j++) {
+        const armY = sy - sz * (0.05 + j * 0.22);
+        const sway = Math.sin(t * 1.0 + j * 1.7 + (side > 0 ? 2.5 : 0)) * sz * 0.12;
+        ctx.strokeStyle = j === 0 ? 'rgba(90,30,70,0.80)' : 'rgba(70,20,55,0.70)';
+        ctx.lineWidth = 5 - j;
+        ctx.beginPath();
+        ctx.moveTo(sx + side * sz * 0.38, armY);
+        ctx.bezierCurveTo(
+          sx + side * sz * (0.60 + j * 0.10), armY + sway,
+          sx + side * sz * (0.80 + j * 0.12), armY - sway * 0.5,
+          sx + side * sz * (0.95 + j * 0.10), armY + sway * 0.3
+        );
+        ctx.stroke();
+        // Bone-white tip
+        ctx.fillStyle = 'rgba(220,210,200,0.72)';
+        ctx.beginPath(); ctx.arc(sx + side * sz * (0.95 + j * 0.10), armY + sway * 0.3, 3.5 - j, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Main body — gradient deep purple + shadow
+    const bodyGrad = ctx.createLinearGradient(sx - sz * 0.62, 0, sx + sz * 0.62, 0);
+    bodyGrad.addColorStop(0, '#0e0a08');
+    bodyGrad.addColorStop(0.4, '#2a1a22');
+    bodyGrad.addColorStop(0.6, '#2a1a22');
+    bodyGrad.addColorStop(1, '#0e0a08');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx - sz * 0.40, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.40, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.62, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.62, sy + sz * 0.55);
+    ctx.closePath(); ctx.fill();
+
+    // Tattered hem
+    ctx.fillStyle = '#060404';
+    for (let i = -3; i <= 3; i++) {
+      const ex = sx + i * sz * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(ex - sz * 0.06, sy + sz * 0.50);
+      ctx.lineTo(ex + sz * 0.06, sy + sz * 0.50);
+      ctx.lineTo(ex + (i % 2 ? sz * 0.02 : -sz * 0.01), sy + sz * 0.64);
       ctx.closePath(); ctx.fill();
     }
-    // Hood — deep cowl casting shadow
-    ctx.fillStyle = '#1a0e0a';
+
+    // Hood — radial gradient cowl
+    const hoodGrad = ctx.createRadialGradient(sx, sy - sz * 0.32, 0, sx, sy - sz * 0.32, sz * 0.35);
+    hoodGrad.addColorStop(0, '#000000');
+    hoodGrad.addColorStop(0.6, '#150a12');
+    hoodGrad.addColorStop(1, '#2a1424');
+    ctx.fillStyle = hoodGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.30, sy - sz*0.10);
-    ctx.lineTo(sx + sz*0.20, sy - sz*0.55);
-    ctx.lineTo(sx - sz*0.20, sy - sz*0.55);
+    ctx.moveTo(sx - sz * 0.30, sy - sz * 0.10);
+    ctx.lineTo(sx + sz * 0.30, sy - sz * 0.10);
+    ctx.lineTo(sx + sz * 0.20, sy - sz * 0.58);
+    ctx.lineTo(sx - sz * 0.20, sy - sz * 0.58);
     ctx.closePath(); ctx.fill();
-    // Hood interior — pure black void
+
+    // Hood interior — pure void
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.32, sz*0.16, sz*0.20, 0, 0, Math.PI*2); ctx.fill();
-    // MANY EYES inside the hood — 6 yellow-orange glints, subtle pulse offset by index
-    for (let i = 0; i < 6; i++) {
-      const ax = (i - 2.5) * 4 + Math.sin(t * 1.5 + i) * 0.5;
-      const ay = ((i % 2) ? -2 : 2) + Math.cos(t * 1.2 + i) * 0.5;
-      const flick = 0.6 + Math.sin(t * 2.5 + i * 1.7) * 0.4;
-      ctx.fillStyle = `rgba(248, 200, 64, ${flick})`;
-      ctx.beginPath(); ctx.arc(sx + ax, sy - sz*0.32 + ay, 1.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz * 0.32, sz * 0.14, sz * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+
+    // MANY EYES — 7 glints, independent pulse
+    for (let i = 0; i < 7; i++) {
+      const ax = (i - 3) * 3.5 + Math.sin(t * 1.5 + i) * 0.8;
+      const ay = ((i % 2) ? -3 : 2.5) + Math.cos(t * 1.2 + i) * 0.6;
+      const flick = 0.55 + Math.sin(t * 2.8 + i * 1.7) * 0.45;
+      ctx.fillStyle = `rgba(255, 200, 60, ${flick})`;
+      ctx.beginPath(); ctx.arc(sx + ax, sy - sz * 0.32 + ay, 1.6, 0, Math.PI * 2); ctx.fill();
     }
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
-  // Wraith Father — purple aura + crown of thorns, void cloak.
+  // Wraith Father — tall void silhouette, no clear features, violet halo + wisps.
   function drawBoss_wraith_father(ctx, sx, sy, b, t) {
     const fx = _bossHitFx(b); sx += fx.wobble;
     const sz = b.size;
-    // Layered purple aura BEHIND the figure (existing concentric pulse logic).
-    for (let i = 3; i > 0; i--) {
-      ctx.fillStyle = `rgba(60, 24, 100, ${0.18 + Math.sin(t*1.5 + i)*0.05})`;
-      ctx.beginPath(); ctx.arc(sx, sy, sz*0.5 + i*4, 0, Math.PI*2); ctx.fill();
+    // Ghostly hover — strong float
+    sy -= Math.sin(t * 0.95) * sz * 0.045;
+
+    // Layered pulsing aura rings
+    for (let i = 4; i > 0; i--) {
+      const r = sz * (0.45 + i * 0.18) + Math.sin(t * 1.5 + i * 0.7) * sz * 0.06;
+      const alpha = (0.12 + Math.sin(t * 1.5 + i) * 0.04) * (5 - i) * 0.12;
+      ctx.fillStyle = `rgba(60, 24, 100, ${alpha})`;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
     }
     drawBossAura(ctx, sx, sy, sz, 'rgba(160, 96, 255, 0.35)', t);
     _bossDropShadow(ctx, sx, sy, sz);
-    // Void cloak — black with deep purple inner shadow
-    ctx.fillStyle = '#180828';
+
+    // Wisps — 8 translucent ovals emanating outward
+    for (let i = 0; i < 8; i++) {
+      const wAng = i * (Math.PI * 2 / 8) + t * 0.4;
+      const wDist = sz * (0.52 + Math.sin(t * 1.2 + i) * 0.12);
+      const wx = sx + Math.cos(wAng) * wDist;
+      const wy = sy + Math.sin(wAng) * wDist * 0.6;
+      const wAlpha = 0.25 + Math.sin(t * 2.0 + i * 0.8) * 0.15;
+      ctx.fillStyle = `rgba(160, 80, 255, ${wAlpha})`;
+      ctx.beginPath();
+      ctx.ellipse(wx, wy, sz * 0.10, sz * 0.05, wAng, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Void cloak — gradient near-black to deep violet
+    const cloakGrad = ctx.createLinearGradient(sx - sz * 0.58, 0, sx + sz * 0.58, 0);
+    cloakGrad.addColorStop(0, '#0a0416');
+    cloakGrad.addColorStop(0.35, '#160828');
+    cloakGrad.addColorStop(0.65, '#160828');
+    cloakGrad.addColorStop(1, '#0a0416');
+    ctx.fillStyle = cloakGrad;
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.34, sy - sz*0.18);
-    ctx.lineTo(sx + sz*0.34, sy - sz*0.18);
-    ctx.lineTo(sx + sz*0.58, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.58, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.34, sy - sz * 0.18);
+    ctx.lineTo(sx + sz * 0.34, sy - sz * 0.18);
+    ctx.bezierCurveTo(sx + sz * 0.50, sy + sz * 0.18, sx + sz * 0.60, sy + sz * 0.42, sx + sz * 0.56, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.56, sy + sz * 0.55);
+    ctx.bezierCurveTo(sx - sz * 0.60, sy + sz * 0.42, sx - sz * 0.50, sy + sz * 0.18, sx - sz * 0.34, sy - sz * 0.18);
     ctx.closePath(); ctx.fill();
+
     // Inner robe — deep purple
-    ctx.fillStyle = '#3a1860';
+    ctx.fillStyle = '#2e1450';
     ctx.beginPath();
-    ctx.moveTo(sx - sz*0.22, sy - sz*0.12);
-    ctx.lineTo(sx + sz*0.22, sy - sz*0.12);
-    ctx.lineTo(sx + sz*0.36, sy + sz*0.55);
-    ctx.lineTo(sx - sz*0.36, sy + sz*0.55);
+    ctx.moveTo(sx - sz * 0.22, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.22, sy - sz * 0.12);
+    ctx.lineTo(sx + sz * 0.34, sy + sz * 0.55);
+    ctx.lineTo(sx - sz * 0.34, sy + sz * 0.55);
     ctx.closePath(); ctx.fill();
-    // Bone clasps down chest — pale dots
+
+    // Bone clasps
     ctx.fillStyle = '#d0c8b0';
     for (let i = 0; i < 4; i++) {
-      ctx.beginPath(); ctx.arc(sx, sy + i * sz*0.10, 1.6, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, sy + i * sz * 0.10, 1.5, 0, Math.PI * 2); ctx.fill();
     }
-    // Shrouded arms hanging straight down
-    ctx.fillStyle = '#180828';
-    ctx.fillRect(sx - sz*0.46, sy - sz*0.08, sz*0.16, sz*0.40);
-    ctx.fillRect(sx + sz*0.30, sy - sz*0.08, sz*0.16, sz*0.40);
-    // Skeletal hands at ends
-    ctx.fillStyle = '#d0c8b0';
-    ctx.beginPath(); ctx.arc(sx - sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(sx + sz*0.38, sy + sz*0.34, sz*0.06, 0, Math.PI*2); ctx.fill();
-    // Pale gaunt face inside hood
-    ctx.fillStyle = '#c0a8c8';
-    ctx.beginPath(); ctx.ellipse(sx, sy - sz*0.32, sz*0.16, sz*0.22, 0, 0, Math.PI*2); ctx.fill();
-    // Black void eyes
-    ctx.fillStyle = '#000';
-    ctx.fillRect(sx - sz*0.10, sy - sz*0.34, sz*0.07, sz*0.06);
-    ctx.fillRect(sx + sz*0.03, sy - sz*0.34, sz*0.07, sz*0.06);
-    // Glowing purple pupils
-    ctx.fillStyle = `rgba(200, 128, 255, ${0.7 + Math.sin(t * 2.2) * 0.3})`;
-    ctx.beginPath(); ctx.arc(sx - sz*0.07, sy - sz*0.31, 1.2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(sx + sz*0.07, sy - sz*0.31, 1.2, 0, Math.PI*2); ctx.fill();
-    // Crown of thorns — jagged spikes radiating from skull
-    ctx.strokeStyle = '#1a0828'; ctx.lineWidth = 2;
+
+    // Void-tendril arms
+    ctx.fillStyle = '#100820';
+    ctx.fillRect(sx - sz * 0.48, sy - sz * 0.08, sz * 0.14, sz * 0.42);
+    ctx.fillRect(sx + sz * 0.34, sy - sz * 0.08, sz * 0.14, sz * 0.42);
+    ctx.fillStyle = '#c8c0b0';
+    ctx.beginPath(); ctx.arc(sx - sz * 0.41, sy + sz * 0.36, sz * 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz * 0.41, sy + sz * 0.36, sz * 0.055, 0, Math.PI * 2); ctx.fill();
+
+    // Face — near-void, only a faint suggestion
+    const faceAlpha = 0.28 + Math.sin(t * 0.7) * 0.08;
+    ctx.fillStyle = `rgba(140, 100, 160, ${faceAlpha})`;
+    ctx.beginPath(); ctx.ellipse(sx, sy - sz * 0.32, sz * 0.14, sz * 0.20, 0, 0, Math.PI * 2); ctx.fill();
+    // Eyes — faint violet glints only
+    const eyePulse = 0.45 + Math.sin(t * 2.4) * 0.30;
+    ctx.fillStyle = `rgba(180, 100, 255, ${eyePulse})`;
+    ctx.beginPath(); ctx.arc(sx - sz * 0.06, sy - sz * 0.30, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + sz * 0.06, sy - sz * 0.30, 1.5, 0, Math.PI * 2); ctx.fill();
+
+    // Crown of void — dark spikes + pulsing gem
+    ctx.strokeStyle = '#100820'; ctx.lineWidth = 2.5;
     for (let i = -2; i <= 2; i++) {
-      const ax = sx + i * sz*0.12;
+      const ax = sx + i * sz * 0.12;
       ctx.beginPath();
-      ctx.moveTo(ax,         sy - sz*0.48);
-      ctx.lineTo(ax + i * 2, sy - sz*0.62 - Math.abs(i));
+      ctx.moveTo(ax, sy - sz * 0.50);
+      ctx.lineTo(ax + i * 2, sy - sz * 0.64 - Math.abs(i) * sz * 0.02);
       ctx.stroke();
     }
-    ctx.fillStyle = '#1a0828';
-    ctx.fillRect(sx - sz*0.30, sy - sz*0.50, sz*0.60, 3);
-    // Crown gem — purple glowing
-    ctx.fillStyle = `rgba(168, 96, 255, ${0.7 + Math.sin(t * 1.8) * 0.3})`;
-    ctx.beginPath(); ctx.arc(sx, sy - sz*0.56, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#100820';
+    ctx.fillRect(sx - sz * 0.30, sy - sz * 0.52, sz * 0.60, 2.5);
+    const gemAlpha = 0.65 + Math.sin(t * 2.0) * 0.35;
+    ctx.fillStyle = `rgba(168, 80, 255, ${gemAlpha})`;
+    ctx.beginPath(); ctx.arc(sx, sy - sz * 0.58, 2.8, 0, Math.PI * 2); ctx.fill();
+
     _bossFlash(ctx, sx, sy, sz, fx);
   }
 
@@ -2230,17 +2566,8 @@
         ctx.drawImage(_feverOffscreen, 0, 0);
         ctx.restore();
       }
-      // Boss HP bar always on main ctx (not glowed)
-      const w = D().width;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(w*0.1, 60, w*0.8, 8);
-      ctx.fillStyle = '#d04848';
-      ctx.fillRect(w*0.1+1, 61, (w*0.8-2) * (b.hp/b.maxHp), 6);
-      ctx.fillStyle = '#f0d890';
-      ctx.font = 'bold 11px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText(b._typeData.name, w*0.5, 56);
-      ctx.textAlign = 'left';
+      // Boss nameplate always on main ctx (not glowed)
+      drawBossNameplate(ctx, b);
     } else if (_feverGlow) {
       // No boss — composite offscreen directly
       ctx.save();
@@ -3080,10 +3407,140 @@
     }
   }
 
+  // ─── Capture-the-Hill render path ─────────────────────────────────────────
+  // Arena: 480×480 world units, camera follows player. Dark stone floor, glowing
+  // hill circle at center. Entities drawn with same ZOOM pipeline as Tower mode.
+  function _drawFrameCapHill() {
+    const ctx    = D().ctx;
+    const nowMs  = performance.now();
+    const fxDt   = _lastFrameMs ? Math.min(0.1, (nowMs - _lastFrameMs) / 1000) : 0;
+    _lastFrameMs = nowMs;
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.tick(fxDt);
+    if (window.WG.HuntFX)        WG.HuntFX.tick(fxDt);
+
+    updateCamera();
+
+    const W = D().width, H = D().height;
+    const t = nowMs / 1000;
+
+    // ── Arena background ──────────────────────────────────────────────────
+    ctx.fillStyle = '#050a0c';
+    ctx.fillRect(0, 0, W, H);
+
+    // Arena boundary: circle in screen space, camera-transformed
+    const acx = (runtime.mapW * 0.5 - camera.x) * ZOOM;
+    const acy = (runtime.mapH * 0.5 - camera.y) * ZOOM;
+    const arenaR = (Math.min(runtime.mapW, runtime.mapH) * 0.47) * ZOOM;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(acx, acy, arenaR, 0, Math.PI * 2);
+    ctx.fillStyle = '#080e14';
+    ctx.fill();
+    ctx.strokeStyle = '#162430'; ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Glowing hill circle ───────────────────────────────────────────────
+    const onHill  = runtime.onHill;
+    const pulse   = 0.7 + 0.3 * Math.sin(t * 2.4);
+    const hillR   = (window.WG.HuntCaptureHill
+      ? WG.HuntCaptureHill.TUNABLES.HILL_RADIUS : 24) * ZOOM;
+    const hc      = onHill ? '#30e880' : '#18b0d8';
+    const hcAlpha = onHill ? 0.30 : 0.18;
+
+    ctx.save();
+    // Outer radial glow
+    const grd = ctx.createRadialGradient(acx, acy, 0, acx, acy, hillR * 2.8);
+    grd.addColorStop(0, onHill ? 'rgba(48,232,128,0.20)' : 'rgba(24,176,216,0.14)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(acx, acy, hillR * 2.8, 0, Math.PI * 2); ctx.fill();
+    // Hill fill + ring
+    ctx.beginPath(); ctx.arc(acx, acy, hillR, 0, Math.PI * 2);
+    ctx.fillStyle = onHill ? 'rgba(32,200,100,0.28)' : 'rgba(16,144,200,0.18)';
+    ctx.fill();
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = hc; ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // ── Trauma shake ──────────────────────────────────────────────────────
+    _trauma = Math.max(0, _trauma - 1.4 * (nowMs - _shakeLastMs) / 1000);
+    _shakeLastMs = nowMs;
+    ctx.save();
+    if (_trauma > 0) {
+      const sh = _trauma * _trauma;
+      ctx.translate((Math.random() * 2 - 1) * sh * 18 + W/2,
+                    (Math.random() * 2 - 1) * sh * 18 + H/2);
+      ctx.rotate((Math.random() * 2 - 1) * sh * 0.04);
+      ctx.translate(-W/2, -H/2);
+    }
+
+    // ── World entities (same ZOOM pipeline as Hunt/Tower) ─────────────────
+    ctx.save();
+    ctx.scale(ZOOM, ZOOM);
+    drawDrops(ctx);
+    if (window.WG.HuntPickups) WG.HuntPickups.draw(ctx, w2s, runtime);
+    drawCreatures(ctx);
+    drawProjectiles(ctx);
+    drawPlayer(ctx);
+    WG.Render.drawParticles(ctx, w2s);
+    if (window.WG.HuntFXNumbers) WG.HuntFXNumbers.draw(ctx, w2s);
+    if (window.WG.HuntFX)        WG.HuntFX.draw(ctx, w2s);
+    ctx.restore();
+    ctx.restore(); // shake
+
+    drawEdgePulse(ctx);
+    _drawCapHillHud(ctx, W, H, runtime, nowMs);
+    drawLevelUpModal(ctx);
+  }
+
+  // HUD overlay: countdown timer, hold-time bar, ghost name badges.
+  function _drawCapHillHud(ctx, W, H, rt, nowMs) {
+    if (!window.WG.HuntCaptureHill) return;
+    const dur       = WG.HuntCaptureHill.TUNABLES.MATCH_DURATION;
+    const remaining = Math.max(0, dur - rt.elapsed);
+    const holdFrac  = Math.min(1, rt.holdTime / dur);
+    const lowTime   = remaining < 10;
+
+    // Countdown timer (top center)
+    ctx.save();
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font         = 'bold 22px Georgia,serif';
+    ctx.fillStyle    = lowTime ? '#ff4848' : '#a0e0ff';
+    ctx.shadowColor  = lowTime ? 'rgba(255,48,48,0.6)' : 'rgba(24,160,220,0.5)';
+    ctx.shadowBlur   = 12;
+    ctx.fillText(Math.ceil(remaining) + 's', W * 0.5, 12);
+    ctx.shadowBlur   = 0;
+    ctx.restore();
+
+    // Hold-time bar (below timer)
+    const barW = Math.min(180, W * 0.5);
+    const barH = 7;
+    const barX = (W - barW) * 0.5;
+    const barY = 40;
+    ctx.save();
+    ctx.fillStyle = '#040a0e';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = rt.onHill ? '#20d890' : '#1888b0';
+    ctx.fillRect(barX, barY, barW * holdFrac, barH);
+    ctx.strokeStyle = '#102030'; ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font         = '9px sans-serif';
+    ctx.fillStyle    = rt.onHill ? '#60e8b0' : '#50a0c0';
+    ctx.fillText('HOLD ' + rt.holdTime.toFixed(1) + 's', W * 0.5, barY + barH + 3);
+    ctx.restore();
+  }
+
   function drawFrame() {
     if (!runtime) return;
     // Tower Gauntlet — own render path (runtime.stage is null in tower mode)
     if (runtime.mode === 'tower') { _drawFrameTower(); return; }
+    // Capture-the-Hill — own render path (runtime.stage is null in hill mode)
+    if (runtime.mode === 'capture_hill') { _drawFrameCapHill(); return; }
     if (!runtime.stage) return;
     const ctx = D().ctx;
     const biome = WG.HuntStage.getBiome(runtime.stage.biome);
@@ -3244,6 +3701,7 @@
       }
     });
     WG.Engine.on('boss:spawned', ({ boss }) => {
+      _bossBarSlide = { startMs: performance.now() };
       pulseEdges(boss._typeData.accent + '88', 0.7, 600);
       for (let i = 0; i < 20; i++) {
         const a = Math.PI*2*(i/20);

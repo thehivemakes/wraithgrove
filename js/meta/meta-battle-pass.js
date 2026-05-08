@@ -351,7 +351,7 @@
                               : 'border:1px solid #2a1a2a;background:rgba(255,255,255,0.02);');
 
     var lvLabel = document.createElement('div');
-    lvLabel.style.cssText = 'font-size:7px;color:' + (reached ? '#c0a8f0' : '#4a3858') + ';font-weight:700;line-height:1;margin-bottom:1px;';
+    lvLabel.style.cssText = 'font-size:11px;color:' + (reached ? '#c0a8f0' : '#4a3858') + ';font-weight:700;line-height:1;margin-bottom:1px;';
     lvLabel.textContent = lv;
     cell.appendChild(lvLabel);
 
@@ -386,7 +386,7 @@
 
   function _buildRewardSlot(reward, reached, claimed, locked, onClaim) {
     var slot = document.createElement('div');
-    slot.style.cssText = 'width:100%;min-height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;cursor:' + (reached && !claimed && !locked ? 'pointer' : 'default') + ';' +
+    slot.style.cssText = 'width:100%;min-height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:' + (reached && !claimed && !locked ? 'pointer' : 'default') + ';' +
       (claimed  ? 'background:rgba(90,128,64,0.2);color:#5a8040;'
       : reached && !locked ? 'background:rgba(200,160,80,0.15);color:#e0c870;animation:passCellPulse 2s infinite;'
       : 'background:rgba(255,255,255,0.03);color:#3a2840;');

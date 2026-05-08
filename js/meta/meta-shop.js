@@ -238,7 +238,7 @@
     gemsRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;';
     gemsRow.innerHTML =
       '<span style="font-size:13px;color:#c8a0ff;font-weight:700;letter-spacing:1px;">💎 ' + gemsNow + ' Gems available</span>' +
-      '<button id="wg-gacha-info-btn" style="background:none;border:1.5px solid #5a3a90;border-radius:50%;width:20px;height:20px;color:#a080c0;font-size:11px;font-weight:700;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="Gacha information">?</button>';
+      '<button id="wg-gacha-info-btn" aria-label="Gacha information" style="background:none;border:1.5px solid #5a3a90;border-radius:50%;width:36px;height:36px;color:#a080c0;font-size:14px;font-weight:700;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="Gacha information">?</button>';
     body.appendChild(gemsRow);
     const infoBtn = gemsRow.querySelector('#wg-gacha-info-btn');
     if (infoBtn) infoBtn.addEventListener('click', function() { if (window.WG && WG.Compliance) WG.Compliance.showGachaDisclosure(); });

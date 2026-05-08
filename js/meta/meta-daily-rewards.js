@@ -151,7 +151,7 @@
       '.wg-dr-tile.past{opacity:0.5;}',
       '.wg-dr-tile.future{opacity:0.3;}',
       '.wg-dr-tile.day7{border-color:#d060ff;}',
-      '.wg-dr-daylbl{font-size:7px;letter-spacing:0.8px;color:#907050;font-weight:700;}',
+      '.wg-dr-daylbl{font-size:11px;letter-spacing:0.8px;color:#907050;font-weight:700;}',
       '.wg-dr-daylbl.today{color:#f0d060;}',
       '.wg-dr-icon{font-size:17px;line-height:1;margin:2px 0;}',
       '.wg-dr-amt{font-size:7.5px;color:#b08050;font-weight:700;text-align:center;line-height:1.4;white-space:pre;}',

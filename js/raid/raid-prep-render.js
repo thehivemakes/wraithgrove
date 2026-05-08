@@ -138,7 +138,7 @@
     btn.innerHTML =
       '<div style="font-size:20px;opacity:' + (noStock ? '0.25' : '1') + ';">' + icon + '</div>' +
       '<div style="font-size:10px;color:' + (sel ? '#b0f0b0' : noStock ? '#3a2850' : '#c0a0e0') + ';font-weight:700;letter-spacing:1px;">' + label + (sel ? ' ✓' : '') + '</div>' +
-      '<div style="font-size:8px;color:' + (noStock ? '#3a2850' : '#806090') + ';margin-top:1px;">' + sublbl + '</div>' +
+      '<div style="font-size:10px;color:' + (noStock ? '#3a2850' : '#806090') + ';margin-top:1px;">' + sublbl + '</div>' +
       '<div style="font-size:9px;color:' + (noStock ? '#5a3060' : '#a08080') + ';margin-top:2px;">' +
         (noStock ? 'No stock' : 'Stock: ' + stock) + ' · L' + level +
       '</div>';
@@ -222,7 +222,7 @@
       slot.style.cssText = 'padding:8px 4px;border-radius:8px;border:1.5px solid ' + (pid ? '#f0c060' : '#3a2818') + ';background:' + (pid ? 'rgba(60,40,8,0.5)' : 'rgba(20,12,6,0.5)') + ';text-align:center;cursor:pointer;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;';
       slot.innerHTML = pid
         ? '<div style="font-size:12px;color:#f0d890;font-weight:700;">' + (def ? def.name.split(' ')[0] : pid) + '</div><div style="font-size:9px;color:#c8a060;">🎯 ' + (def ? def.damage : '') + ' dmg</div>'
-        : '<div style="font-size:20px;color:#5a4028;">+</div><div style="font-size:8px;color:#5a4028;letter-spacing:1px;">SLOT ' + (i+1) + '</div>';
+        : '<div style="font-size:20px;color:#5a4028;">+</div><div style="font-size:10px;color:#5a4028;letter-spacing:1px;">SLOT ' + (i+1) + '</div>';
       slot.dataset.slotIdx = i;
       slot.addEventListener('click', () => {
         const cur = s.forge.cannon_loadout[i];
@@ -439,7 +439,7 @@
           '<div style="font-size:9px;color:' + (countered ? '#80e8a0' : '#e88080') + ';font-weight:700;letter-spacing:0.5px;">' +
             (countered ? '⚡ COUNTERED' : '💥 HIT') + ' — ' + trapName +
           '</div>' +
-          (actionLabel ? '<div style="font-size:8px;color:#806090;margin-top:1px;">' + actionLabel + '</div>' : '');
+          (actionLabel ? '<div style="font-size:10px;color:#806090;margin-top:1px;">' + actionLabel + '</div>' : '');
         row.appendChild(info);
 
         // Buff floater (shows what was earned on counter) or damage number on hit
@@ -449,7 +449,7 @@
           // Green "+BUFF" floater — emits into WG.HuntFX if hunt canvas is active
           if (window.WG && WG.HuntFX) WG.HuntFX.burst(0, 0, 'heal', { count: 4, life: 0.4 });
           outcome.innerHTML = '<div style="font-size:9px;color:#60e890;font-weight:700;">+' + buffDef.name.replace('Counter: ', '') + '</div>' +
-            '<div style="font-size:8px;color:#40a060;">' + buffDef.desc + '</div>';
+            '<div style="font-size:10px;color:#40a060;">' + buffDef.desc + '</div>';
         } else if (!countered && ev.value > 0) {
           outcome.innerHTML = '<div style="font-size:11px;color:#ff7070;font-weight:700;">-' + ev.value + ' HP</div>';
         } else if (!countered) {

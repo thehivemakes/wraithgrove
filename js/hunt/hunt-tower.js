@@ -325,7 +325,7 @@
         'cursor:pointer;transition:transform 100ms ease,box-shadow 100ms ease;position:relative;',
       ].join('');
       el.innerHTML = `
-        <div style="position:absolute;top:7px;right:8px;font-size:8px;font-weight:700;
+        <div style="position:absolute;top:7px;right:8px;font-size:10px;font-weight:700;
           letter-spacing:1px;color:${rc.border};text-transform:uppercase;">${rarityLabel}</div>
         <div style="font-size:26px;margin-bottom:8px;">${card.icon}</div>
         <div style="font-size:11px;font-weight:700;color:${rc.text};letter-spacing:0.5px;

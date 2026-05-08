@@ -53,6 +53,14 @@
     const frac = Math.max(0, hp / maxHp);
     ctx.fillStyle = frac > 0.5 ? '#88c878' : (frac > 0.25 ? '#d8c060' : '#d04848');
     ctx.fillRect(cx - w/2 + 1, cy + 1, (w - 2) * frac, h - 2);
+    if (frac <= 0.5) {
+      ctx.save();
+      ctx.font = 'bold 8px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = frac > 0.25 ? '#d8c060' : '#ff8080';
+      ctx.fillText(Math.round(frac * 100) + '%', cx, cy - 1);
+      ctx.restore();
+    }
   }
 
   function drawFloatText(ctx, text, x, y, color) {

@@ -209,7 +209,7 @@
     font-size: 22px; color: #ffd870;
   }
   #hunt-hud .menu-btn {
-    position: absolute; top: 6px; right: 78px; width: 32px; height: 32px;
+    position: absolute; top: 0px; right: 72px; width: 44px; height: 44px;
     background: rgba(0,0,0,0.6); border-radius: 50%;
     pointer-events: auto; cursor: pointer; border: 1px solid #604020;
     color: #c8a868; font-size: 16px; display: flex; align-items: center; justify-content: center;
@@ -265,8 +265,8 @@
   body.in-stage #top-strip { display: none; }
   body.in-stage #hunt-hud { inset: 0; }
   #hunt-hud .back-btn {
-    position: absolute; top: 8px; left: 12px;
-    height: 30px; padding: 0 12px;
+    position: absolute; top: 0px; left: 12px;
+    min-height: 44px; padding: 0 12px;
     background: rgba(0,0,0,0.7); border: 1px solid #604020; border-radius: 15px;
     pointer-events: auto; cursor: pointer;
     color: #c8a868; font-size: 11px; letter-spacing: 1.5px; font-weight: 600;
@@ -292,13 +292,34 @@
     pointer-events: none; background: rgba(0,0,0,0); transition: background 500ms;
   }
   .wg-victory.show { background: rgba(0,0,0,0.88); }
+
+  /* A11Y: keyboard/switch-access focus ring — only fires for non-pointer nav */
+  :focus-visible { outline: 2px solid #f0d890; outline-offset: 2px; }
+
+  /* A11Y: honour OS reduce-motion setting — collapse all looping/transform animations */
+  @media (prefers-reduced-motion: reduce) {
+    .wg-rift-intrude { animation: none; }
+    @keyframes battlePulse {
+      0%, 100% { box-shadow: 0 4px 12px rgba(232,80,32,0.45), 0 0 0 1px rgba(255,200,120,0.35) inset; }
+    }
+    @keyframes wg-char-breathe {
+      0%, 100% { transform: translateY(0) scale(1.000); filter: brightness(1.00); }
+    }
+    @keyframes wg-char-glow {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(216,168,56,0.15) inset, 0 4px 20px rgba(216,168,56,0.04); }
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } }
+    @keyframes modal-pop { from, to { transform: scale(1); opacity: 1; } }
+    @keyframes wgRiftGlitch { 0%, 100% { transform: translate(0, 0); } }
+  }
 </style>
 </head>
 <body>
 
 <div id="app">
   <div id="stage">
-    <canvas id="game-canvas"></canvas>
+    <canvas id="game-canvas" aria-label="Hunt — tap to play" role="img"></canvas>
+  <div id="a11y-announce" role="status" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;pointer-events:none;"></div>
     <div id="top-strip">
       <div class="group">
         <div class="currency coins"><span class="glyph"></span><span class="val" data-bind="coins">0</span></div>
@@ -320,15 +341,15 @@
       <div class="tab-panel" id="tab-ascend"></div>
       <div class="tab-panel active" id="tab-hunt">
         <div id="hunt-hud">
-          <div class="back-btn" id="hunt-back-btn" data-i18n="hunt.back_btn">← MENU</div>
+          <div class="back-btn" id="hunt-back-btn" role="button" aria-label="Back to menu" data-i18n="hunt.back_btn">← MENU</div>
           <div class="stage-banner" id="hunt-stage-banner">stage —</div>
-          <div class="menu-btn" id="hunt-menu-btn">⚙</div>
-          <div class="skill-btn" id="hunt-skill-btn">✦</div>
+          <div class="menu-btn" id="hunt-menu-btn" role="button" aria-label="Settings">⚙</div>
+          <div class="skill-btn" id="hunt-skill-btn" role="button" aria-label="Use skill">✦</div>
           <!-- W-Special-Abilities: 3 ability slots -->
           <div id="hunt-ability-row">
-            <div class="ability-slot locked" id="hunt-ability-0" data-slot="0"><span class="as-icon">·</span><div class="as-ring"></div></div>
-            <div class="ability-slot locked" id="hunt-ability-1" data-slot="1"><span class="as-icon">·</span><div class="as-ring"></div></div>
-            <div class="ability-slot locked" id="hunt-ability-2" data-slot="2"><span class="as-icon">·</span><div class="as-ring"></div></div>
+            <div class="ability-slot locked" id="hunt-ability-0" data-slot="0" aria-disabled="true" aria-label="Ability slot 1 — locked"><span class="as-icon">·</span><div class="as-ring"></div></div>
+            <div class="ability-slot locked" id="hunt-ability-1" data-slot="1" aria-disabled="true" aria-label="Ability slot 2 — locked"><span class="as-icon">·</span><div class="as-ring"></div></div>
+            <div class="ability-slot locked" id="hunt-ability-2" data-slot="2" aria-disabled="true" aria-label="Ability slot 3 — locked"><span class="as-icon">·</span><div class="as-ring"></div></div>
           </div>
           <div class="joystick-zone"></div>
           <div class="joystick-vis" id="hunt-joystick"><div class="knob"></div></div>
@@ -339,29 +360,29 @@
       <div class="tab-panel" id="tab-relics"></div>
     </div>
   </div>
-  <nav id="nav-bar">
-    <div class="nav-tab" data-tab="duel">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l6-6M21 3l-6 6M9 3l12 12M3 9l12 12"/></svg>
+  <nav id="nav-bar" role="tablist" aria-label="Game tabs">
+    <div class="nav-tab" data-tab="duel" role="tab" aria-selected="false" aria-controls="tab-duel" aria-label="Duel tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21l6-6M21 3l-6 6M9 3l12 12M3 9l12 12"/></svg>
       <span class="label" data-i18n="nav.duel">Duel</span>
     </div>
-    <div class="nav-tab" data-tab="ascend">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M12 5l-6 8h12z"/></svg>
+    <div class="nav-tab" data-tab="ascend" role="tab" aria-selected="false" aria-controls="tab-ascend" aria-label="Ascend tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19h16M12 5l-6 8h12z"/></svg>
       <span class="label" data-i18n="nav.ascend">Ascend</span>
     </div>
-    <div class="nav-tab active" data-tab="hunt">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l4 4 8 8 2 2-2 2-2-2-8-8-4-4z"/><circle cx="6" cy="18" r="2"/></svg>
+    <div class="nav-tab active" data-tab="hunt" role="tab" aria-selected="true" aria-controls="tab-hunt" aria-label="Hunt tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l4 4 8 8 2 2-2 2-2-2-8-8-4-4z"/><circle cx="6" cy="18" r="2"/></svg>
       <span class="label" data-i18n="nav.hunt">Hunt</span>
     </div>
-    <div class="nav-tab" data-tab="forge">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>
+    <div class="nav-tab" data-tab="forge" role="tab" aria-selected="false" aria-controls="tab-forge" aria-label="Forge tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>
       <span class="label" data-i18n="nav.forge">Forge</span>
     </div>
-    <div class="nav-tab" data-tab="alliance" id="nav-tab-alliance">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <div class="nav-tab" data-tab="alliance" id="nav-tab-alliance" role="tab" aria-selected="false" aria-controls="tab-alliance" aria-label="Alliance tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="label">Alliance</span>
     </div>
-    <div class="nav-tab" data-tab="relics">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/></svg>
+    <div class="nav-tab" data-tab="relics" role="tab" aria-selected="false" aria-controls="tab-relics" aria-label="Relics tab">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/></svg>
       <span class="label" data-i18n="nav.relics">Relics</span>
     </div>
   </nav>
@@ -382,7 +403,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Unlimited Chaos', version: '0.45.5-alliance-glue-1778253366', built: '2026-05-08', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Unlimited Chaos', version: '0.48.0-pre-launch-final-1778256046', built: '2026-05-08', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -474,6 +495,7 @@
       'js/meta/meta-alliance-war.js',
       'js/meta/meta-alliance-notifications.js',
       'js/meta/meta-alliance-render.js',
+      'js/meta/meta-capture-hill-match.js',
       'js/raid/raid-boss-attack.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
@@ -492,6 +514,7 @@
       'js/hunt/hunt-tower-buffs.js',
       'js/hunt/hunt-tower.js',
       'js/hunt/hunt-tower-render.js',
+      'js/hunt/hunt-capture-hill.js',
       'js/ascend/ascend-character.js',
       'js/ascend/ascend-skins.js',
       'js/ascend/ascend-equipment.js',

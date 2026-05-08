@@ -8,7 +8,7 @@
   let huntRuntime = null;
   // SPEC §0 — Day/Night mode chosen on lobby level select; persists across panel rerenders
   let currentLevelMode = 'day';
-  // W-Mode1-Base-Raid-Foundation — Hunt-tab content mode: 'solo' | 'raid'
+  // W-Mode1-Base-Raid-Foundation — Hunt-tab content mode: 'solo' | 'raid' | 'hill'
   let huntMode = 'solo';
   // W-Stage-Zero-Tutorial — set when stage 0 is cleared; consumed in exitHunt to trigger tabs reveal
   let _stage0JustCleared = false;
@@ -87,9 +87,21 @@
     WG.Engine.emit('tower:run-start', { floor: 1 });
   }
 
+  // W-Mode2-Capture-Hill: energy already spent by CaptureHillMatch ATTACK button.
+  // opponents: array of { name, holdTime } from seed pool.
+  function startCaptureHillRun(opponents) {
+    cancelMenuLoop();
+    const ghostNames = opponents.map(function(o) { return o.name; });
+    const rt = WG.HuntCaptureHill.startCaptureHill(ghostNames);
+    huntRuntime = rt;
+    WG.HuntRender.setRuntime(rt);
+    document.body.classList.add('in-stage');
+    WG.Engine.emit('capture-hill:run-start', {});
+  }
+
   function exitHunt() {
     // Clean up tower overlays if returning from a Tower run
-    ['wg-buff-picker','wg-milestone-chest','wg-tower-death','wg-run-summary'].forEach(id => {
+    ['wg-buff-picker','wg-milestone-chest','wg-tower-death','wg-run-summary','wg-ch-results'].forEach(id => {
       const el = document.getElementById(id);
       if (el && el.parentNode) el.parentNode.removeChild(el);
     });
@@ -142,6 +154,9 @@
       // Tower Gauntlet branch — its own tick handles all combat + floor logic
       if (huntRuntime.mode === 'tower') {
         WG.HuntTower.tickFloor(dt);
+      } else if (huntRuntime.mode === 'capture_hill') {
+        // Capture-the-Hill branch — own tick (60s run vs AI ghosts)
+        if (window.WG.HuntCaptureHill) WG.HuntCaptureHill.tickMatch(dt);
       } else if (huntRuntime.player && huntRuntime.player.hp > 0 && !huntRuntime.pendingLevelUp) {
       if (!huntRuntime._tutorialPaused && !WG.Engine.isHitPaused()) {
       // W-Special-Abilities: time_slow effect — scale world dt for enemies/projectiles
@@ -432,6 +447,7 @@
 
   // Quick fullscreen flash overlay — non-blocking, fades out, removed on done.
   function flashScreen(color, alpha, durationMs) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const flash = document.createElement('div');
     flash.style.cssText = `
       position:fixed;inset:0;background:${color};opacity:${alpha};
@@ -517,6 +533,14 @@
     wraith_father:       'images/bosses/wraith_father.png',
     echo_throne_keeper:  'images/bosses/echo_throne_keeper.png',
     wraith_father_echo:  'images/bosses/wraith_father_echo.png',
+  };
+  const BOSS_INTRO_TITLES = {
+    pale_bride:     'The White Widow',
+    frozen_crone:   'Keeper of the Glacier Gate',
+    autumn_lord:    'Lord of the Dying Season',
+    temple_warden:  'Guardian of the Inner Sanctum',
+    cave_mother:    'She Who Fills the Dark',
+    wraith_father:  'The Unending',
   };
   // RIFT biomes are future cross-IP intrusion stages — when stage.biome is in
   // this set the menu hero gains a violet drop-shadow + intermittent glitch
@@ -985,15 +1009,21 @@
     select.style.cssText = 'position:absolute;inset:36px 0 0 0;padding:8px 14px 16px 14px;background:#0c0a08;z-index:10;display:flex;flex-direction:column;';
     root.appendChild(select);
 
-    // ─── W-Mode1-Base-Raid-Foundation: SUPER OBVIOUS mode toggle pill ───────
+    // ─── Mode toggle: SOLO | RAID | HILL (3-pill) ────────────────────────────
+    function _modePillColor(m) {
+      if (m === 'raid') return { border:'#a040e0', shadow:'rgba(160,40,220,0.5)', bg:'linear-gradient(to right,#5a10b0,#3a0890)', text:'#e0b0ff' };
+      if (m === 'hill') return { border:'#1898c8', shadow:'rgba(24,152,200,0.5)', bg:'linear-gradient(to right,#0c6898,#043858)', text:'#80d8f8' };
+      return { border:'#e08030', shadow:'rgba(220,120,40,0.5)', bg:'linear-gradient(to right,#d05010,#902810)', text:'#fff8e0' };
+    }
+    const _mc = _modePillColor(huntMode);
     const modeToggleBar = document.createElement('div');
-    modeToggleBar.style.cssText = 'display:flex;margin-bottom:10px;border-radius:28px;overflow:hidden;border:2px solid ' + (huntMode === 'raid' ? '#a040e0' : '#e08030') + ';box-shadow:0 0 12px ' + (huntMode === 'raid' ? 'rgba(160,40,220,0.5)' : 'rgba(220,120,40,0.5)') + ';transition:border-color 200ms,box-shadow 200ms;';
+    modeToggleBar.style.cssText = 'display:flex;margin-bottom:10px;border-radius:28px;overflow:hidden;border:2px solid ' + _mc.border + ';box-shadow:0 0 12px ' + _mc.shadow + ';transition:border-color 200ms,box-shadow 200ms;';
 
-    function _modeHalf(label, mode) {
+    function _modePill(label, mode) {
       const isActive = huntMode === mode;
-      const isRaid   = mode === 'raid';
+      const mc = _modePillColor(mode);
       const btn = document.createElement('button');
-      btn.style.cssText = 'flex:1;padding:13px 8px;font-size:13px;font-weight:800;letter-spacing:2px;border:none;cursor:pointer;transition:background 200ms,color 200ms;background:' + (isActive ? (isRaid ? 'linear-gradient(to right,#5a10b0,#3a0890)' : 'linear-gradient(to right,#d05010,#902810)') : '#14100a') + ';color:' + (isActive ? (isRaid ? '#e0b0ff' : '#fff8e0') : '#4a3828') + ';';
+      btn.style.cssText = 'flex:1;padding:13px 4px;font-size:12px;font-weight:800;letter-spacing:1px;border:none;cursor:pointer;transition:background 200ms,color 200ms;background:' + (isActive ? mc.bg : '#14100a') + ';color:' + (isActive ? mc.text : '#4a3828') + ';';
       btn.textContent = label;
       btn.addEventListener('click', function() {
         if (huntMode === mode) return;
@@ -1003,8 +1033,9 @@
       return btn;
     }
 
-    modeToggleBar.appendChild(_modeHalf('⚔ SOLO HUNT', 'solo'));
-    modeToggleBar.appendChild(_modeHalf('⚔ RAID BASE', 'raid'));
+    modeToggleBar.appendChild(_modePill('⚔ SOLO', 'solo'));
+    modeToggleBar.appendChild(_modePill('⚔ RAID', 'raid'));
+    modeToggleBar.appendChild(_modePill('⛰ HILL', 'hill'));
     select.appendChild(modeToggleBar);
 
     // In RAID mode: delegate to raid prep screen and return early
@@ -1015,6 +1046,18 @@
         const ph = document.createElement('div');
         ph.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;color:#7a5888;font-size:13px;letter-spacing:2px;';
         ph.textContent = 'RAID PREP — Loading…';
+        select.appendChild(ph);
+      }
+      return;
+    }
+    // In HILL mode: delegate to capture-hill match queue and return early
+    if (huntMode === 'hill') {
+      if (window.WG && WG.CaptureHillMatch) {
+        WG.CaptureHillMatch.showMatchQueue(select, function() { huntMode = 'solo'; showHuntStageList(); });
+      } else {
+        const ph = document.createElement('div');
+        ph.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;color:#406880;font-size:13px;letter-spacing:2px;';
+        ph.textContent = 'HILL CONTROL — Loading…';
         select.appendChild(ph);
       }
       return;
@@ -1045,7 +1088,7 @@
     function sideIcon(opts) {
       const b = document.createElement('button');
       b.style.cssText = `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:52px;padding:7px 4px;border:1.5px solid ${opts.border||'#5a4028'};border-radius:9px;background:linear-gradient(to bottom,rgba(40,30,16,0.85),rgba(20,12,6,0.92));color:#f0d890;cursor:pointer;font-size:9px;letter-spacing:0.5px;font-weight:700;position:relative;transition:transform 80ms ease;`;
-      b.innerHTML = `<span style="font-size:22px;line-height:1;">${opts.glyph}</span><span style="margin-top:2px;text-align:center;line-height:1.05;">${opts.label}</span>${opts.badge?`<span style="position:absolute;top:-3px;right:-3px;background:#e02828;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;font-weight:700;border:1px solid #200808;">${opts.badge}</span>`:''}${opts.timer?`<span style="font-size:8px;color:#a8d878;margin-top:1px;letter-spacing:0;">${opts.timer}</span>`:''}`;
+      b.innerHTML = `<span style="font-size:22px;line-height:1;">${opts.glyph}</span><span style="margin-top:2px;text-align:center;line-height:1.05;">${opts.label}</span>${opts.badge?`<span style="position:absolute;top:-3px;right:-3px;background:#e02828;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;font-weight:700;border:1px solid #200808;">${opts.badge}</span>`:''}${opts.timer?`<span style="font-size:10px;color:#a8d878;margin-top:1px;letter-spacing:0;">${opts.timer}</span>`:''}`;
       b.addEventListener('pointerdown',()=>{b.style.transform='scale(0.92)';});
       b.addEventListener('pointerup',()=>{b.style.transform='scale(1)';});
       b.addEventListener('pointerleave',()=>{b.style.transform='scale(1)';});
@@ -1082,7 +1125,8 @@
     function arrowBtn(dir) {
       const a = document.createElement('button');
       a.textContent = dir === 'left' ? '◀' : '▶';
-      a.style.cssText = `position:absolute;${dir}:6px;top:50%;transform:translateY(-50%);width:34px;height:54px;border-radius:8px;border:1.5px solid #5a4028;background:linear-gradient(to bottom,rgba(40,30,16,0.85),rgba(20,12,6,0.92));color:#f0d890;font-size:18px;cursor:pointer;z-index:3;transition:transform 80ms ease;`;
+      a.setAttribute('aria-label', dir === 'left' ? 'Previous stage' : 'Next stage');
+      a.style.cssText = `position:absolute;${dir}:6px;top:50%;transform:translateY(-50%);width:44px;height:54px;border-radius:8px;border:1.5px solid #5a4028;background:linear-gradient(to bottom,rgba(40,30,16,0.85),rgba(20,12,6,0.92));color:#f0d890;font-size:18px;cursor:pointer;z-index:3;transition:transform 80ms ease;`;
       a.addEventListener('pointerdown',()=>{a.style.transform='translateY(-50%) scale(0.92)';});
       a.addEventListener('pointerup',()=>{a.style.transform='translateY(-50%) scale(1)';});
       a.addEventListener('pointerleave',()=>{a.style.transform='translateY(-50%) scale(1)';});
@@ -1345,11 +1389,13 @@
           <div style="font-size:11px;color:#a89878;margin-top:6px;line-height:1.4;">${stage.biome === 'ascended' ? 'Defeat the Wraith Father to ascend.' : 'Beat Stage ' + (stage.id - 1) + ' to unlock'}</div>
         `;
         heroContent.appendChild(lock);
+        battleBtn.disabled = true;
         battleBtn.style.opacity = '0.45';
         battleBtn.style.cursor = 'not-allowed';
         battleBtn.textContent = WG.i18n ? WG.i18n.t('menu.locked') : '🔒  LOCKED';
         battleBtn.style.animation = '';
       } else {
+        battleBtn.disabled = false;
         battleBtn.style.opacity = '1';
         battleBtn.style.cursor = 'pointer';
         battleBtn.textContent = WG.i18n ? WG.i18n.t('menu.battle') : 'BATTLE';
@@ -1763,6 +1809,7 @@
     if (WG.Onboarding && WG.Onboarding.init) WG.Onboarding.init();
     if (WG.HuntTowerBuffs && WG.HuntTowerBuffs.init) WG.HuntTowerBuffs.init();
     if (WG.HuntTower && WG.HuntTower.init) WG.HuntTower.init();
+    if (WG.HuntCaptureHill && WG.HuntCaptureHill.init) WG.HuntCaptureHill.init();
     WG.AscendCharacter.init();
     WG.AscendSkins.init();
     WG.AscendEquipment.init();
@@ -1805,7 +1852,10 @@
     if (WG.AllianceRecruitment && WG.AllianceRecruitment.init) WG.AllianceRecruitment.init();
     // W-Alliance-War-Scheduling — init after AllianceBoss (needs member count + power), before Render
     if (WG.AllianceWar && WG.AllianceWar.init) WG.AllianceWar.init();
+    // W-Alliance-Cross-Mode-Glue — init after AllianceWar (reads war state), before Render
+    if (WG.AllianceNotifications && WG.AllianceNotifications.init) WG.AllianceNotifications.init();
     if (WG.AllianceRender && WG.AllianceRender.init) WG.AllianceRender.init();
+    if (WG.CaptureHillMatch && WG.CaptureHillMatch.init) WG.CaptureHillMatch.init();
     // Fire daily:reset now — state is loaded + all listeners registered
     if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
 
@@ -1839,31 +1889,35 @@
       // show: card fades + slides in (300ms). Both classes removed together on exit.
       css.textContent = `
         .wg-boss-intro{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
-          background:radial-gradient(ellipse at center,rgba(20,8,12,0.78) 0%,rgba(4,2,6,0.96) 70%);
+          background:radial-gradient(ellipse at center,rgba(20,8,12,0.80) 0%,rgba(4,2,6,0.97) 70%);
           opacity:0;pointer-events:none;transition:opacity 300ms ease-out;}
         .wg-boss-intro.pre-darken{opacity:1;}
         .wg-boss-intro.show{opacity:1;}
-        .wg-boss-intro .wg-bi-card{display:flex;flex-direction:column;align-items:center;gap:12px;
-          opacity:0;transform:translateY(24px) scale(0.96);
-          transition:opacity 300ms ease-out,transform 300ms cubic-bezier(.2,.8,.2,1);}
+        .wg-boss-intro .wg-bi-card{display:flex;flex-direction:column;align-items:center;gap:8px;
+          opacity:0;transform:translateY(40px) scale(0.94);
+          transition:opacity 320ms ease-out,transform 320ms cubic-bezier(.15,.85,.25,1.05);}
         .wg-boss-intro.pre-darken .wg-bi-card{opacity:0;}
         .wg-boss-intro.show .wg-bi-card{opacity:1;transform:translateY(0) scale(1);}
-        .wg-boss-intro .wg-bi-img{width:min(72vw,420px);height:min(72vw,420px);object-fit:cover;
-          border:1px solid rgba(220,180,120,0.35);box-shadow:0 0 32px rgba(120,40,60,0.45),0 0 96px rgba(40,8,16,0.6);
+        .wg-boss-intro .wg-bi-img{width:min(70vw,400px);height:min(70vw,400px);object-fit:cover;
+          border:1px solid rgba(220,178,90,0.40);
+          box-shadow:0 0 40px rgba(120,40,60,0.50),0 0 100px rgba(40,8,16,0.65);
           background:#0a0608;}
-        .wg-boss-intro .wg-bi-name{font-family:Georgia,serif;font-size:28px;letter-spacing:0.08em;
-          color:#f0d8a8;text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 4px rgba(180,80,60,0.35);
-          text-transform:uppercase;}
+        .wg-boss-intro .wg-bi-name{font-family:Georgia,serif;font-size:26px;letter-spacing:0.10em;
+          color:#f0d8a0;text-shadow:0 2px 14px rgba(0,0,0,0.95),0 0 6px rgba(200,100,50,0.45);
+          text-transform:uppercase;margin-top:4px;}
+        .wg-boss-intro .wg-bi-title{font-family:Georgia,serif;font-size:12px;letter-spacing:0.06em;
+          color:rgba(200,165,100,0.72);font-style:italic;
+          text-shadow:0 1px 6px rgba(0,0,0,0.90);margin-top:-4px;}
         @keyframes wg-bi-pulse{
-          0%,100%{text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 4px rgba(180,80,60,0.35);opacity:1;}
-          50%{text-shadow:0 2px 20px rgba(0,0,0,0.9),0 0 18px rgba(220,100,60,0.75);opacity:0.82;}}
-        .wg-boss-intro .wg-bi-name.pulsing{animation:wg-bi-pulse 0.6s ease-in-out infinite;}
+          0%,100%{text-shadow:0 2px 14px rgba(0,0,0,0.95),0 0 6px rgba(200,100,50,0.45);opacity:1;}
+          50%{text-shadow:0 2px 22px rgba(0,0,0,0.95),0 0 20px rgba(240,140,50,0.80);opacity:0.84;}}
+        .wg-boss-intro .wg-bi-name.pulsing{animation:wg-bi-pulse 0.65s ease-in-out infinite;}
       `;
       document.head.appendChild(css);
     }
     const el = document.createElement('div');
     el.className = 'wg-boss-intro';
-    el.innerHTML = '<div class="wg-bi-card"><img class="wg-bi-img" alt=""><div class="wg-bi-name"></div></div>';
+    el.innerHTML = '<div class="wg-bi-card"><img class="wg-bi-img" alt=""><div class="wg-bi-name"></div><div class="wg-bi-title"></div></div>';
     document.body.appendChild(el);
     _bossIntroEl = el;
     return el;
@@ -1880,9 +1934,11 @@
     const el = ensureBossIntroDom();
     const img = el.querySelector('.wg-bi-img');
     const nameEl = el.querySelector('.wg-bi-name');
+    const titleEl = el.querySelector('.wg-bi-title');
     img.src = url;
     img.onerror = () => { hideBossIntro(); };
     nameEl.textContent = (boss._typeData && boss._typeData.name) || boss.type || '';
+    if (titleEl) titleEl.textContent = BOSS_INTRO_TITLES[boss.type] || '';
     nameEl.classList.remove('pulsing');
     if (_bossIntroTimer) clearTimeout(_bossIntroTimer);
     if (WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(1600);
@@ -1902,9 +1958,21 @@
     _bossIntroEl.classList.remove('show');
     _bossIntroEl.classList.remove('pre-darken');
   }
+  function _a11yAnnounce(msg) {
+    const el = document.getElementById('a11y-announce');
+    if (!el) return;
+    el.textContent = '';
+    requestAnimationFrame(() => { el.textContent = msg; });
+  }
+
   function initBossIntro() {
     if (!WG.Engine || !WG.Engine.on) return;
     WG.Engine.on('boss:spawned', ({ boss }) => { if (boss) showBossIntro(boss); });
+    WG.Engine.on('boss:defeated',   ()         => _a11yAnnounce('Boss defeated'));
+    WG.Engine.on('player:died',     ()         => _a11yAnnounce('You died'));
+    WG.Engine.on('player:level',    ({ level }) => _a11yAnnounce('Level up — level ' + level));
+    WG.Engine.on('wave:advanced',   ({ index, total }) => _a11yAnnounce('Wave ' + index + ' of ' + total));
+    WG.Engine.on('hunt:stage-cleared', ()      => _a11yAnnounce('Stage cleared'));
 
     // Boss fragments: decrement _fragmentsAlive; when 0 the boss's immunity drops
     // and it is finished via a direct hp=0 + boss:defeated emit.
@@ -1948,5 +2016,5 @@
     rafId = 0;
   }
 
-  window.WG.Game = { init, start, stop, switchTab, startHunt, startTowerRun, exitHunt, syncTopStrip, getHuntRuntime, flashScreen };
+  window.WG.Game = { init, start, stop, switchTab, startHunt, startTowerRun, startCaptureHillRun, exitHunt, syncTopStrip, getHuntRuntime, flashScreen };
 })();
