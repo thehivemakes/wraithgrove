@@ -1,4 +1,4 @@
-// WG.RelicsCatalog — 48 relics across 5 rarity tiers (original IP)
+// WG.RelicsCatalog — 66 relics across 5 rarity tiers (original IP)
 (function(){'use strict';
   // Generated catalog. All names are original to Wraithgrove.
   // Stat conventions:
@@ -48,7 +48,7 @@
     { id:'r_vermilionbrush',  name:'Vermilion Brush',  tier:'rare',   icon:'🖌', stat:'gatherRate', value: 0.05 },
     { id:'r_crowplume',       name:'Crow Plume',       tier:'rare',   icon:'🪶', stat:'critRate',   value: 0.025 },
 
-    // Epic (12)
+    // Epic (18)
     { id:'r_stargazer',  name:'Stargazer',        tier:'epic',   icon:'⭐', stat:'attack',     value: 20 },
     { id:'r_blackthorn', name:'Blackthorn',       tier:'epic',   icon:'🌑', stat:'attack',     value: 17 },
     { id:'r_mournlock',  name:'Mournlock',        tier:'epic',   icon:'🔒', stat:'defense',    value: 14 },
@@ -61,8 +61,15 @@
     { id:'r_lichensigil',name:'Lichen Sigil',     tier:'epic',   icon:'🌀', stat:'hpMax',      value: 95 },
     { id:'r_ravenknot',  name:'Raven Knot',       tier:'epic',   icon:'🪡', stat:'attack',     value: 22 },
     { id:'r_dustcrown',  name:'Dust Crown',       tier:'epic',   icon:'👑', stat:'critRate',   value: 0.06 },
+    // Epic additions — W-Relics-Catalog-Expand
+    { id:'r_inkwyrm',      name:'Ink Wyrm',       tier:'epic', icon:'✒', stat:'attack',     value: 20,    powerValue: 320, effect:'+20 atk; kills leave an ink cloud slowing nearby enemies 20% for 2s',              lore:'Brewed from the bile of a transcription spirit. What it writes, bleeds.' },
+    { id:'r_porcelainhand',name:'Porcelain Hand', tier:'epic', icon:'🏺', stat:'hpMax',      value: 75,    powerValue: 255, effect:'+75 hp; first kill per stage restores 12% max HP',                                lore:"Taken from a burial effigy whose fingers wouldn't stop moving." },
+    { id:'r_rustpendulum', name:'Rust Pendulum',  tier:'epic', icon:'⏳', stat:'defense',    value: 14,    powerValue: 215, effect:'+14 def; after taking a hit, defense increases 60% for 2s',                       lore:'It still swings. No one wound it.' },
+    { id:'r_ashveil',      name:'Ash Veil',       tier:'epic', icon:'💨', stat:'critRate',   value: 0.055, powerValue: 285, effect:'+5.5% crit; crits apply 2s ash mark reducing target defense by 8',                lore:"Ash from a cremation that wasn't finished. The warmth never left it." },
+    { id:'r_ironmantis',   name:'Iron Mantis',    tier:'epic', icon:'🦗', stat:'attack',     value: 18,    powerValue: 335, effect:'+18 atk; first strike each stage deals double damage',                            lore:'The mantis waits. Its patience is itself a weapon.' },
+    { id:'r_whitejoss',    name:'White Joss',     tier:'epic', icon:'🕯', stat:'gatherRate', value: 0.13,  powerValue: 240, effect:'+13% gather; 15% chance on wood collect to drop a spirit fragment (+5% gather 8s)', lore:'Burned in place of a name. The name finds its way back.' },
 
-    // Legendary (8) + 1 special progression key
+    // Legendary (16) + 1 special progression key
     { id:'r_moonshear',  name:'Moonshear',        tier:'legendary', icon:'🌙', stat:'attack',     value: 38 },
     { id:'r_souldrift',  name:'Souldrift',        tier:'legendary', icon:'💫', stat:'critRate',   value: 0.12 },
     { id:'r_marrowveil', name:'Marrowveil',       tier:'legendary', icon:'🌫', stat:'hpMax',      value: 230 },
@@ -71,17 +78,31 @@
     { id:'r_silentbell', name:'Silent Bell',      tier:'legendary', icon:'🪘', stat:'gatherRate', value: 0.30 },
     { id:'r_ashtongue',  name:'Ash Tongue',       tier:'legendary', icon:'🔥', stat:'attack',     value: 55 },
     { id:'r_hollowmark', name:'Hollow Mark',      tier:'legendary', icon:'⚜', stat:'critRate',   value: 0.14 },
+    // Legendary additions — W-Relics-Catalog-Expand
+    { id:'r_mourningbell', name:'Mourning Bell',  tier:'legendary', icon:'🛎', stat:'attack',     value: 45,   stat2:'critRate',   value2: 0.11, powerValue: 780,  effect:'+45 atk, +11% crit; 3 kills within 4s rings bell granting +30% atk for 5s',                  lore:'Cast from a cracked temple bell. Still rings the note no living ear hears.' },
+    { id:'r_bloodquill',   name:'Blood Quill',    tier:'legendary', icon:'🩸', stat:'attack',     value: 40,   stat2:'hpMax',      value2: 180,  powerValue: 720,  effect:'+40 atk, +180 hp; 8% of damage dealt restores HP (lifesteal)',                              lore:"Used to sign contracts the living shouldn't have signed. Both parties bled." },
+    { id:'r_cinerroot',    name:'Ciner Root',     tier:'legendary', icon:'☘', stat:'defense',    value: 32,   stat2:'hpMax',      value2: 200,  powerValue: 650,  effect:'+32 def, +200 hp; below 30% HP, all incoming damage is halved',                            lore:'Grows only above sealed tombs. It feeds on the stillness inside.' },
+    { id:'r_hangingthread',name:'Hanging Thread', tier:'legendary', icon:'🧶', stat:'gatherRate', value: 0.30, stat2:'attack',     value2: 38,   powerValue: 680,  effect:'+30% gather, +38 atk; enemy kills drop red thread (+5% gather 10s, stacks x3)',            lore:'Cut from the burial shroud of a weaver who refused to stop. Thread still warm.' },
+    { id:'r_emberpaper',   name:'Ember Paper',    tier:'legendary', icon:'📄', stat:'critRate',   value: 0.13, stat2:'attack',     value2: 42,   powerValue: 800,  effect:'+13% crit, +42 atk; crit kills create fire sigil — first enemy inside burns 4s (15% HP)',  lore:"Folded by a monk who prayed for destruction. The fire wasn't a surprise to anyone who knew him." },
+    { id:'r_stonepalm',    name:'Stone Palm',     tier:'legendary', icon:'🖐', stat:'defense',    value: 36,   stat2:'critRate',   value2: 0.10, powerValue: 700,  effect:'+36 def, +10% crit; killing an attacker before their blow lands grants +20% crit for 5s',  lore:'The hand preserved in lime mortar. Open and waiting.' },
+    { id:'r_foxmantle',    name:'Fox Mantle',     tier:'legendary', icon:'🌠', stat:'attack',     value: 50,   stat2:'gatherRate', value2: 0.25, powerValue: 900,  effect:'+50 atk, +25% gather; once per stage at <40% HP, gain +35% speed and intangibility 6s',    lore:'Nine tails, one intention. She left it behind willingly — which was the frightening part.' },
+    { id:'r_ashneedle',    name:'Ash Needle',     tier:'legendary', icon:'⚡', stat:'hpMax',      value: 215,  stat2:'critRate',   value2: 0.13, powerValue: 850,  effect:'+215 hp, +13% crit; every 15th crit, next strike pierces through all enemies in a line',    lore:'The seamstress used it to sew shrouds. Stopped counting after the first thousand.' },
     // Rift Sigil — progression key only; no combat stat; not equippable.
     // Drops from eldritch boss (stage 18 guaranteed) + 1% per eldritch stage clear.
     // 3 collected → unlock next Rift Guest slot in Ascend tab.
     // Icon: violet sigil 24×24 canvas draw — deferred to render worker.
     { id:'rift_sigil', name:'Rift Sigil', tier:'legendary', icon:'🔮', stat:null, value:0, equippable:false },
 
-    // Mythic (4)
+    // Mythic (8)
     { id:'r_wraithheart',name:'Wraithheart',      tier:'mythic', icon:'💜', stat:'attack',     value: 135 },
     { id:'r_voidlantern',name:'Void Lantern',     tier:'mythic', icon:'🪔', stat:'hpMax',      value: 800 },
     { id:'r_starpyre',   name:'Starpyre',         tier:'mythic', icon:'☄', stat:'critRate',   value: 0.30 },
     { id:'r_nightclasp', name:'Nightclasp',       tier:'mythic', icon:'🪙', stat:'defense',    value: 103 },
+    // Mythic additions — W-Relics-Catalog-Expand
+    { id:'r_riverbone',   name:'River Bone',      tier:'mythic', icon:'🌊', stat:'attack',     value: 140,  stat2:'defense',  value2: 95,   powerValue: 1800, effect:'+140 atk, +95 def; once per run, when HP reaches 0, survive at 1 HP and gain 5s invulnerability', lore:'Pulled from the deepest ford where the drowned linger longest. It carries the weight of every uncompleted crossing.' },
+    { id:'r_silkspecter', name:'Silk Specter',    tier:'mythic', icon:'👻', stat:'critRate',   value: 0.28, stat2:'attack',   value2: 120,  powerValue: 2100, effect:'+28% crit, +120 atk; every 25s a spectral duplicate fights for you for 8s inheriting your stats',     lore:'The shroud remembers the body. The body is gone. The shroud stayed.' },
+    { id:'r_jademourn',   name:'Jade Mourn',      tier:'mythic', icon:'💠', stat:'hpMax',      value: 750,  stat2:'defense',  value2: 100,  powerValue: 2400, effect:'+750 hp, +100 def; regenerate 1% max HP every 3s; rate doubles during first 30s of each stage',      lore:"Carved by a physician who refused to accept the deaths of his patients. The jade outlasted all of them." },
+    { id:'r_eyeofwinter', name:'Eye of Winter',   tier:'mythic', icon:'❄', stat:'attack',     value: 150,  stat2:'critRate', value2: 0.30, powerValue: 2700, effect:'+150 atk, +30% crit; once per stage on first crit, all enemies move at half speed for 4s',           lore:'Found in the socket of a statue that had watched the valley for four hundred years. Still warm when removed.' },
   ];
 
   function byId(id) { return RELICS.find(r => r.id === id); }
