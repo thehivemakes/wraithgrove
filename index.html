@@ -382,7 +382,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Unlimited Chaos', version: '0.34.0-alliance-foundation-1778239155', built: '2026-05-08', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Unlimited Chaos', version: '0.35.0-mode1-base-raid-1778242800', built: '2026-05-08', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -468,7 +468,9 @@
       'js/meta/meta-alliance.js',
       'js/meta/meta-alliance-chat.js',
       'js/meta/meta-alliance-missions.js',
+      'js/meta/meta-alliance-boss.js',
       'js/meta/meta-alliance-render.js',
+      'js/raid/raid-boss-attack.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
       'js/hunt/hunt-enemies.js',
@@ -504,6 +506,11 @@
       'js/duel/duel-roster.js',
       'js/duel/duel-rank.js',
       'js/duel/duel-render.js',
+      'js/raid/raid-defenses.js',
+      'js/raid/raid-layout-editor.js',
+      'js/raid/raid-layout-render.js',
+      'js/raid/raid-sim.js',
+      'js/raid/raid-prep-render.js',
       'js/wg-game.js',
     ];
     function loadOne(src) {

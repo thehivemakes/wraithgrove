@@ -8,6 +8,8 @@
   let huntRuntime = null;
   // SPEC §0 — Day/Night mode chosen on lobby level select; persists across panel rerenders
   let currentLevelMode = 'day';
+  // W-Mode1-Base-Raid-Foundation — Hunt-tab content mode: 'solo' | 'raid'
+  let huntMode = 'solo';
   // W-Stage-Zero-Tutorial — set when stage 0 is cleared; consumed in exitHunt to trigger tabs reveal
   let _stage0JustCleared = false;
 
@@ -983,6 +985,42 @@
     select.style.cssText = 'position:absolute;inset:36px 0 0 0;padding:8px 14px 16px 14px;background:#0c0a08;z-index:10;display:flex;flex-direction:column;';
     root.appendChild(select);
 
+    // ─── W-Mode1-Base-Raid-Foundation: SUPER OBVIOUS mode toggle pill ───────
+    const modeToggleBar = document.createElement('div');
+    modeToggleBar.style.cssText = 'display:flex;margin-bottom:10px;border-radius:28px;overflow:hidden;border:2px solid ' + (huntMode === 'raid' ? '#a040e0' : '#e08030') + ';box-shadow:0 0 12px ' + (huntMode === 'raid' ? 'rgba(160,40,220,0.5)' : 'rgba(220,120,40,0.5)') + ';transition:border-color 200ms,box-shadow 200ms;';
+
+    function _modeHalf(label, mode) {
+      const isActive = huntMode === mode;
+      const isRaid   = mode === 'raid';
+      const btn = document.createElement('button');
+      btn.style.cssText = 'flex:1;padding:13px 8px;font-size:13px;font-weight:800;letter-spacing:2px;border:none;cursor:pointer;transition:background 200ms,color 200ms;background:' + (isActive ? (isRaid ? 'linear-gradient(to right,#5a10b0,#3a0890)' : 'linear-gradient(to right,#d05010,#902810)') : '#14100a') + ';color:' + (isActive ? (isRaid ? '#e0b0ff' : '#fff8e0') : '#4a3828') + ';';
+      btn.textContent = label;
+      btn.addEventListener('click', function() {
+        if (huntMode === mode) return;
+        huntMode = mode;
+        showHuntStageList();
+      });
+      return btn;
+    }
+
+    modeToggleBar.appendChild(_modeHalf('⚔ SOLO HUNT', 'solo'));
+    modeToggleBar.appendChild(_modeHalf('⚔ RAID BASE', 'raid'));
+    select.appendChild(modeToggleBar);
+
+    // In RAID mode: delegate to raid prep screen and return early
+    if (huntMode === 'raid') {
+      if (window.WG && WG.RaidPrepRender) {
+        WG.RaidPrepRender.show(select, function() { huntMode = 'solo'; showHuntStageList(); });
+      } else {
+        const ph = document.createElement('div');
+        ph.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;color:#7a5888;font-size:13px;letter-spacing:2px;';
+        ph.textContent = 'RAID PREP — Loading…';
+        select.appendChild(ph);
+      }
+      return;
+    }
+    // ─── End mode toggle ───────────────────────────────────────────────────
+
     // Architect 2026-05-06 hotfix: Stage 0 is the tutorial pre-stage — auto-launched
     // on first boot only. It's never shown in the carousel. Otherwise it appeared as
     // a locked tile (no stage -1 exists for the unlock check) and players with existing
@@ -1737,10 +1775,15 @@
     if (WG.DailyRewards && WG.DailyRewards.init) WG.DailyRewards.init();
     // W-Event-System-Scaffold — apply event buffs + register active missions
     if (WG.LtdEvents && WG.LtdEvents.init) WG.LtdEvents.init();
+    // W-Mode1-Base-Raid-Foundation — raid modules (no explicit init needed; RaidLayout reads state lazily)
+    // RaidDefenses, RaidLayout, RaidLayoutRender, RaidSim, RaidPrepRender are self-contained.
     // W-Alliance-Foundation — after cache load so saved alliance state is restored
     if (WG.Alliance && WG.Alliance.init) WG.Alliance.init();
     if (WG.AllianceChat && WG.AllianceChat.init) WG.AllianceChat.init();
     if (WG.AllianceMissions && WG.AllianceMissions.init) WG.AllianceMissions.init();
+    // W-Mode5-Alliance-Boss — init after Alliance so member count is available
+    if (WG.AllianceBoss && WG.AllianceBoss.init) WG.AllianceBoss.init();
+    if (WG.RaidBossAttack && WG.RaidBossAttack.init) WG.RaidBossAttack.init();
     if (WG.AllianceRender && WG.AllianceRender.init) WG.AllianceRender.init();
     // Fire daily:reset now — state is loaded + all listeners registered
     if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();

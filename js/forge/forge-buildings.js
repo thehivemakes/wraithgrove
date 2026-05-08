@@ -41,6 +41,7 @@
     bow_range:      { name: 'Bow Range',      icon: '🏹', category: 'C', desc: 'Archer regiments for raids' },
     barracks:       { name: 'Barracks',       icon: '⚔', category: 'C', desc: 'Footmen squads — tank role in raids' },
     wall_workshop:  { name: 'Wall Workshop',  icon: '🪵', category: 'C', desc: 'Wall segments for base defense layout' },
+    trap_workshop:  { name: 'Trap Workshop',  icon: '🪤', category: 'C', desc: 'Trap arsenal for base defense (6 active types)' },
   });
 
   const MAX_LEVEL = 20;
@@ -116,13 +117,21 @@
     return 14;
   }
 
+  // Trap Workshop: trap stock cap. L1=4, L10=6, L20=8.
+  function trapCountAt(level) {
+    if (level < 10) return 4;
+    if (level < 20) return 6;
+    return 8;
+  }
+
   // Refill interval (ms) per unit for each C-category building.
   function refillIntervalMs(id) {
     switch (id) {
       case 'cannon_battery': return 30 * 60 * 1000;      // 30 min per shot
       case 'bow_range':      return 4 * 60 * 60 * 1000;  // 4h per squad
       case 'barracks':       return 4 * 60 * 60 * 1000;  // 4h per squad
-      case 'wall_workshop':  return 90 * 60 * 1000;       // 90 min per wall segment
+      case 'wall_workshop':  return 90 * 60 * 1000;        // 90 min per wall segment
+      case 'trap_workshop':  return 60 * 60 * 1000;        // 60 min per trap
       default: return 0;
     }
   }
@@ -293,6 +302,29 @@
         f.nextRefillAt.walls = now;
       }
     }
+
+    // Trap Workshop: 1 trap per 60 min up to trapCountAt(level).
+    const trapB = bl.find(b => b.id === 'trap_workshop');
+    if (trapB) {
+      if (!f.stocks.trap_stocks) f.stocks.trap_stocks = [];
+      const cap = trapCountAt(trapB.level);
+      if (f.stocks.trap_stocks.length < cap) {
+        const iMs  = refillIntervalMs('trap_workshop');
+        const last = f.nextRefillAt.trap_stocks || now;
+        if (now > last) {
+          const trapIds = ['pressure_spike', 'paper_charm', 'sigil_snare', 'echo_ringer', 'wraith_mist', 'falling_lantern'];
+          const count = Math.min(Math.floor((now - last) / iMs), cap - f.stocks.trap_stocks.length);
+          if (count > 0) {
+            for (let i = 0; i < count; i++) {
+              f.stocks.trap_stocks.push(trapIds[f.stocks.trap_stocks.length % trapIds.length]);
+            }
+            f.nextRefillAt.trap_stocks = last + count * iMs;
+          }
+        }
+      } else {
+        f.nextRefillAt.trap_stocks = now;
+      }
+    }
   }
 
   // ── WOOD + STONE (relic crafting resources — unchanged) ───────────────────
@@ -389,7 +421,7 @@
     anvilScrollsAt, shotCapAt,
     archerCountAt, archerCaptainsAt,
     footmanCountAt, footmanCaptainsAt,
-    wallCountAt, refillIntervalMs,
+    wallCountAt, trapCountAt, refillIntervalMs,
     unlocksAt, availableProjectilesAt, availableEnchantmentsAt,
     // actions
     tryUpgrade, upgradeCost, collectMine, applyEnchantment,
