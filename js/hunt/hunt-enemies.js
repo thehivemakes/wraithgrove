@@ -89,7 +89,7 @@
   // in PIVOT_REPORT §4). Applied at spawn time only; does NOT affect Tower Gauntlet or bosses.
   const GOD_WINDOW = Object.freeze({
     DURATION_SEC: 60,
-    START_MULT:   0.60,
+    START_MULT:   0.40, // W-Balance-Flags-Action: was 0.60 (reason: at player level 6+ elite enemies still take 6–9 hits at window start — power fantasy lost. 0.40 makes elites take 4–5 hits, genuinely easy, then ramp to 12–15 by second 60)
     END_MULT:     1.00,
     EASE:         'cubic-out',
   });

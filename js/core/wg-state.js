@@ -8,8 +8,8 @@
     STAGE_COST:          5,
     WIN_REFUND:          3,
     LOSS_REFUND:         0,       // competence treadmill — no loss refund
-    LOGIN_BONUS:         20,
-    STREAK_7_BONUS:      50,
+    LOGIN_BONUS:         500, // W-Balance-Flags-Action: was 20 energy (reason: energy bonus wasted at 30-cap; daily player wakes to full energy — bonus silently discarded. 500 coins maps to first-stage upgrade cost and is immediately visible)
+    STREAK_7_BONUS:      30,  // W-Balance-Flags-Action: was 50 energy (reason: same overflow problem; 30 💎 is meaningful and non-overflowable)
     FIRST_CLEAR_BONUS:   10,
   });
 

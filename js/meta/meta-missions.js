@@ -2,25 +2,39 @@
 // W-Monetization-V2-Missions-Pass Concerns A (daily) + B (weekly) + C (UI) + F (events)
 (function(){'use strict';
 
-  // ─── Concern A: Daily missions catalog ────────────────────────────────────
+  // ─── Concern A: Daily missions catalog (20 entries, W-Daily-Mission-Expand) ─
   const DAILY_MISSIONS = [
-    { id: 'kill_30',        desc: 'Kill 30 enemies',           target: 30,  reward: { coins: 100,  diamonds: 5 } },
-    { id: 'kill_100',       desc: 'Kill 100 enemies',          target: 100, reward: { coins: 300,  energy: 10 } },
-    { id: 'clear_2_stages', desc: 'Clear 2 Hunt stages',       target: 2,   reward: { diamonds: 10 } },
-    { id: 'clear_5_stages', desc: 'Clear 5 Hunt stages',       target: 5,   reward: { coins: 500,  diamonds: 15 } },
-    { id: 'tower_floor_5',  desc: 'Reach Tower floor 5',       target: 5,   reward: { diamonds: 20, frags: 5 } },
-    { id: 'win_3_duels',    desc: 'Win 3 Duel matches',        target: 3,   reward: { coins: 200,  diamonds: 8 } },
-    { id: 'craft_1',        desc: 'Craft 1 building',          target: 1,   reward: { coins: 150 } },
-    { id: 'pull_relic',     desc: 'Pull 1 relic',              target: 1,   reward: { frags: 10 } },
-    { id: 'pickup_50_orbs', desc: 'Pick up 50 orbs',           target: 50,  reward: { coins: 100,  energy: 5 } },
-    { id: 'crit_10',        desc: 'Land 10 critical hits',     target: 10,  reward: { diamonds: 5 } },
-    { id: 'combo_15',       desc: 'Reach 15-kill combo',       target: 15,  reward: { coins: 200,  diamonds: 10 } },
-    { id: 'level_up',       desc: 'Level up 1 character',      target: 1,   reward: { coins: 100 } },
-    { id: 'buff_ad_watch',  desc: 'Watch 1 buff ad',           target: 1,   reward: { diamonds: 5 } },
+    // ── Easy (12) — reward: 200 coins ───────────────────────────────────────
+    { id: 'kill_30',           desc: 'Kill 30 enemies in Hunt',              target: 30,  tier: 'easy',     reward: { coins: 200 } },
+    { id: 'clear_2_stages',    desc: 'Clear 2 Hunt stages today',            target: 2,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'win_3_duels',       desc: 'Win 3 Duel matches today',             target: 3,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'craft_1',           desc: 'Upgrade 1 Forge building today',       target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'pickup_50_orbs',    desc: 'Pick up 50 orbs in Hunt',              target: 50,  tier: 'easy',     reward: { coins: 200 } },
+    { id: 'crit_10',           desc: 'Land 10 critical hits in Hunt',        target: 10,  tier: 'easy',     reward: { coins: 200 } },
+    { id: 'level_up',          desc: 'Level up 1 character in Ascend',       target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'buff_ad_watch',     desc: 'Watch 1 buff ad for a boost',          target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'forge_gold_mine',   desc: 'Tap-collect from the Gold Mine',       target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'send_gifts_3',      desc: 'Send 3 gifts to alliance members',     target: 3,   tier: 'easy',     reward: { coins: 200 } },
+    { id: 'pickup_coins_200',  desc: 'Collect 200 coins during Hunt runs',   target: 200, tier: 'easy',     reward: { coins: 200 } },
+    { id: 'claim_daily_login', desc: 'Claim your daily login reward today',  target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    // ── Standard (5) — reward: 500 coins + 5 diamonds ───────────────────────
+    { id: 'kill_100',          desc: 'Kill 100 enemies in Hunt today',       target: 100, tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    { id: 'clear_5_stages',    desc: 'Clear 5 Hunt stages today',            target: 5,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    { id: 'tower_floor_5',     desc: 'Reach Tower floor 5 today',            target: 5,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    { id: 'pull_relic',        desc: 'Pull 1 relic from the Forge today',    target: 1,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    { id: 'tower_climb_5',     desc: 'Reach Tower floor 5 in a single run', target: 1,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    // ── Hard (3) — reward: 1500 coins + 20 diamonds + 1 fragment ────────────
+    { id: 'combo_15',          desc: 'Land a 15-kill combo in Hunt',         target: 15,  tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
+    { id: 'boss_defeated_1',   desc: 'Defeat 1 boss in Hunt today',          target: 1,   tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
+    { id: 'tower_peak',        desc: 'Beat your Tower personal record today',target: 1,   tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
   ];
 
   const TUNABLES = Object.freeze({
-    DAILY_PICK_COUNT: 5,
+    DAILY_PICK_COUNT: 5,  // total per day (3 easy + 1 standard + 1 hard)
+    EASY_PER_DAY: 3,
+    STANDARD_PER_DAY: 1,
+    HARD_PER_DAY: 1,
+    NO_REPEAT_WINDOW: 4, // days before a mission may recur
   });
 
   // Dynamic event missions — populated by WG.LtdEvents via setEventMissions()
@@ -52,17 +66,45 @@
     return n;
   }
 
-  function _pickDailySet(dateStr, userId) {
-    const seed = _dateToSeed(dateStr) ^ _dateToSeed(String(userId || 'anon'));
-    const rng = _seededRng(seed);
-    const pool = DAILY_MISSIONS.slice();
-    const picks = [];
-    for (let i = 0; i < TUNABLES.DAILY_PICK_COUNT; i++) {
-      const j = i + Math.floor(rng() * (pool.length - i));
-      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
-      picks.push(pool[i].id);
+  // Pick n missions from a tier pool, excluding missions seen in the previous
+  // NO_REPEAT_WINDOW-1 days. Falls back to unrestricted pick if pool is too small.
+  function _pickFromTier(tierPool, n, epochDay, uid, tierOffset) {
+    var excluded = {};
+    for (var d = 1; d < TUNABLES.NO_REPEAT_WINDOW; d++) {
+      var pSeed = _dateToSeed(String(epochDay - d)) ^ _dateToSeed(uid) ^ tierOffset;
+      var pRng  = _seededRng(pSeed);
+      var pArr  = tierPool.slice();
+      for (var pi = 0; pi < n && pi < pArr.length; pi++) {
+        var pj   = pi + Math.floor(pRng() * (pArr.length - pi));
+        var ptmp = pArr[pi]; pArr[pi] = pArr[pj]; pArr[pj] = ptmp;
+        excluded[pArr[pi].id] = true;
+      }
+    }
+    var available = tierPool.filter(function(m) { return !excluded[m.id]; });
+    var src  = (available.length >= n) ? available : tierPool;
+    var seed = _dateToSeed(String(epochDay)) ^ _dateToSeed(uid) ^ tierOffset;
+    var rng  = _seededRng(seed);
+    var arr  = src.slice();
+    var picks = [];
+    for (var i = 0; i < n && i < arr.length; i++) {
+      var j   = i + Math.floor(rng() * (arr.length - i));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      picks.push(arr[i].id);
     }
     return picks;
+  }
+
+  function _pickDailySet(dateStr, userId) {
+    var uid      = String(userId || 'anon');
+    var epochDay = Math.floor(new Date(dateStr).getTime() / 86400000);
+    var easy     = DAILY_MISSIONS.filter(function(m) { return m.tier === 'easy'; });
+    var standard = DAILY_MISSIONS.filter(function(m) { return m.tier === 'standard'; });
+    var hard     = DAILY_MISSIONS.filter(function(m) { return m.tier === 'hard'; });
+    return [].concat(
+      _pickFromTier(easy,     TUNABLES.EASY_PER_DAY,     epochDay, uid, 0),
+      _pickFromTier(standard, TUNABLES.STANDARD_PER_DAY, epochDay, uid, 1000000),
+      _pickFromTier(hard,     TUNABLES.HARD_PER_DAY,     epochDay, uid, 2000000)
+    );
   }
 
   function _weekStartStr(now) {
@@ -284,9 +326,36 @@
       }
     });
 
-    // Boss defeated → BP XP
+    // Boss defeated → mission + BP XP
     eng.on('boss:defeated', function() {
+      increment('boss_defeated_1', 1);
       if (WG.BattlePass && WG.BattlePass.addXP) WG.BattlePass.addXP(100, 'boss-defeated');
+    });
+
+    // Tower run end → floor-5-in-one-run + personal-record missions
+    eng.on('tower:run-end', function(e) {
+      if (e && e.floor >= 5) increment('tower_climb_5', 1);
+      if (e && e.isNewRecord) increment('tower_peak', 1);
+    });
+
+    // Gold Mine collect
+    eng.on('forge:mine-collected', function() {
+      increment('forge_gold_mine', 1);
+    });
+
+    // Alliance gift sent
+    eng.on('alliance:gift-sent', function() {
+      increment('send_gifts_3', 1);
+    });
+
+    // Coin pickup in Hunt
+    eng.on('pickup:coin', function() {
+      increment('pickup_coins_200', 1);
+    });
+
+    // Daily login reward claimed
+    eng.on('daily:claimed', function() {
+      increment('claim_daily_login', 1);
     });
 
     // Daily reset — refresh missions for the new day; also check weekly
@@ -304,6 +373,11 @@
       tower_floor_5: '🗼', win_3_duels: '🥊', craft_1: '🔨', pull_relic: '💎',
       pickup_50_orbs: '🔮', crit_10: '💥', combo_15: '🔥', level_up: '🎯',
       buff_ad_watch: '📺',
+      // W-Daily-Mission-Expand new entries
+      forge_gold_mine: '⛏', send_gifts_3: '🎁', pickup_coins_200: '🪙',
+      claim_daily_login: '📅', tower_climb_5: '🗼', boss_defeated_1: '💀',
+      tower_peak: '🏔',
+      // weekly
       wk_kill_500: '⚔', wk_clear_15_stages: '🏆',
       wk_tower_floor_15: '🗼', wk_duel_wins_15: '🥊', wk_chests_50: '📦',
     };

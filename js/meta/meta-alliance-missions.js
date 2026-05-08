@@ -1,57 +1,86 @@
-// WG.AllianceMissions — 5 daily alliance missions, gift system, points-spend modal
+// WG.AllianceMissions — 12-pool daily alliance missions, 5 picked per day (W-Daily-Mission-Expand)
 (function(){'use strict';
 
-  // 5 daily missions (Architect-locked)
+  // Full pool of 12 alliance missions (W-Daily-Mission-Expand Concern C)
   const DAILY_MISSIONS = Object.freeze([
-    {
-      id:     'stages_30',
-      label:  'Members complete 30 Hunt stages today',
-      goal:   30,
-      reward: 5,  // alliance points
-    },
-    {
-      id:     'boss_100k',
-      label:  'Alliance damages boss for 100K total',
-      goal:   100000,
-      reward: 5,
-    },
-    {
-      id:     'members_login_5',
-      label:  '5 members log in today',
-      goal:   5,
-      reward: 5,
-    },
-    {
-      id:     'raids_win_2',
-      label:  'Win 2 base raids together',
-      goal:   2,
-      reward: 5,
-    },
-    {
-      id:     'gifts_10',
-      label:  'Send 10 gifts among members',
-      goal:   10,
-      reward: 5,
-    },
+    // original 5
+    { id: 'stages_30',        label: 'Members complete 30 Hunt stages',         goal: 30,     reward: 5 },
+    { id: 'boss_100k',        label: 'Alliance deals 100K damage to the boss',   goal: 100000, reward: 5 },
+    { id: 'members_login_5',  label: '5 members log in today',                   goal: 5,      reward: 5 },
+    { id: 'raids_win_2',      label: 'Win 2 base raids together',                goal: 2,      reward: 5 },
+    { id: 'gifts_10',         label: 'Send 10 gifts among members',              goal: 10,     reward: 5 },
+    // 7 new additions
+    { id: 'kills_500',        label: 'Members collectively kill 500 enemies',    goal: 500,    reward: 5 },
+    { id: 'tower_floors_30',  label: 'Members climb 30 Tower floors combined',   goal: 30,     reward: 5 },
+    { id: 'boss_150k',        label: 'Alliance deals 150K damage to the boss',   goal: 150000, reward: 8 },
+    { id: 'gifts_25',         label: 'Send 25 gifts among members',              goal: 25,     reward: 8 },
+    { id: 'members_login_10', label: '10 members log in today',                  goal: 10,     reward: 8 },
+    { id: 'raids_win_5',      label: 'Win 5 base raids together',                goal: 5,      reward: 8 },
+    { id: 'applications_3',   label: 'Accept 3 new alliance applications',       goal: 3,      reward: 5 },
   ]);
 
-  function _ensureState() {
+  const ACTIVE_COUNT = 5; // missions shown per day
+
+  // ─── Seeded daily picker ──────────────────────────────────────────────────
+  function _dateToSeed(str) {
+    var n = 0;
+    for (var i = 0; i < str.length; i++) n = (n * 31 + str.charCodeAt(i)) | 0;
+    return n;
+  }
+
+  function _seededRng(seed) {
+    var s = seed | 0;
+    return function() {
+      s = (s ^ (s << 13)) | 0;
+      s = (s ^ (s >>> 17)) | 0;
+      s = (s ^ (s << 5))  | 0;
+      return (s >>> 0) / 0xFFFFFFFF;
+    };
+  }
+
+  function _activeMissionIds(dateStr) {
+    if (!dateStr) dateStr = new Date().toISOString().slice(0, 10);
+    var rng  = _seededRng(_dateToSeed(dateStr));
+    var pool = DAILY_MISSIONS.slice();
+    var ids  = [];
+    for (var i = 0; i < ACTIVE_COUNT; i++) {
+      var j = i + Math.floor(rng() * (pool.length - i));
+      var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      ids.push(pool[i].id);
+    }
+    return ids;
+  }
+
+  function _todayStr() {
+    return window.WG && WG.MetaDailyReset ? WG.MetaDailyReset.todayStr()
+                                           : new Date().toISOString().slice(0, 10);
+  }
+
+  function _ensureState(dateStr) {
     const a = window.WG && WG.Alliance && WG.Alliance.get();
     if (!a) return null;
     if (!a.dailyMissionState) a.dailyMissionState = {};
-    DAILY_MISSIONS.forEach(function(m) {
-      if (!a.dailyMissionState[m.id]) {
-        a.dailyMissionState[m.id] = { progress: 0, claimed: false };
+    const ids = _activeMissionIds(dateStr || _todayStr());
+    ids.forEach(function(id) {
+      if (!a.dailyMissionState[id]) {
+        a.dailyMissionState[id] = { progress: 0, claimed: false };
       }
     });
     return a.dailyMissionState;
   }
 
+  function _activeMissionDefs(dateStr) {
+    const ids = _activeMissionIds(dateStr || _todayStr());
+    return ids.map(function(id) {
+      return DAILY_MISSIONS.find(function(m) { return m.id === id; });
+    }).filter(Boolean);
+  }
+
   function progress() {
     const ms = _ensureState();
     if (!ms) return [];
-    return DAILY_MISSIONS.map(function(m) {
-      const st = ms[m.id];
+    return _activeMissionDefs().map(function(m) {
+      const st = ms[m.id] || { progress: 0, claimed: false };
       return Object.assign({}, m, {
         progress: st.progress,
         claimed:  st.claimed,
@@ -62,7 +91,7 @@
 
   function increment(missionId, amount) {
     const ms = _ensureState();
-    if (!ms || !ms[missionId]) return;
+    if (!ms || !ms[missionId]) return; // not in today's active set
     const m = DAILY_MISSIONS.find(function(d){ return d.id === missionId; });
     if (!m) return;
     if (ms[missionId].claimed) return;
@@ -89,8 +118,9 @@
     const ms = _ensureState();
     if (!ms) return [];
     const claimed = [];
-    DAILY_MISSIONS.forEach(function(m) {
-      if (!ms[m.id].claimed && ms[m.id].progress >= m.goal) {
+    _activeMissionDefs().forEach(function(m) {
+      const st = ms[m.id];
+      if (st && !st.claimed && st.progress >= m.goal) {
         const r = claim(m.id);
         if (r.ok) claimed.push(m.id);
       }
@@ -99,109 +129,30 @@
   }
 
   function dailyReset() {
-    const ms = _ensureState();
-    if (!ms) return;
-    DAILY_MISSIONS.forEach(function(m) {
-      ms[m.id] = { progress: 0, claimed: false };
-    });
-    // Seed NPC-contributed progress so missions feel active at reset
-    if (ms['stages_30'])     ms['stages_30'].progress    = Math.floor(Math.random() * 8) + 4;
-    if (ms['members_login_5']) ms['members_login_5'].progress = 3; // 3 NPCs already "logged in"
-    if (ms['gifts_10'])      ms['gifts_10'].progress     = Math.floor(Math.random() * 3) + 1;
+    const a = window.WG && WG.Alliance && WG.Alliance.get();
+    if (!a) return;
+    // Clear all prior mission state, then initialise today's active 5
+    a.dailyMissionState = {};
+    const today = _todayStr();
+    _ensureState(today);
+    const ms = a.dailyMissionState;
+    // Seed NPC-contributed progress so today's missions feel active at reset
+    if (ms['stages_30'])        ms['stages_30'].progress        = Math.floor(Math.random() * 8) + 4;
+    if (ms['kills_500'])        ms['kills_500'].progress        = Math.floor(Math.random() * 80) + 20;
+    if (ms['tower_floors_30'])  ms['tower_floors_30'].progress  = Math.floor(Math.random() * 8) + 2;
+    if (ms['members_login_5'])  ms['members_login_5'].progress  = 3;
+    if (ms['members_login_10']) ms['members_login_10'].progress = 3;
+    if (ms['gifts_10'])         ms['gifts_10'].progress         = Math.floor(Math.random() * 3) + 1;
+    if (ms['gifts_25'])         ms['gifts_25'].progress         = Math.floor(Math.random() * 3) + 1;
     WG.Engine.emit('alliance:missions-reset', {});
     WG.Engine.emit('alliance:changed', {});
   }
 
-  // ---- Points spend modal ----
+  // ---- Points spend — delegates to AllianceRender shop sub-tab ----
   function openShopModal() {
-    const existing = document.getElementById('wg-alliance-shop-modal');
-    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-
-    const a = WG.Alliance && WG.Alliance.get();
-    if (!a || !a.id) return;
-
-    const SP = WG.Alliance.SPEND_POOL;
-    const pts = a.points || 0;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'wg-alliance-shop-modal';
-    overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.82);',
-      'display:flex;align-items:center;justify-content:center;padding:16px;',
-    ].join('');
-
-    const card = document.createElement('div');
-    card.style.cssText = [
-      'background:linear-gradient(to bottom,#2a1c10,#1a1006);',
-      'border:2px solid #604020;border-radius:12px;padding:20px;',
-      'width:min(360px,100%);max-height:90vh;overflow-y:auto;',
-      'box-shadow:0 8px 32px rgba(0,0,0,0.7);',
-    ].join('');
-
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
-    header.innerHTML = [
-      '<span style="font-size:15px;color:#f0d890;letter-spacing:2px;text-transform:uppercase;font-weight:600;">Alliance Shop</span>',
-      '<span style="font-size:13px;color:#c0a040;font-weight:700;">⚑ ' + pts + ' pts</span>',
-    ].join('');
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕';
-    closeBtn.style.cssText = 'background:none;border:none;color:#a08858;font-size:18px;cursor:pointer;padding:0;';
-    closeBtn.addEventListener('click', function() { overlay.remove(); });
-    header.appendChild(closeBtn);
-    card.appendChild(header);
-
-    Object.keys(SP).forEach(function(key) {
-      const def   = SP[key];
-      const canAfford = pts >= def.cost;
-      const row = document.createElement('div');
-      row.style.cssText = [
-        'display:flex;align-items:center;gap:12px;padding:12px;',
-        'background:rgba(255,255,255,0.03);border-radius:8px;',
-        'border:1px solid #3a2818;margin-bottom:8px;',
-      ].join('');
-      row.innerHTML = [
-        '<div style="flex:1;">',
-          '<div style="font-size:12px;color:#f0d890;font-weight:600;letter-spacing:0.5px;">' + _esc(def.label) + '</div>',
-          '<div style="font-size:10px;color:#907858;margin-top:2px;">' + _esc(def.desc) + '</div>',
-        '</div>',
-        '<button class="wg-shop-btn" data-key="' + key + '" style="',
-          'padding:8px 14px;border-radius:6px;border:1px solid ' + (canAfford ? '#b08840' : '#4a3018') + ';',
-          'background:' + (canAfford ? 'linear-gradient(to bottom,#806020,#5a3c0a)' : 'rgba(30,18,6,0.8)') + ';',
-          'color:' + (canAfford ? '#fff0c8' : '#6a5038') + ';',
-          'font-size:10px;font-weight:700;letter-spacing:1px;cursor:' + (canAfford ? 'pointer' : 'not-allowed') + ';',
-          'white-space:nowrap;">',
-          '⚑ ' + def.cost,
-        '</button>',
-      ].join('');
-      card.appendChild(row);
-    });
-
-    overlay.appendChild(card);
-    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
-
-    // Spend button handlers (delegated)
-    card.addEventListener('click', function(e) {
-      const btn = e.target.closest('.wg-shop-btn');
-      if (!btn) return;
-      const key = btn.dataset.key;
-      const result = WG.Alliance.spend(key);
-      if (result.ok) {
-        _showToast('Purchased! ' + SP[key].label);
-        // Refresh modal with updated points
-        overlay.remove();
-        openShopModal();
-      } else if (result.reason === 'insufficient_points') {
-        _showToast('Not enough alliance points');
-      } else if (result.reason === 'cap_maxed') {
-        _showToast('Member cap is already at maximum (50)');
-      } else {
-        _showToast('Could not purchase: ' + result.reason);
-      }
-    });
-
-    document.body.appendChild(overlay);
+    if (window.WG && WG.AllianceRender && WG.AllianceRender.openShop) {
+      WG.AllianceRender.openShop();
+    }
   }
 
   function _esc(s) {
@@ -227,31 +178,53 @@
 
   function init() {
     _ensureState();
-    // Wire mission progress events
+
     WG.Engine.on('hunt:stage-cleared', function() {
       increment('stages_30', 1);
     });
+    WG.Engine.on('enemy:killed', function() {
+      increment('kills_500', 1);
+    });
+    WG.Engine.on('tower:floor-start', function() {
+      increment('tower_floors_30', 1);
+    });
+    // Boss damage — allianceBoss:damage carries {amount}
+    WG.Engine.on('allianceBoss:damage', function(ev) {
+      var dmg = (ev && ev.amount) ? ev.amount : 0;
+      if (dmg > 0) {
+        increment('boss_100k', dmg);
+        increment('boss_150k', dmg);
+      }
+    });
     WG.Engine.on('duel:match-result', function(ev) {
-      if (ev && ev.won) increment('raids_win_2', 1);
+      if (ev && ev.won) {
+        increment('raids_win_2', 1);
+        increment('raids_win_5', 1);
+      }
     });
     WG.Engine.on('alliance:gift-sent', function() {
       increment('gifts_10', 1);
+      increment('gifts_25', 1);
+    });
+    WG.Engine.on('alliance:member-joined', function() {
+      increment('applications_3', 1);
+      increment('members_login_5', 1);
+      increment('members_login_10', 1);
     });
     WG.Engine.on('daily:reset', function() {
       dailyReset();
     });
     WG.Engine.on('alliance:created', function() {
-      _ensureState();
-      dailyReset(); // seed fresh NPC progress
+      dailyReset();
     });
     WG.Engine.on('alliance:joined', function() {
-      _ensureState();
       dailyReset();
     });
   }
 
   window.WG.AllianceMissions = {
     init, progress, increment, claim, claimAll, dailyReset,
-    openShopModal, DAILY_MISSIONS,
+    openShopModal, DAILY_MISSIONS, ACTIVE_COUNT,
+    activeMissionDefs: _activeMissionDefs,
   };
 })();

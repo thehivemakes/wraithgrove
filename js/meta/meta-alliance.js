@@ -16,12 +16,29 @@
     WAR_WIN:         20,
   });
 
-  // Spend pool (Architect-locked)
+  // Spend pool
   const SPEND_POOL = Object.freeze({
-    SLOT_EXPAND:     { cost: 200, label: '+5 Member Slots',          desc: 'Expands cap by 5 (max 50)' },
-    ENERGY_REGEN:    { cost: 100, label: '+10% Energy Regen 24h',    desc: 'All members for 24 hours' },
-    RAID_REWARDS:    { cost: 150, label: '+20% Raid Rewards 24h',    desc: 'All members for 24 hours' },
-    BANNER_COSMETIC: { cost:  50, label: 'Alliance Banner Cosmetic', desc: 'Unlock banner style' },
+    // ── Utility (original 4) ─────────────────────────────────────────────────
+    SLOT_EXPAND:     { cost: 200, label: '+5 Member Slots',          desc: 'Expands cap by 5 (max 50)',    category: 'utility' },
+    ENERGY_REGEN:    { cost: 100, label: '+10% Energy Regen 24h',    desc: 'All members for 24 hours',    category: 'utility',       durationMs: 86400000 },
+    RAID_REWARDS:    { cost: 150, label: '+20% Raid Rewards 24h',    desc: 'All members for 24 hours',    category: 'utility',       durationMs: 86400000 },
+    BANNER_COSMETIC: { cost:  50, label: 'Alliance Banner Cosmetic', desc: 'Unlock banner style',         category: 'utility' },
+    // ── Cosmetics (5) ────────────────────────────────────────────────────────
+    BANNER_ART_1:       { cost:   50, label: 'Banner Art: Ember Crest',          desc: 'Gold-lit ember crest banner art. Grants gold alliance name color.',                category: 'cosmetics',       durationMs: 0 },
+    BANNER_ART_2:       { cost:  100, label: 'Banner Art: Sigil Storm',          desc: 'Jade sigil-storm banner art. Grants jade alliance name color.',                   category: 'cosmetics',       durationMs: 0 },
+    BANNER_ART_3:       { cost:  200, label: 'Banner Art: Wraith Crown',         desc: 'Crimson wraith crown banner art. Grants crimson alliance name color.',             category: 'cosmetics',       durationMs: 0 },
+    BANNER_ART_4:       { cost:  500, label: 'Banner Art: Void Throne',          desc: 'Violet void throne banner art — rarest tier. Grants violet alliance name color.', category: 'cosmetics',       durationMs: 0 },
+    MEMBER_BADGE_FRAME: { cost:  300, label: 'Member Badge Frame',               desc: 'Decorative frame displayed on all member name badges.',                           category: 'cosmetics',       durationMs: 0 },
+    // ── Buffs (3) ─────────────────────────────────────────────────────────────
+    BUFF_GOLD_RAID:   { cost: 200, label: '+50% Gold from Raid · 24h',     desc: 'All members earn 50% more gold from raids for 24 hours.',             category: 'buffs', durationMs: 86400000 },
+    BUFF_BOSS_DMG:    { cost: 250, label: '+100% Boss Damage · 24h',       desc: 'All members deal double damage to the alliance boss for 24 hours.',   category: 'buffs', durationMs: 86400000 },
+    BUFF_ENERGY_CAP:  { cost: 180, label: '+10 Energy Cap · 24h',          desc: 'All members gain +10 maximum energy for 24 hours.',                  category: 'buffs', durationMs: 86400000 },
+    // ── Building Skins (2) ────────────────────────────────────────────────────
+    SKIN_CANNON_GOLD: { cost: 400, label: 'Cannon Battery: Gold Trim', desc: 'Gold-trimmed Cannon Battery skin — visible to raiders.', category: 'building_skins', durationMs: 0 },
+    SKIN_WALL_JADE:   { cost: 400, label: 'Wall Workshop: Jade',       desc: 'Jade Wall Workshop skin — visible to raiders.',          category: 'building_skins', durationMs: 0 },
+    // ── Member Benefits (2) ───────────────────────────────────────────────────
+    BENEFIT_GIFT_CAP:   { cost: 300, label: 'Gift Cap +5/day · 7 Days',         desc: 'Raises the daily gift cap by 5 for all members for 7 days.',                      category: 'member_benefits', durationMs: 604800000 },
+    BENEFIT_RELIC_PULL: { cost: 500, label: 'Free Relic Pull (Alliance-wide)',   desc: 'Grants one free relic pull to each alliance member. Fires once per member.',     category: 'member_benefits', durationMs: 0 },
   });
 
   const MEMBER_CAP_BASE = 30;
@@ -229,20 +246,108 @@
     const def = SPEND_POOL[type];
     if (!def)  return { ok: false, reason: 'unknown_type' };
     if (a.points < def.cost) return { ok: false, reason: 'insufficient_points' };
+
+    // Block re-purchase of active timed buffs
+    if (isActiveTimedBoost(type)) { return { ok: false, reason: 'already_active' }; }
+    // Block re-purchase of owned permanent cosmetics / skins
+    if (_isOwnedPermanent(type, a)) { return { ok: false, reason: 'already_owned' }; }
+    // Block relicPull if in cooldown
+    if (type === 'BENEFIT_RELIC_PULL') {
+      const rp = a.activeBoosts.relicPull;
+      if (rp && rp.grantedAt > Date.now() - 86400000) { return { ok: false, reason: 'on_cooldown' }; }
+    }
+
     a.points -= def.cost;
+    const now = Date.now();
+
     if (type === 'SLOT_EXPAND') {
       if (a.memberCap >= MEMBER_CAP_MAX) { a.points += def.cost; return { ok: false, reason: 'cap_maxed' }; }
       a.memberCap = Math.min(MEMBER_CAP_MAX, a.memberCap + MEMBER_CAP_STEP);
     } else if (type === 'ENERGY_REGEN') {
-      a.activeBoosts.energyRegen = { endsAt: Date.now() + 86400000 };
+      a.activeBoosts.energyRegen = { endsAt: now + 86400000 };
     } else if (type === 'RAID_REWARDS') {
-      a.activeBoosts.raidRewards = { endsAt: Date.now() + 86400000 };
+      a.activeBoosts.raidRewards = { endsAt: now + 86400000 };
     } else if (type === 'BANNER_COSMETIC') {
       a.activeBoosts.bannerCosmetic = true;
+    // ── Cosmetics ──────────────────────────────────────────────────────────
+    } else if (type === 'BANNER_ART_1' || type === 'BANNER_ART_2' ||
+               type === 'BANNER_ART_3' || type === 'BANNER_ART_4') {
+      a.activeBoosts.bannerArt = type;
+    } else if (type === 'MEMBER_BADGE_FRAME') {
+      a.activeBoosts.memberBadgeFrame = true;
+    // ── Buffs ───────────────────────────────────────────────────────────────
+    } else if (type === 'BUFF_GOLD_RAID') {
+      a.activeBoosts.goldRaid   = { endsAt: now + 86400000 };
+    } else if (type === 'BUFF_BOSS_DMG') {
+      a.activeBoosts.bossDmg    = { endsAt: now + 86400000 };
+    } else if (type === 'BUFF_ENERGY_CAP') {
+      a.activeBoosts.energyCap  = { endsAt: now + 86400000 };
+    // ── Building Skins ──────────────────────────────────────────────────────
+    } else if (type === 'SKIN_CANNON_GOLD') {
+      a.activeBoosts.skinCannon = 'gold';
+    } else if (type === 'SKIN_WALL_JADE') {
+      a.activeBoosts.skinWall   = 'jade';
+    // ── Member Benefits ─────────────────────────────────────────────────────
+    } else if (type === 'BENEFIT_GIFT_CAP') {
+      a.activeBoosts.giftCapBoost = { endsAt: now + 604800000 };
+    } else if (type === 'BENEFIT_RELIC_PULL') {
+      a.activeBoosts.relicPull = { grantedAt: now, membersReceived: [] };
+      WG.Engine.emit('alliance:relic-pull-granted', {});
     }
+
     WG.Engine.emit('alliance:points-change', { points: a.points });
     WG.Engine.emit('alliance:changed', {});
     return { ok: true };
+  }
+
+  // ── Boost query helpers ────────────────────────────────────────────────────
+  const _TIMED_BOOST_MAP = Object.freeze({
+    ENERGY_REGEN:     'energyRegen',
+    RAID_REWARDS:     'raidRewards',
+    BUFF_GOLD_RAID:   'goldRaid',
+    BUFF_BOSS_DMG:    'bossDmg',
+    BUFF_ENERGY_CAP:  'energyCap',
+    BENEFIT_GIFT_CAP: 'giftCapBoost',
+  });
+
+  function isActiveTimedBoost(spendKey) {
+    const a = _ensureState();
+    const bKey = _TIMED_BOOST_MAP[spendKey];
+    if (!bKey) return false;
+    const b = a.activeBoosts[bKey];
+    return !!(b && b.endsAt > Date.now());
+  }
+
+  function boostTimeLeftMs(spendKey) {
+    const a = _ensureState();
+    const bKey = _TIMED_BOOST_MAP[spendKey];
+    if (!bKey) return 0;
+    const b = a.activeBoosts[bKey];
+    if (!b || !b.endsAt) return 0;
+    return Math.max(0, b.endsAt - Date.now());
+  }
+
+  function _isOwnedPermanent(type, a) {
+    const b = a.activeBoosts || {};
+    if (type === 'MEMBER_BADGE_FRAME') return !!b.memberBadgeFrame;
+    if (type === 'SKIN_CANNON_GOLD')   return b.skinCannon === 'gold';
+    if (type === 'SKIN_WALL_JADE')     return b.skinWall   === 'jade';
+    return false;
+  }
+
+  function getActiveTimedBoosts() {
+    const a = _ensureState();
+    const b = a.activeBoosts || {};
+    const now = Date.now();
+    return [
+      { bKey: 'energyRegen',  label: 'Energy Regen' },
+      { bKey: 'raidRewards',  label: 'Raid Boost'   },
+      { bKey: 'goldRaid',     label: 'Gold Boost'   },
+      { bKey: 'bossDmg',      label: 'Boss Boost'   },
+      { bKey: 'energyCap',    label: 'Energy Cap+'  },
+      { bKey: 'giftCapBoost', label: 'Gift Cap+'    },
+    ].filter(function(p) { return b[p.bKey] && b[p.bKey].endsAt > now; })
+     .map(function(p) { return { label: p.label, timeLeftMs: b[p.bKey].endsAt - now }; });
   }
 
   function sendGift() {
@@ -338,6 +443,7 @@
     addPoints, spend, sendGift, claimGift,
     canPromote, canKick, canDemote, canSetMOTD, canEditBanner, canSpendPoints,
     findAlliances, getNPCMember, getNPCMembers,
+    isActiveTimedBoost, boostTimeLeftMs, getActiveTimedBoosts,
     EARN_RATES, SPEND_POOL, CREATE_COST_COINS,
     NPC_MEMBERS,
   };

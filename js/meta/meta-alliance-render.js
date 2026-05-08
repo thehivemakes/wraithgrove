@@ -465,6 +465,9 @@
           '</div>',
         '</div>',
 
+        // Active buff timer strip
+        _activeBuffStrip(a),
+
         // MOTD card — leader sees edit button even when empty
         (a.msgOfDay || (WG.Alliance.canSetMOTD && WG.Alliance.canSetMOTD(myId)))
           ? '<div style="display:flex;align-items:flex-start;gap:8px;' +
@@ -1379,6 +1382,175 @@
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // ── Active buff timer strip (shown in roster header) ─────────────────────────
+  function _activeBuffStrip(a) {
+    if (!WG.Alliance || !WG.Alliance.getActiveTimedBoosts) return '';
+    const boosts = WG.Alliance.getActiveTimedBoosts();
+    if (!boosts.length) return '';
+    const pills = boosts.map(function(b) {
+      const ms = b.timeLeftMs;
+      const h  = Math.floor(ms / 3600000);
+      const m  = Math.floor((ms % 3600000) / 60000);
+      const timeStr = h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+      return '<span style="display:inline-flex;align-items:center;gap:4px;' +
+        'background:rgba(80,200,80,0.12);border:1px solid rgba(80,200,80,0.25);' +
+        'border-radius:10px;padding:3px 8px;font-size:9px;color:#90d870;' +
+        'white-space:nowrap;letter-spacing:0.5px;">' +
+        '▶ ' + _esc(b.label) + ' · ' + timeStr + ' left' +
+        '</span>';
+    }).join('');
+    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' + pills + '</div>';
+  }
+
+  // ── Shop section render ───────────────────────────────────────────────────────
+  const _SHOP_CATEGORIES = [
+    { id: 'cosmetics',       label: 'Cosmetics' },
+    { id: 'buffs',           label: 'Buffs' },
+    { id: 'building_skins',  label: 'Building Skins' },
+    { id: 'member_benefits', label: 'Member Benefits' },
+  ];
+
+  function _renderShopSection(panel) {
+    const a   = WG.Alliance.get();
+    const pts = a.points || 0;
+    const myId = (window.WG && WG.Account && WG.Account.getDeviceId) ? WG.Account.getDeviceId() : 'local';
+    const canBuy = WG.Alliance.canSpendPoints && WG.Alliance.canSpendPoints(myId);
+    const SP = WG.Alliance.SPEND_POOL;
+
+    const catTabs = _SHOP_CATEGORIES.map(function(cat) {
+      const active = _shopCat === cat.id;
+      return '<button class="wg-al-shopcat" data-cat="' + cat.id + '" style="' +
+        'flex:1;padding:7px 2px;border:none;background:' +
+        (active ? 'rgba(240,200,128,0.1)' : 'transparent') + ';' +
+        'color:' + (active ? '#f0d890' : '#705840') + ';font-size:9px;' +
+        'letter-spacing:0.8px;text-transform:uppercase;font-weight:' + (active ? '700' : '400') + ';' +
+        'border-bottom:2px solid ' + (active ? '#d0a840' : 'transparent') + ';cursor:pointer;">' +
+        _esc(cat.label) + '</button>';
+    }).join('');
+
+    const entries = Object.keys(SP).filter(function(k) {
+      return SP[k].category === _shopCat;
+    });
+
+    const rows = entries.map(function(key) {
+      const def = SP[key];
+      const canAfford = pts >= def.cost;
+      const isTimedActive = WG.Alliance.isActiveTimedBoost && WG.Alliance.isActiveTimedBoost(key);
+      const timeLeft = isTimedActive && WG.Alliance.boostTimeLeftMs ? WG.Alliance.boostTimeLeftMs(key) : 0;
+      const isBannerEquipped = key.indexOf('BANNER_ART') === 0 && (a.activeBoosts || {}).bannerArt === key;
+      const isOwned = key === 'MEMBER_BADGE_FRAME' && !!(a.activeBoosts || {}).memberBadgeFrame ||
+                      key === 'SKIN_CANNON_GOLD' && (a.activeBoosts || {}).skinCannon === 'gold' ||
+                      key === 'SKIN_WALL_JADE'   && (a.activeBoosts || {}).skinWall   === 'jade';
+      const relicCooldown = key === 'BENEFIT_RELIC_PULL' &&
+        (a.activeBoosts || {}).relicPull &&
+        (a.activeBoosts || {}).relicPull.grantedAt > Date.now() - 86400000;
+
+      const blocked = isTimedActive || isOwned || relicCooldown || isBannerEquipped;
+      const btnDisabled = !canBuy || !canAfford || blocked;
+
+      let btnLabel = '⚑ ' + def.cost;
+      let btnColor = '#fff0c8';
+      let btnBorder = '#b08840';
+      let btnBg = 'linear-gradient(to bottom,#806020,#5a3c0a)';
+      let btnCursor = 'pointer';
+      if (isTimedActive) {
+        const h = Math.floor(timeLeft / 3600000);
+        const m = Math.floor((timeLeft % 3600000) / 60000);
+        btnLabel = 'ACTIVE · ' + (h > 0 ? h + 'h' : m + 'm');
+        btnColor = '#90d870'; btnBorder = '#408030'; btnBg = 'rgba(20,50,12,0.8)'; btnCursor = 'not-allowed';
+      } else if (isBannerEquipped) {
+        btnLabel = 'EQUIPPED'; btnColor = '#a0c090'; btnBorder = '#406030'; btnBg = 'rgba(20,40,12,0.8)'; btnCursor = 'default';
+      } else if (isOwned) {
+        btnLabel = 'OWNED'; btnColor = '#a0c090'; btnBorder = '#406030'; btnBg = 'rgba(20,40,12,0.8)'; btnCursor = 'default';
+      } else if (relicCooldown) {
+        btnLabel = 'SENT'; btnColor = '#a0c090'; btnBorder = '#406030'; btnBg = 'rgba(20,40,12,0.8)'; btnCursor = 'not-allowed';
+      } else if (!canAfford) {
+        btnColor = '#6a5038'; btnBorder = '#4a3018'; btnBg = 'rgba(30,18,6,0.8)'; btnCursor = 'not-allowed';
+      }
+
+      const durationPill = def.durationMs > 0
+        ? '<span style="font-size:9px;color:#907858;background:rgba(80,50,10,0.5);' +
+            'border-radius:4px;padding:1px 5px;margin-left:4px;">' +
+            (def.durationMs >= 604800000 ? '7 days' : '24h') + '</span>'
+        : '';
+
+      return [
+        '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;',
+          'background:rgba(255,255,255,0.03);border:1px solid #3a2818;',
+          'border-radius:8px;margin-bottom:7px;">',
+          '<div style="flex:1;min-width:0;">',
+            '<div style="font-size:11px;color:#f0d890;font-weight:600;letter-spacing:0.5px;">',
+              _esc(def.label), durationPill,
+            '</div>',
+            '<div style="font-size:9px;color:#907858;margin-top:3px;line-height:1.4;">' + _esc(def.desc) + '</div>',
+          '</div>',
+          canBuy
+            ? '<button class="wg-al-shop-buy" data-key="' + key + '" ' +
+                (btnDisabled ? 'disabled ' : '') +
+                'style="flex-shrink:0;padding:7px 11px;border-radius:6px;border:1px solid ' + btnBorder + ';' +
+                'background:' + btnBg + ';color:' + btnColor + ';font-size:9px;font-weight:700;' +
+                'letter-spacing:0.8px;cursor:' + btnCursor + ';white-space:nowrap;">' +
+                btnLabel + '</button>'
+            : '<span style="flex-shrink:0;font-size:9px;color:#5a4028;font-weight:700;' +
+                'letter-spacing:0.8px;padding:7px 0;white-space:nowrap;">VIEW ONLY</span>',
+        '</div>',
+      ].join('');
+    }).join('');
+
+    panel.innerHTML = [
+      '<div style="position:absolute;inset:0;display:flex;flex-direction:column;">',
+      _subTabNav(),
+      // Points header
+      '<div style="display:flex;align-items:center;justify-content:space-between;',
+        'padding:10px 12px;background:rgba(40,24,8,0.5);border-bottom:1px solid #2e1e0c;flex-shrink:0;">',
+        '<span style="font-size:11px;color:#c0a040;font-weight:700;">⚑ ' + _fmtPts(pts) + ' pts</span>',
+        !canBuy ? '<span style="font-size:9px;color:#605040;letter-spacing:1px;">MEMBER VIEW</span>' : '',
+      '</div>',
+      // Category tabs
+      '<div style="display:flex;border-bottom:1px solid #2e1e0c;flex-shrink:0;">',
+        catTabs,
+      '</div>',
+      // Entries
+      '<div class="scroll" style="flex:1;overflow-y:auto;padding:12px;">',
+        rows || '<div style="color:#4a3020;font-size:11px;text-align:center;padding:24px;">Nothing here yet.</div>',
+      '</div>',
+      '</div>',
+    ].join('');
+
+    _wireSubTabNav(panel);
+    panel.querySelectorAll('.wg-al-shopcat').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const cat = btn.dataset.cat;
+        if (cat && cat !== _shopCat) { _shopCat = cat; _renderShopSection(panel); }
+      });
+    });
+    panel.addEventListener('click', function(e) {
+      const btn = e.target.closest('.wg-al-shop-buy');
+      if (!btn || btn.disabled) return;
+      const key = btn.dataset.key;
+      const result = WG.Alliance.spend(key);
+      if (result.ok) {
+        _toast('✓ ' + (WG.Alliance.SPEND_POOL[key] || {}).label);
+        _renderShopSection(panel);
+      } else if (result.reason === 'insufficient_points') {
+        _toast('Not enough alliance points');
+      } else if (result.reason === 'already_active') {
+        _toast('This buff is already active');
+      } else if (result.reason === 'already_owned') {
+        _toast('Already owned');
+      } else if (result.reason === 'on_cooldown') {
+        _toast('Pull was already sent — resets in 24h');
+      } else {
+        _toast('Could not purchase: ' + result.reason);
+      }
+    });
+  }
+
+  function _openShop() {
+    _subTab = 'shop';
+    refresh();
+  }
+
   function _wireFullButtons(panel) {
     const myId = (window.WG && WG.Account && WG.Account.getDeviceId) ? WG.Account.getDeviceId() : 'local';
     _wireSubTabNav(panel);
@@ -1485,10 +1657,10 @@
     if (chatSend) chatSend.addEventListener('click', _doSend);
     if (chatIn) chatIn.addEventListener('keydown', function(e){ if (e.key === 'Enter') _doSend(); });
 
-    // Alliance shop
+    // Alliance shop — navigate to shop sub-tab
     const shopBtn = panel.querySelector('#wg-al-shop-btn');
     if (shopBtn) shopBtn.addEventListener('click', function() {
-      WG.AllianceMissions && WG.AllianceMissions.openShopModal();
+      _subTab = 'shop'; refresh();
     });
 
     // Leave
@@ -1611,5 +1783,5 @@
     return WG.State && WG.State.get && WG.State.get().activeTab === 'alliance';
   }
 
-  window.WG.AllianceRender = { init, refresh };
+  window.WG.AllianceRender = { init, refresh, openShop: _openShop };
 })();

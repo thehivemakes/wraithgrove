@@ -42,6 +42,9 @@
   });
 
   let runtime = null;
+  // W-Performance-Patches: cap runtime.drops to prevent unbounded accumulation (PERFORMANCE_AUDIT.md §2A: 800 drops possible on stage 18)
+  const MAX_DROPS = 500;
+  function _pushDrop(d) { if (runtime.drops.length < MAX_DROPS) runtime.drops.push(d); }
 
   function place(x, y, rt) {
     runtime = rt;
@@ -106,34 +109,60 @@
     const TREE_R = 9;
     const minD = PLAYER_R + TREE_R;
     const minD2 = minD * minD;
-    for (let iter = 0; iter < 3; iter++) {
-      let resolved = false;
-      for (let i = 0; i < props.stumps.length; i++) {
-        const t = props.stumps[i];
-        if (t.dropped) continue;
-        const dx = p.x - t.x, dy = p.y - t.y;
-        const d2 = dx*dx + dy*dy;
-        if (d2 < minD2) {
-          if (d2 < 0.01) {
-            // Player exactly at tree center — push +x by default
-            p.x += minD;
-            resolved = true;
-            continue;
+    // W-Performance-Patches: was O(1380) scan per iter (reason: 0.8–2.5ms/frame on A11, PERFORMANCE_AUDIT.md §1B)
+    // Spatial grid reduces to ~27 neighbour checks; gcx0/gcy0 recomputed per iter since p.x/y shifts.
+    const grid = props.stumpsGrid;
+    const cell = props.stumpsGridCell || 64;
+    if (grid) {
+      for (let iter = 0; iter < 3; iter++) {
+        let resolved = false;
+        const gcx0 = Math.floor(p.x / cell) - 1;
+        const gcy0 = Math.floor(p.y / cell) - 1;
+        for (let gcx = gcx0; gcx <= gcx0 + 2; gcx++) {
+          for (let gcy = gcy0; gcy <= gcy0 + 2; gcy++) {
+            const bucket = grid[gcx + ',' + gcy];
+            if (!bucket) continue;
+            for (const t of bucket) {
+              if (t.dropped) continue;
+              const dx = p.x - t.x, dy = p.y - t.y;
+              const d2 = dx*dx + dy*dy;
+              if (d2 < minD2) {
+                if (d2 < 0.01) { p.x += minD; resolved = true; continue; }
+                const d = Math.sqrt(d2);
+                const overlap = minD - d;
+                p.x += (dx / d) * overlap;
+                p.y += (dy / d) * overlap;
+                const dotV = (p.vx * (dx/d) + p.vy * (dy/d));
+                if (dotV < 0) { p.vx -= dotV * (dx/d); p.vy -= dotV * (dy/d); }
+                resolved = true;
+              }
+            }
           }
-          const d = Math.sqrt(d2);
-          const overlap = minD - d;
-          p.x += (dx / d) * overlap;
-          p.y += (dy / d) * overlap;
-          // Damp velocity along the collision normal to prevent jitter
-          const dotV = (p.vx * (dx/d) + p.vy * (dy/d));
-          if (dotV < 0) {
-            p.vx -= dotV * (dx/d);
-            p.vy -= dotV * (dy/d);
-          }
-          resolved = true;
         }
+        if (!resolved) break;
       }
-      if (!resolved) break;
+    } else {
+      // Fallback: O(n) scan if grid not yet populated (first-frame safety)
+      for (let iter = 0; iter < 3; iter++) {
+        let resolved = false;
+        for (let i = 0; i < props.stumps.length; i++) {
+          const t = props.stumps[i];
+          if (t.dropped) continue;
+          const dx = p.x - t.x, dy = p.y - t.y;
+          const d2 = dx*dx + dy*dy;
+          if (d2 < minD2) {
+            if (d2 < 0.01) { p.x += minD; resolved = true; continue; }
+            const d = Math.sqrt(d2);
+            const overlap = minD - d;
+            p.x += (dx / d) * overlap;
+            p.y += (dy / d) * overlap;
+            const dotV = (p.vx * (dx/d) + p.vy * (dy/d));
+            if (dotV < 0) { p.vx -= dotV * (dx/d); p.vy -= dotV * (dy/d); }
+            resolved = true;
+          }
+        }
+        if (!resolved) break;
+      }
     }
   }
 
@@ -240,7 +269,7 @@
               // counter without traveling through screen space first."
               const cAng = Math.random() * Math.PI * 2;
               const cSp  = 80 + Math.random() * 40;
-              runtime.drops.push({
+              _pushDrop({
                 x: s.x, y: s.y, type: 'coin',
                 vx: Math.cos(cAng) * cSp, vy: Math.sin(cAng) * cSp,
               });
@@ -249,20 +278,20 @@
               // SPEC §0 — Night Mode: TORCH_DROP_CHANCE replaces this second
               // coin with a Torch item. Tree still gives wood + first coin.
               if (runtime.mode === 'night' && Math.random() < TORCH_DROP_CHANCE) {
-                runtime.drops.push({
+                _pushDrop({
                   x: s.x + 6, y: s.y + 4, type: 'torch',
                   vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
                   _flickerSeed: Math.random() * Math.PI * 2,
                 });
               } else {
-                runtime.drops.push({
+                _pushDrop({
                   x: s.x + 6, y: s.y + 4, type: 'coin',
                   vx: Math.cos(cAng2) * cSp2, vy: Math.sin(cAng2) * cSp2,
                 });
               }
               const wAng = Math.random() * Math.PI * 2;
               const wSp  = 160 + Math.random() * 60;
-              runtime.drops.push({
+              _pushDrop({
                 x: s.x, y: s.y, type: 'wood',
                 vx: Math.cos(wAng) * wSp, vy: Math.sin(wAng) * wSp,
               });
@@ -273,13 +302,13 @@
               if (woodX2) {
                 const wAng2 = wAng + Math.PI + (Math.random() - 0.5) * 0.6;
                 const wSp2  = 160 + Math.random() * 60;
-                runtime.drops.push({
+                _pushDrop({
                   x: s.x, y: s.y, type: 'wood',
                   vx: Math.cos(wAng2) * wSp2, vy: Math.sin(wAng2) * wSp2,
                 });
                 const cAngB = Math.random() * Math.PI * 2;
                 const cSpB  = 80 + Math.random() * 40;
-                runtime.drops.push({
+                _pushDrop({
                   x: s.x, y: s.y, type: 'coin',
                   vx: Math.cos(cAngB) * cSpB, vy: Math.sin(cAngB) * cSpB,
                 });
@@ -416,7 +445,7 @@
     for (let _i = 0; _i < orbRolls; _i++) {
       if (Math.random() < 0.25) {
         const _ang = Math.random() * Math.PI * 2;
-        runtime.drops.push({
+        _pushDrop({
           x: c.x, y: c.y, type: 'orb',
           vx: orbRolls > 1 ? Math.cos(_ang) * 28 : 0,
           vy: orbRolls > 1 ? Math.sin(_ang) * 28 : 0,

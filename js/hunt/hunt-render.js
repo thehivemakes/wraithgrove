@@ -12,7 +12,25 @@
   const camera = { x: 0, y: 0 };
   let runtime = null;
   let _edgePulse = null;
-  let _stagePropsCache = {}; // stageId → { stumps:[], cabins:[], fires:[] }
+  let _stagePropsCache = {}; // stageId → { stumps:[], stumpsSorted:[], stumpsGrid:{}, cabins:[], fires:[] }
+  // W-Performance-Patches: night overlay gradient cache — recreate only on resize (PERFORMANCE_AUDIT.md §1C)
+  let _nightGradCache = null; // { skyGrad, vGrad }
+  let _nightGradCacheW = 0;
+  let _nightGradCacheH = 0;
+  // W-Performance-Patches: fever offscreen canvas — creatures rendered here, composited with single shadow pass (PERFORMANCE_AUDIT.md §1D)
+  let _feverOffscreen = null;
+  let _feverOffscreenCtx = null;
+  let _feverOffscreenW = 0;
+  let _feverOffscreenH = 0;
+  function _ensureFeverOffscreen(w, h) {
+    if (!_feverOffscreen || _feverOffscreenW !== w || _feverOffscreenH !== h) {
+      _feverOffscreen = document.createElement('canvas');
+      _feverOffscreen.width = w; _feverOffscreen.height = h;
+      _feverOffscreenCtx = _feverOffscreen.getContext('2d');
+      _feverOffscreenW = w; _feverOffscreenH = h;
+    }
+    return _feverOffscreenCtx;
+  }
 
   // W-Tower-Visual-Polish: floor-clear transition state
   // { startMs, durationMs, floor, name } — null when inactive
@@ -337,7 +355,17 @@
         });
       }
     }
-    _stagePropsCache[stage.id] = { stumps, caves, fires, constructions };
+    // W-Performance-Patches: pre-sort by Y once at stage build; drawStumps consumes this directly (PERFORMANCE_AUDIT.md §1A)
+    const stumpsSorted = stumps.slice().sort((a, b) => a.y - b.y);
+    // W-Performance-Patches: spatial grid for resolveTreeCollisions O(n)→O(~27) per iter (PERFORMANCE_AUDIT.md §1B)
+    const STUMPS_GRID_CELL = 64;
+    const stumpsGrid = {};
+    for (const s of stumps) {
+      const key = Math.floor(s.x / STUMPS_GRID_CELL) + ',' + Math.floor(s.y / STUMPS_GRID_CELL);
+      if (!stumpsGrid[key]) stumpsGrid[key] = [];
+      stumpsGrid[key].push(s);
+    }
+    _stagePropsCache[stage.id] = { stumps, stumpsSorted, stumpsGrid, stumpsGridCell: STUMPS_GRID_CELL, caves, fires, constructions };
     return _stagePropsCache[stage.id];
   }
 
@@ -488,9 +516,8 @@
   }
 
   function drawStumps(ctx, props) {
-    // Sort by Y so closer trees draw over farther ones (top-down layering)
-    const sorted = props.stumps.slice().sort((a, b) => a.y - b.y);
-    for (const s of sorted) {
+    // W-Performance-Patches: was props.stumps.slice().sort() per-frame (reason: ~1380-elem alloc+sort every frame ~1–3ms, PERFORMANCE_AUDIT.md §1A)
+    for (const s of props.stumpsSorted) {
       if (s.dropped) continue;
       const ss = w2s(s.x, s.y);
       drawStump(ctx, ss.x, ss.y, s.r, s);
@@ -873,19 +900,25 @@
 
     // Considered overlay — vertical gradient with deeper indigo at top + horizon,
     // slightly warmer mid-band (folk-horror register, not flat black).
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-    skyGrad.addColorStop(0,    NIGHT_OVERLAY_TOP);
-    skyGrad.addColorStop(0.55, NIGHT_OVERLAY_MID);
-    skyGrad.addColorStop(1,    NIGHT_OVERLAY_TOP);
-    ctx.fillStyle = skyGrad;
+    // W-Performance-Patches: was 4 gradient objects created per frame (reason: 0.3–1.0ms/frame, PERFORMANCE_AUDIT.md §1C)
+    // skyGrad + vGrad are stable per screen size — cached and reused until resize.
+    if (!_nightGradCache || _nightGradCacheW !== W || _nightGradCacheH !== H) {
+      const sg = ctx.createLinearGradient(0, 0, 0, H);
+      sg.addColorStop(0,    NIGHT_OVERLAY_TOP);
+      sg.addColorStop(0.55, NIGHT_OVERLAY_MID);
+      sg.addColorStop(1,    NIGHT_OVERLAY_TOP);
+      const vmidBuild = Math.max(W, H);
+      const vg = ctx.createRadialGradient(W/2, H/2, vmidBuild * 0.30, W/2, H/2, vmidBuild * 0.85);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.45)');
+      _nightGradCache = { skyGrad: sg, vGrad: vg };
+      _nightGradCacheW = W; _nightGradCacheH = H;
+    }
+    ctx.fillStyle = _nightGradCache.skyGrad;
     ctx.fillRect(0, 0, W, H);
 
     // Subtle vignette dim at corners (tunnel-vision in the dark).
-    const vmid = Math.max(W, H);
-    const vGrad = ctx.createRadialGradient(W/2, H/2, vmid * 0.30, W/2, H/2, vmid * 0.85);
-    vGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    vGrad.addColorStop(1, 'rgba(0,0,0,0.45)');
-    ctx.fillStyle = vGrad;
+    ctx.fillStyle = _nightGradCache.vGrad;
     ctx.fillRect(0, 0, W, H);
 
     // Carve light holes — destination-out subtracts alpha from the dark fill.
@@ -2138,59 +2171,66 @@
       ? ((window.WG && WG.HuntPlayer && WG.HuntPlayer.FEVER_TUNABLES)
           ? WG.HuntPlayer.FEVER_TUNABLES.ENEMY_GLOW : '#ff8040')
       : null;
+    // W-Performance-Patches: was ctx.shadowBlur=9 per-creature — N shadow compositor passes per frame
+    // Now: creatures+boss body drawn to offscreen canvas, composited once with single shadow pass (PERFORMANCE_AUDIT.md §1D: 2–6ms/frame saved on A11)
+    const tgt = _feverGlow ? _ensureFeverOffscreen(D().width, D().height) : ctx;
+    if (_feverGlow) tgt.clearRect(0, 0, D().width, D().height);
     for (const c of runtime.creatures) {
       if (c.hp <= 0) continue;
-      if (_feverGlow) { ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9; }
       const s = w2s(c.x, c.y);
       switch (c.type) {
         // W-Enemy-Sprites-Stage1-Pack Concern C — sprite-first with geometric fallback
         case 'red_zombie':
-          if (ENEMY_SPRITES.red_zombie && _spriteCache.red_zombie) drawSpriteCreature(ctx, s.x, s.y, c);
-          else drawZombie(ctx, s.x, s.y, c);
+          if (ENEMY_SPRITES.red_zombie && _spriteCache.red_zombie) drawSpriteCreature(tgt, s.x, s.y, c);
+          else drawZombie(tgt, s.x, s.y, c);
           break;
         case 'pumpkin_lantern':
-          if (ENEMY_SPRITES.pumpkin_lantern && _spriteCache.pumpkin_lantern) drawSpriteCreature(ctx, s.x, s.y, c);
-          else drawPumpkin(ctx, s.x, s.y, c);
+          if (ENEMY_SPRITES.pumpkin_lantern && _spriteCache.pumpkin_lantern) drawSpriteCreature(tgt, s.x, s.y, c);
+          else drawPumpkin(tgt, s.x, s.y, c);
           break;
         case 'skull_swarmer':
-          if (ENEMY_SPRITES.skull_swarmer && _spriteCache.skull_swarmer) drawSpriteCreature(ctx, s.x, s.y, c);
-          else drawSkullImp(ctx, s.x, s.y, c);
+          if (ENEMY_SPRITES.skull_swarmer && _spriteCache.skull_swarmer) drawSpriteCreature(tgt, s.x, s.y, c);
+          else drawSkullImp(tgt, s.x, s.y, c);
           break;
         case 'wraith_fast':
-          if (ENEMY_SPRITES.wraith_fast && _spriteCache.wraith_fast) drawSpriteCreature(ctx, s.x, s.y, c);
-          else drawWraithFast(ctx, s.x, s.y, c);
+          if (ENEMY_SPRITES.wraith_fast && _spriteCache.wraith_fast) drawSpriteCreature(tgt, s.x, s.y, c);
+          else drawWraithFast(tgt, s.x, s.y, c);
           break;
-        case 'jiangshi':        drawJiangshi(ctx, s.x, s.y, c);  break;
-        case 'samurai_grunt':   drawSamurai(ctx, s.x, s.y, c);   break;
-        case 'banshee':         drawBanshee(ctx, s.x, s.y, c);   break;
-        case 'sigil_drone':     drawSigilDrone(ctx, s.x, s.y, c); break;
-        case 'memory_husk':     drawMemoryHusk(ctx, s.x, s.y, c); break;
+        case 'jiangshi':        drawJiangshi(tgt, s.x, s.y, c);  break;
+        case 'samurai_grunt':   drawSamurai(tgt, s.x, s.y, c);   break;
+        case 'banshee':         drawBanshee(tgt, s.x, s.y, c);   break;
+        case 'sigil_drone':     drawSigilDrone(tgt, s.x, s.y, c); break;
+        case 'memory_husk':     drawMemoryHusk(tgt, s.x, s.y, c); break;
         default:
-          if (ENEMY_SPRITES[c.type]) drawSpriteCreature(ctx, s.x, s.y, c);
-          else drawZombie(ctx, s.x, s.y, c);
+          if (ENEMY_SPRITES[c.type]) drawSpriteCreature(tgt, s.x, s.y, c);
+          else drawZombie(tgt, s.x, s.y, c);
       }
-      if (_feverGlow) ctx.shadowBlur = 0;
-    }
-    if (_feverGlow && runtime.boss && runtime.boss.hp > 0) {
-      ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9;
     }
     if (runtime.boss && runtime.boss.hp > 0) {
       const b = runtime.boss;
       const s = w2s(b.x, b.y);
       const t = performance.now() / 1000;
       switch (b.type) {
-        case 'pale_bride':    drawBoss_pale_bride(ctx, s.x, s.y, b, t); break;
-        case 'frozen_crone':  drawBoss_frozen_crone(ctx, s.x, s.y, b, t); break;
-        case 'autumn_lord':   drawBoss_autumn_lord(ctx, s.x, s.y, b, t); break;
-        case 'temple_warden': drawBoss_temple_warden(ctx, s.x, s.y, b, t); break;
-        case 'cave_mother':   drawBoss_cave_mother(ctx, s.x, s.y, b, t); break;
-        case 'wraith_father':       drawBoss_wraith_father(ctx, s.x, s.y, b, t); break;
-        case 'echo_throne_keeper':  drawBoss_echo_throne_keeper(ctx, s.x, s.y, b, t); break;
-        case 'wraith_father_echo':  drawBoss_wraith_father_echo(ctx, s.x, s.y, b, t); break;
+        case 'pale_bride':    drawBoss_pale_bride(tgt, s.x, s.y, b, t); break;
+        case 'frozen_crone':  drawBoss_frozen_crone(tgt, s.x, s.y, b, t); break;
+        case 'autumn_lord':   drawBoss_autumn_lord(tgt, s.x, s.y, b, t); break;
+        case 'temple_warden': drawBoss_temple_warden(tgt, s.x, s.y, b, t); break;
+        case 'cave_mother':   drawBoss_cave_mother(tgt, s.x, s.y, b, t); break;
+        case 'wraith_father':       drawBoss_wraith_father(tgt, s.x, s.y, b, t); break;
+        case 'echo_throne_keeper':  drawBoss_echo_throne_keeper(tgt, s.x, s.y, b, t); break;
+        case 'wraith_father_echo':  drawBoss_wraith_father_echo(tgt, s.x, s.y, b, t); break;
         default:
-          ctx.fillStyle = b._typeData.color;
-          ctx.beginPath(); ctx.arc(s.x, s.y, b.size/2, 0, Math.PI*2); ctx.fill();
+          tgt.fillStyle = b._typeData.color;
+          tgt.beginPath(); tgt.arc(s.x, s.y, b.size/2, 0, Math.PI*2); tgt.fill();
       }
+      // Composite offscreen (with single shadow) before drawing boss HP bar to main ctx
+      if (_feverGlow) {
+        ctx.save();
+        ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9;
+        ctx.drawImage(_feverOffscreen, 0, 0);
+        ctx.restore();
+      }
+      // Boss HP bar always on main ctx (not glowed)
       const w = D().width;
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(w*0.1, 60, w*0.8, 8);
@@ -2201,8 +2241,13 @@
       ctx.textAlign = 'center';
       ctx.fillText(b._typeData.name, w*0.5, 56);
       ctx.textAlign = 'left';
+    } else if (_feverGlow) {
+      // No boss — composite offscreen directly
+      ctx.save();
+      ctx.shadowColor = _feverGlow; ctx.shadowBlur = 9;
+      ctx.drawImage(_feverOffscreen, 0, 0);
+      ctx.restore();
     }
-    if (_feverGlow) ctx.shadowBlur = 0;
   }
 
   // Projectile draw — supports an optional `_trail` array on the projectile
@@ -3380,6 +3425,12 @@
     const _comboLabel = _comboHud.querySelector('.combo-label');
     let _feverCountdownInterval = null;
     let _feverEndsAt = 0;
+    // W-Performance-Patches: was clearInterval only in fever:end — orphan interval if stage ends during fever (PERFORMANCE_AUDIT.md §2C)
+    function _clearFeverInterval() {
+      if (_feverCountdownInterval) { clearInterval(_feverCountdownInterval); _feverCountdownInterval = null; }
+    }
+    WG.Engine.on('hunt:stage-cleared', _clearFeverInterval);
+    WG.Engine.on('hunt:stage-failed',  _clearFeverInterval);
 
     // Generates a descending WebAudio tone for fever break grief. Self-contained:
     // creates a fresh AudioContext so it never conflicts with the main WG.Audio context.

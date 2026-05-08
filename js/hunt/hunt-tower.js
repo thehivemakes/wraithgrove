@@ -8,7 +8,7 @@
     ENERGY_COST:           5,
     // Concern B fills scaling constants
     BASE_HP_MULT:          1.0,
-    HP_MULT_PER_FLOOR:     0.18,
+    HP_MULT_PER_FLOOR:     0.12, // W-Balance-Flags-Action: was 0.18 (reason: floor 10 HP mult was 2.62×, forcing F2P new player into 55-swing mini-boss requiring 💎 continues. 0.12 drops floor 10 to 2.08×, achievable in 1–2 runs without spends)
     DAMAGE_MULT_PER_FLOOR: 0.10,
     SPEED_MULT_PER_FLOOR:  0.04,
     SPEED_MULT_CAP:        1.6,

@@ -1,6 +1,6 @@
 # STATE_OF_BUILD.md — Unlimited Chaos
 
-**Last updated:** 2026-05-06 by W-Progressive-Tab-Unlock
+**Last updated:** 2026-05-08 by W-Alliance-War-Scheduling
 **Server:** http://localhost:3996/ via `wraithgrove` launch.json entry
 **Path decision:** A — faithful clone (Architect-confirmed)
 
@@ -166,6 +166,14 @@
 - **Submit hook** — `hunt-tower.js#endRun`: calls `WG.MetaLeaderboard.submit(rt.floor, rt.totalElapsed, [skinId])` on every run end (death or exit), before summary overlay.
 - `WG.Config` initialized as `{}` if absent (safe default in stub mode, swapped for real config in Phase 4).
 
+### Alliance War (W-Alliance-War-Scheduling 2026-05-08)
+- **`js/meta/meta-alliance-war.js`** — `WG.AllianceWar`: weekly phase state machine (idle → matchmaking → attack → results → idle). Schedule: Fri 22:00 matchmaking open; Sat 18:00–Sun 18:00 attack window (24 h); Sun 18:00–Mon 00:00 results. Phase computed purely from wall-clock (no stored transitions). `OPPONENT_POOL` 5 NPC alliances (Shadow Claw 800 → Void Covenant 7000) matched by cumulative alliance power (playerPower × memberCount), ±1 tier weekly hash variation. 4-attacker cap: `selectAttackers(memberIds)` callable by alliance leader (or player if NPC-led). Deterministic raid simulation: xorshift32 seeded from `attackerId|weekKey|captainIndex` → power-ratio base damage 20–85% ± 15% variance. War resolution: player avg damage% vs NPC seeded score 30–65%. Rewards: WIN 200 coins + 20 alliancePoints; LOSE 50 coins + 5 alliancePoints. Public API: `init()`, `getState()`, `selectAttackers()`, `launchRaid(captainIndex)`, `grantRewards()`. History: last 5 war outcomes stored in state.
+- **`js/meta/meta-alliance-render.js`** (extended) — "⚔ War" sub-tab added to alliance panel. 4 phase UIs: idle (countdown + history table); matchmaking (opponent card + captain tap-to-select list, ⚔ badge on selected); attack (raid slot cards, RAID button per captain, damage% circle on completion); results (WIN/LOSS banner + score comparison + CLAIM button). War captain ⚔ badge shown in roster for `currentMatch.attackers` members. `_startWarCountdown()` helper drives 1-second interval countdowns per phase.
+- `wg-game.js` — `WG.AllianceWar.init()` added after `AllianceRecruitment.init()`, before `AllianceRender.init()`.
+- `index.html` — `'js/meta/meta-alliance-war.js'` added to MODULES after `meta-alliance-recruitment.js`. Cache-bust bumped to `0.39.5-alliance-war-1746720000`.
+- **Syntax check** — `node --check` passes on both JS files.
+- **State shape** — `state.allianceWar = { phase, currentMatch: { matchId, weekKey, opponentAlliance{id,name,banner,power}, attackers[], attackResults[], opponentScore, winner, rewardsGranted }, history[] }`.
+
 ### Meta (`js/meta/` — 10 modules)
 - `meta-iap.js` — 30+ IAP SKUs ($0.99 to $99.99); gem packs, bundles, Royal Pass, energy refills. `isAvailable()` + `bundleResetIn()` for timed gating. **STUB** — production needs Apple StoreKit + Google Play Billing wiring.
 - `meta-ads.js` — rewarded video + interstitial placeholder modals; daily 50-RV cap; ad-removal entitlement check. **STUB** — production needs AdMob via Capacitor plugin.
@@ -277,8 +285,8 @@
 
 ## Reference: file count
 
-- 43 JS modules + 1 index.html = 44 files
-- ~4,700 lines of vanilla JS
+- 44 JS modules + 1 index.html = 45 files
+- ~5,050 lines of vanilla JS
 - 0 frameworks
 - 0 third-party SDKs
 - 0 network calls (all client-side localStorage in v1.0)

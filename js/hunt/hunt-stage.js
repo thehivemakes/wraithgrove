@@ -171,6 +171,15 @@
     s.waveDurationSec = waveDurationFor(s.id);
     s.durationSec     = s.waveCount * s.waveDurationSec;
   }
+  // W-Balance-Flags-Action: bridge tier for stages 4–6. Was 3 waves → now 4 waves.
+  // Reason: stage 6→7 duration jump was 2.77× (90s→250s), steepest in the game; correlates
+  // with max churn in comparable ARPGs. 4×30s=120s → jump becomes 2.08×, within acceptable range.
+  for (const s of STAGES) {
+    if (s.id >= 4 && s.id <= 6) {
+      s.waveCount = 4;
+      s.durationSec = s.waveCount * s.waveDurationSec;
+    }
+  }
   // Stage 24 override — 8-minute final boss marathon (8 waves × 60s).
   const _s24 = STAGES.find(s => s.id === 24);
   if (_s24) { _s24.waveCount = 8; _s24.durationSec = _s24.waveCount * _s24.waveDurationSec; }

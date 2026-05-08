@@ -60,9 +60,9 @@
   // Gold Mine: coins/hr. L1=50, +30/level. L20=620.
   function yieldAt(level) { return level * 30 + 20; }
 
-  // Gold Mine: storage cap in coins. Cap hours: L1=2h → L20=24h (linear).
+  // Gold Mine: storage cap in coins. Cap hours: L1=8h → L20=24h (linear).
   function capAt(level) {
-    const hours = 2 + (level - 1) * 22 / 19;
+    const hours = 8 + (level - 1) * 16 / 19; // W-Balance-Flags-Action: base was 2h (reason: L1 2h cap = 100 coins, casual once-daily player loses 92% of production — 121 days to afford L5 upgrades. 8h base → 400 coins L1, viable idle income from D1)
     return Math.round(yieldAt(level) * hours);
   }
 

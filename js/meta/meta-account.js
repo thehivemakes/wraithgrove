@@ -49,13 +49,15 @@
     s.meta.lastLoginDayKey = today;
 
     const T = WG.State.ENERGY_TUNABLES;
-    if (WG.State.grantEnergy && T) {
-      WG.State.grantEnergy(T.LOGIN_BONUS, 'daily-login');
-      showToast('+' + T.LOGIN_BONUS + ' ⚡ Daily Login (Day ' + streak + ')');
+    if (WG.State.grant && T) {
+      // W-Balance-Flags-Action: was grantEnergy(T.LOGIN_BONUS) — now coins so overflow cap can't silently discard the bonus
+      WG.State.grant('coins', T.LOGIN_BONUS);
+      showToast('+' + T.LOGIN_BONUS + ' 🪙 Daily Login (Day ' + streak + ')');
       WG.Engine.emit('account:daily-login', { streak, bonus: T.LOGIN_BONUS });
       if (streak >= 7) {
-        WG.State.grantEnergy(T.STREAK_7_BONUS, '7-day-streak');
-        setTimeout(() => showToast('+' + T.STREAK_7_BONUS + ' ⚡ 7-Day Streak!', '#ffe080'), 600);
+        // W-Balance-Flags-Action: was grantEnergy(T.STREAK_7_BONUS) — now diamonds (non-overflowable)
+        WG.State.grant('diamonds', T.STREAK_7_BONUS);
+        setTimeout(() => showToast('+' + T.STREAK_7_BONUS + ' 💎 7-Day Streak!', '#ffe080'), 600);
         WG.Engine.emit('account:streak-7', { bonus: T.STREAK_7_BONUS });
         s.meta.loginStreak = 0; // wrap to start the next cycle on the day after
       }
