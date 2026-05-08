@@ -1704,6 +1704,47 @@
     setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 2700);
   }
 
+  // ---- Revenge raid pill (Concern A) ----
+  function _injectRevengePill(panel) {
+    const old = panel.querySelector('#wg-revenge-pill');
+    if (old) old.remove();
+    if (!WG.AllianceWar || !WG.AllianceWar.getRevengeWindow) return;
+    const rw = WG.AllianceWar.getRevengeWindow();
+    if (!rw) return;
+    const msLeft = Math.max(0, rw.expiresAt - Date.now());
+    if (msLeft === 0) return;
+    const hrs  = Math.floor(msLeft / 3600000);
+    const mins = Math.floor((msLeft % 3600000) / 60000);
+    const pill = document.createElement('div');
+    pill.id = 'wg-revenge-pill';
+    pill.style.cssText = [
+      'position:absolute;top:0;left:0;right:0;z-index:20;',
+      'background:linear-gradient(90deg,#8a1020,#c02030);',
+      'border-bottom:2px solid #e03040;padding:8px 14px;',
+      'display:flex;align-items:center;justify-content:space-between;cursor:pointer;',
+    ].join('');
+    pill.innerHTML = [
+      '<div>',
+        '<span style="font-size:11px;color:#ffe0e0;font-weight:700;letter-spacing:2px;">⚔ REVENGE RAID</span>',
+        '<span style="font-size:9px;color:#c08080;margin-left:8px;">vs ' + _esc(rw.opponentName) + '</span>',
+      '</div>',
+      '<div>',
+        '<span style="font-size:9px;color:#ff9090;font-weight:700;letter-spacing:1px;">+50% DMG</span>',
+        '<span style="font-size:8px;color:#904040;margin-left:6px;">' + hrs + 'h ' + mins + 'm ›</span>',
+      '</div>',
+    ].join('');
+    pill.addEventListener('click', function() {
+      const result = WG.AllianceWar.launchRevengeRaid();
+      if (result.ok) {
+        _toast('⚔ Revenge: ' + result.damagePercent + '% damage dealt!');
+      } else {
+        _toast('Revenge window has expired.');
+      }
+      pill.remove();
+    });
+    panel.appendChild(pill);
+  }
+
   // ---- Lock icon on nav tab ----
   function _updateNavLock() {
     const navTab = document.getElementById('nav-tab-alliance');
@@ -1742,6 +1783,7 @@
       return;
     }
     _renderFull(panel);
+    _injectRevengePill(panel);
   }
 
   function init() {
@@ -1774,6 +1816,14 @@
     });
     WG.Engine.on('allianceBoss:tierClaimed', function() {
       if (_isAllianceTabActive() && _subTab === 'boss') refresh();
+    });
+    // Refresh revenge pill when attack event fires
+    WG.Engine.on('alliance-war:attacked', function() {
+      if (_isAllianceTabActive()) refresh();
+    });
+    // Show alliance mission bonus popup
+    WG.Engine.on('alliance-mission-complete', function(ev) {
+      if (ev && ev.bonusCoins) _toast('⚑ Alliance Progress: +' + ev.bonusCoins + ' coins!');
     });
     // Initial lock state update on boot
     _updateNavLock();

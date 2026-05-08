@@ -96,11 +96,15 @@
     const s = WG.State.get();
     if (!s.allianceWar) {
       s.allianceWar = {
-        phase:        'idle',
-        currentMatch: null,
-        history:      [],
+        phase:         'idle',
+        currentMatch:  null,
+        history:       [],
+        revengeWindow: null,
+        activeBuff:    null,
       };
     }
+    if (!('revengeWindow' in s.allianceWar)) s.allianceWar.revengeWindow = null;
+    if (!('activeBuff'    in s.allianceWar)) s.allianceWar.activeBuff    = null;
     return s.allianceWar;
   }
 
@@ -182,6 +186,19 @@
 
     match.opponentScore = Math.round(opp);
     match.winner        = playerAvg >= opp ? 'us' : 'them';
+
+    // Concern A — revenge raid window when we lose
+    if (match.winner === 'them') {
+      aw.revengeWindow = {
+        opponentAllianceId: match.opponentAlliance.id,
+        opponentName:       match.opponentAlliance.name,
+        expiresAt:          Date.now() + 24 * 3600000,
+      };
+      WG.Engine.emit('alliance-war:attacked', {
+        attackerName: match.opponentAlliance.name,
+        expiresAt:    aw.revengeWindow.expiresAt,
+      });
+    }
 
     _saveState();
     WG.Engine.emit('allianceWar:resolved', {
@@ -305,7 +322,17 @@
 
     WG.State.grant('coins', reward.coins);
     if (WG.Alliance && WG.Alliance.addPoints) WG.Alliance.addPoints(reward.alliancePoints);
-    if (match.winner === 'us' && WG.Engine) WG.Engine.emit('alliance:war-won', {});
+    if (match.winner === 'us' && WG.Engine) {
+      WG.Engine.emit('alliance:war-won', {});
+      // Concern C — war victory buff
+      aw.activeBuff = {
+        id:            'war_victors_might',
+        durationMs:    24 * 3600000,
+        bossDamageMul: 1.5,
+        expiresAt:     Date.now() + 24 * 3600000,
+      };
+      WG.Engine.emit('alliance-war:win', { buff: aw.activeBuff });
+    }
 
     aw.history.unshift({
       weekKey:      match.weekKey,
@@ -321,12 +348,73 @@
     return { ok: true, winner: match.winner, reward };
   }
 
+  // ── REVENGE WINDOW ────────────────────────────────────────────────────────────
+
+  function getRevengeWindow() {
+    const aw = _ensureState();
+    if (!aw.revengeWindow) return null;
+    if (Date.now() > aw.revengeWindow.expiresAt) {
+      aw.revengeWindow = null;
+      _saveState();
+      return null;
+    }
+    return aw.revengeWindow;
+  }
+
+  // Launch a revenge raid against the attacker with +50% damage.
+  // Burns the window — can only be used once per attack event.
+  function launchRevengeRaid() {
+    const rw = getRevengeWindow();
+    if (!rw) return { ok: false, reason: 'no_window' };
+    const aw   = _ensureState();
+    const myId = (WG.Account && WG.Account.getDeviceId) ? WG.Account.getDeviceId() : 'local';
+    const opp  = OPPONENT_POOL.find(function(o) { return o.id === rw.opponentAllianceId; }) || OPPONENT_POOL[0];
+    const seed = rw.opponentAllianceId + '|revenge|' + Math.floor(Date.now() / 3600000);
+    const base   = _simulateRaid(myId, opp.power, seed, 0);
+    const dmgPct = Math.min(100, Math.round(base * 1.5));
+    aw.revengeWindow = null;
+    _saveState();
+    WG.Engine.emit('allianceWar:revengeRaid', { opponentName: rw.opponentName, damagePercent: dmgPct });
+    return { ok: true, damagePercent: dmgPct };
+  }
+
+  // ── ACTIVE BUFF ───────────────────────────────────────────────────────────────
+
+  function getActiveBuff() {
+    const aw = _ensureState();
+    if (!aw.activeBuff) return null;
+    if (Date.now() > aw.activeBuff.expiresAt) {
+      aw.activeBuff = null;
+      _saveState();
+      return null;
+    }
+    return aw.activeBuff;
+  }
+
   function init() {
     _ensureState();
     WG.Engine.on('tab:change', function(ev) {
       if (ev && ev.tab === 'alliance') _tick();
     });
     WG.Engine.on('daily:reset', _tick);
+    // Concern C — daily personal mission → +1 alliance point bonus if in an alliance
+    WG.Engine.on('mission:claimed', function(ev) {
+      if (ev && ev.type === 'daily' &&
+          WG.Alliance && WG.Alliance.isInAlliance && WG.Alliance.isInAlliance()) {
+        if (WG.Alliance.addPoints) WG.Alliance.addPoints(1);
+      }
+    });
+    // Concern C — alliance mission claimed → +5 personal coins popup (once per day)
+    WG.Engine.on('alliance:mission-claimed', function() {
+      const s     = WG.State.get();
+      const today = new Date().toDateString();
+      const aw    = _ensureState();
+      if (aw._allianceMissionBonusDay === today) return;
+      aw._allianceMissionBonusDay = today;
+      WG.State.grant('coins', 5);
+      _saveState();
+      WG.Engine.emit('alliance-mission-complete', { bonusCoins: 5 });
+    });
     _tick();
   }
 
@@ -336,6 +424,9 @@
     selectAttackers,
     launchRaid,
     grantRewards,
+    getRevengeWindow,
+    launchRevengeRaid,
+    getActiveBuff,
     REWARDS,
     OPPONENT_POOL,
   };

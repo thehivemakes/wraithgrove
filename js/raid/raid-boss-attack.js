@@ -47,8 +47,10 @@
     const atk  = p.stats ? (p.stats.attack || 5) : 5;
     const base = atk * 45 + Math.floor(Math.random() * atk * 35);
     const isCrit = Math.random() < ((p.stats && p.stats.critRate) || 0.05) * 2 + 0.08;
-    const enchMul = _enchantMul();
-    const dmg  = Math.floor(base * (isCrit ? 2.5 : 1) * enchMul);
+    const enchMul  = _enchantMul();
+    const warBuff  = WG.AllianceWar && WG.AllianceWar.getActiveBuff ? WG.AllianceWar.getActiveBuff() : null;
+    const warMul   = (warBuff && warBuff.bossDamageMul) ? warBuff.bossDamageMul : 1;
+    const dmg  = Math.floor(base * (isCrit ? 2.5 : 1) * enchMul * warMul);
     _totalDamage += dmg;
     _spawnFloat(dmg, isCrit);
     if (WG.AllianceBoss && WG.AllianceBoss.recordDamage) WG.AllianceBoss.recordDamage(dmg);
