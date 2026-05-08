@@ -13,6 +13,44 @@
   let runtime = null;
   let _edgePulse = null;
   let _stagePropsCache = {}; // stageId → { stumps:[], cabins:[], fires:[] }
+
+  // W-Tower-Visual-Polish: floor-clear transition state
+  // { startMs, durationMs, floor, name } — null when inactive
+  let _towerClearAnim = null;
+  const _TOWER_CLEAR_DUR_MS = 600;
+
+  // 60 floor names keyed by tier (10 per tier, floors 1-9/10-19/20-29/30-39/40-49/50+)
+  const FLOOR_NAMES = [
+    // Tier 1 — Wooden Hall (floors 1-9, 9 entries + 1 bonus)
+    'Timber Threshold', 'Lantern Passage', 'Plankwood Hollow', 'Ember Antechamber',
+    'Sawdust Hall', 'Torchbeam Corridor', 'Splintervault', 'Kindling Chamber',
+    'Hearthwood Shrine', 'Ashbeam Nave',
+    // Tier 2 — Mossy Stone (floors 10-19)
+    'Mossgrown Landing', 'Dripping Archway', 'Algae Vault', 'Slick Stone Passage',
+    'Mold Sanctum', 'Trickling Nave', 'Lichen Hall', 'Weeping Gallery',
+    'Fungal Chamber', 'Damp Reliquary',
+    // Tier 3 — Cracked Obsidian (floors 20-29)
+    'Obsidian Breach', 'Smoldering Hall', 'Ashcrack Passage', 'Lava-Vein Corridor',
+    'Cinderhold', 'Magma Antechamber', 'Fracture Nave', 'Scorched Reliquary',
+    'Glowing Fissure', 'Slag Chamber',
+    // Tier 4 — Bone Yard (floors 30-39)
+    'Charnel Entrance', 'Skull Passage', 'Marrow Hall', 'Ossuary Nave',
+    'Grave-Stone Gallery', 'Bonepile Vault', 'Lantern of Remains', 'Ribcage Corridor',
+    'Hollow-Eye Chamber', 'Crypt of Sighs',
+    // Tier 5 — Starlight Void (floors 40-49)
+    'Void Threshold', 'Crystal Drift', 'Astral Passage', 'Nebula Hall',
+    'Star-Shard Chamber', 'Luminous Void', 'Prism Nave', 'Cosmos Antechamber',
+    'Ether Gallery', 'Celestial Reliquary',
+    // Tier 6 — Wraith Court (floors 50-59 + overflow)
+    'Wraith Vestibule', 'Specter Hall', 'Court of Echoes', 'Banshee Nave',
+    'Phantom Gallery', 'Shade Sanctum', 'Haunted Corridor', 'Revenant Chamber',
+    'Wailing Reliquary', 'Throne of Shades',
+  ];
+
+  function _floorName(floor) {
+    const idx = Math.min(floor - 1, FLOOR_NAMES.length - 1);
+    return FLOOR_NAMES[idx] || ('Floor ' + floor);
+  }
   // Trauma-based screen shake (DOPAMINE_DESIGN §9 / Eiserloh GDC 2016).
   // shake = trauma², decays ~1.4/sec, max 18px offset + 0.04 rad rotation.
   let _trauma = 0;
@@ -2789,6 +2827,76 @@
     }
   }
 
+  // W-Tower-Visual-Polish: floor name plate — fades in on tower:floor-start, holds 1.4s, fades.
+  function _drawTowerNamePlate(ctx, W, H, nowMs) {
+    if (!_towerClearAnim) return;
+    const elapsed = nowMs - _towerClearAnim.startMs;
+    if (elapsed > _TOWER_CLEAR_DUR_MS + 1400) { return; }
+    // alpha envelope: 0→1 in first 200ms, hold, 1→0 in last 400ms
+    const totalMs = _TOWER_CLEAR_DUR_MS + 1400;
+    let alpha;
+    if (elapsed < 200) alpha = elapsed / 200;
+    else if (elapsed < totalMs - 400) alpha = 1;
+    else alpha = 1 - (elapsed - (totalMs - 400)) / 400;
+    alpha = Math.max(0, Math.min(1, alpha));
+    if (alpha <= 0) return;
+
+    const text = 'Floor ' + _towerClearAnim.floor + ' — ' + _towerClearAnim.name;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // Background pill
+    ctx.font = 'bold 15px Georgia,serif';
+    const tw = ctx.measureText(text).width;
+    const px = W / 2 - tw / 2 - 18, py = H * 0.44 - 14;
+    const pw = tw + 36, ph = 32;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(px, py, pw, ph, 8) : ctx.rect(px, py, pw, ph);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(240,210,100,0.60)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(px, py, pw, ph, 8) : ctx.rect(px, py, pw, ph);
+    ctx.stroke();
+    // Text
+    ctx.fillStyle = '#f0d890';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, W / 2, H * 0.44 + 8);
+    ctx.textAlign = 'left';
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // W-Tower-Visual-Polish: next-floor portal pulse — drawn when floor is cleared.
+  // Shows a pulsing upward-chevron at the bottom-center as "the way forward."
+  function _drawTowerPortalPulse(ctx, W, H, nowMs) {
+    if (!runtime || !runtime.floorCleared) return;
+    const t = nowMs / 1000;
+    const pulse = 0.55 + Math.sin(t * 3.5) * 0.35;
+    const cx = W / 2, cy = H * 0.88;
+    ctx.save();
+    ctx.globalAlpha = pulse * 0.85;
+    // Glow ring
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 22);
+    gr.addColorStop(0, 'rgba(240,200,80,0.55)');
+    gr.addColorStop(0.5, 'rgba(240,200,80,0.18)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2); ctx.fill();
+    // Upward chevron arrow
+    ctx.strokeStyle = 'rgba(240,210,90,0.90)';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy + 4); ctx.lineTo(cx, cy - 8); ctx.lineTo(cx + 10, cy + 4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy + 10); ctx.lineTo(cx, cy - 2); ctx.lineTo(cx + 7, cy + 10);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   // ── Tower Gauntlet frame render ─────────────────────────────────────────
   // Called from drawFrame() when runtime.mode === 'tower'.
   // Background: procedural tower interior (screen-space, fixed parallax).
@@ -2807,8 +2915,22 @@
     // Tower interior background — procedural painter (screen-space)
     const t = nowMs / 1000;
     const W = D().width, H = D().height;
+
+    // Floor-clear parallax shift: ease-out over 600ms, 0→1→0 arc
+    let _clearShift = 0;
+    if (_towerClearAnim) {
+      const elapsed = nowMs - _towerClearAnim.startMs;
+      if (elapsed >= _TOWER_CLEAR_DUR_MS) {
+        _towerClearAnim = null;
+      } else {
+        const k = elapsed / _TOWER_CLEAR_DUR_MS;
+        // ease-out: rises to 1 at 40% then falls back to 0
+        _clearShift = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6;
+      }
+    }
+
     if (window.WG.HuntTowerRender) {
-      WG.HuntTowerRender.paintTowerInterior(ctx, W, H, t, runtime.floor || 1);
+      WG.HuntTowerRender.paintTowerInterior(ctx, W, H, t, runtime.floor || 1, _clearShift);
     } else {
       WG.Render.clear(ctx, '#06020c');
     }
@@ -2843,6 +2965,8 @@
 
     drawEdgePulse(ctx);
     drawTowerHud(ctx);
+    _drawTowerNamePlate(ctx, W, H, nowMs);
+    _drawTowerPortalPulse(ctx, W, H, nowMs);
     drawLevelUpModal(ctx);
   }
 
@@ -3036,6 +3160,11 @@
       if (WG.State.get().activeTab !== 'hunt') return;
       if (handleHuntTap(e.clientX, e.clientY)) e.stopImmediatePropagation();
     }, true);
+
+    // W-Tower-Visual-Polish: trigger parallax-shift + nameplate on each new floor
+    WG.Engine.on('tower:floor-start', ({ floor }) => {
+      _towerClearAnim = { startMs: performance.now(), floor, name: _floorName(floor) };
+    });
 
     WG.Engine.on('enemy:killed', ({ creature }) => {
       for (let i = 0; i < 8; i++)
