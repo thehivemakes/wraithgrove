@@ -38,6 +38,67 @@
         { id: 'evt_tower_50', desc: 'Reach Tower floor 50 once', target: 50, reward: { gems: 200, rareMat: 5 } },
       ],
     },
+    // W-Content-Pack-V2 stub entries — activation Architect-driven
+    {
+      id: 'halloween_wraith_hunt',
+      name: 'Halloween Wraith Hunt',
+      desc: 'Cursed fog descends. Wraiths are stronger — and so are the rewards.',
+      startDate: '2026-10-27', endDate: '2026-10-31',
+      buffs: { enemy_spawn_mult: 1.5, cursed_drop_rate: 0.15 },
+      missions: [
+        { id: 'evt_cursed_wraiths', desc: 'Defeat 20 cursed enemies in Hunt', target: 20, reward: { gems: 80, frags: 25 } },
+        { id: 'evt_night_stages_2', desc: 'Clear 2 stages in Night Mode',       target: 2,  reward: { rareMat: 1 } },
+      ],
+      cosmetic: 'pumpkin_lantern_skin',
+    },
+    {
+      id: 'lantern_festival',
+      name: 'Lunar Lantern Festival',
+      desc: 'Paper lanterns light the hollow. Login bonuses doubled. Red thread falls from defeated enemies.',
+      startDate: '2027-01-29', endDate: '2027-02-06',
+      buffs: { login_bonus_mult: 2.0, red_thread_drop: true },
+      missions: [
+        { id: 'evt_lantern_logins', desc: 'Login 5 days during the festival', target: 5, reward: { gems: 100 } },
+        { id: 'evt_lantern_stages', desc: 'Clear 3 Hunt stages',              target: 3, reward: { coins: 2000 } },
+      ],
+      cosmetic: 'paper_lantern_trail',
+    },
+    {
+      id: 'summer_spirit_race',
+      name: 'Summer Spirit Race',
+      desc: 'Speed spirits roam the hollow. Movement is faster; so is everything chasing you.',
+      startDate: '2026-06-21', endDate: '2026-07-05',
+      buffs: { sprint_speed_mult: 1.2, race_spirit_spawn: true },
+      missions: [
+        { id: 'evt_race_tower_20', desc: 'Reach Tower floor 20',   target: 20, reward: { gems: 120, frags: 15 } },
+        { id: 'evt_race_duels_5',  desc: 'Win 5 Duel matches',     target: 5,  reward: { diamonds: 80 } },
+      ],
+      cosmetic: 'fox_fire_trail',
+    },
+    {
+      id: 'spring_cherry_bloom',
+      name: 'Spring Cherry Bloom',
+      desc: 'Petals drift through every stage. Gather rate increased. Brief beauty before the rot returns.',
+      startDate: '2026-03-20', endDate: '2026-04-05',
+      buffs: { gather_rate_bonus: 0.25, bloom_petal_drop: true },
+      missions: [
+        { id: 'evt_bloom_petals',  desc: 'Collect 30 bloom petals in Hunt', target: 30, reward: { gems: 60, frags: 10 } },
+        { id: 'evt_bloom_relics',  desc: 'Craft 5 relics',                  target: 5,  reward: { diamonds: 100 } },
+      ],
+      cosmetic: 'petal_cape_skin',
+    },
+    {
+      id: 'grand_anniversary',
+      name: 'Wraithgrove Grand Anniversary',
+      desc: 'One year of the hollow. All rewards doubled. The Wraith Father remembers.',
+      startDate: '2027-05-08', endDate: '2027-05-15',
+      buffs: { anniversary_reward_mult: 2.0, anniversary_banner: true },
+      missions: [
+        { id: 'evt_anniv_stages', desc: 'Clear 5 Hunt stages',       target: 5,  reward: { gems: 150, frags: 30 } },
+        { id: 'evt_anniv_tower',  desc: 'Reach Tower floor 30 once', target: 30, reward: { gems: 200, rareMat: 3 } },
+      ],
+      cosmetic: 'anniversary_flame_skin',
+    },
   ]);
 
   // ─── Concern B: Event scheduler + buff stack ─────────────────────────────────

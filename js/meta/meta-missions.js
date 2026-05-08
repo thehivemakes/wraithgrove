@@ -17,16 +17,24 @@
     { id: 'send_gifts_3',      desc: 'Send 3 gifts to alliance members',     target: 3,   tier: 'easy',     reward: { coins: 200 } },
     { id: 'pickup_coins_200',  desc: 'Collect 200 coins during Hunt runs',   target: 200, tier: 'easy',     reward: { coins: 200 } },
     { id: 'claim_daily_login', desc: 'Claim your daily login reward today',  target: 1,   tier: 'easy',     reward: { coins: 200 } },
+    // W-Content-Pack-V2 easy additions (+3)
+    { id: 'hunt_revive_1',        desc: 'Use 1 revival during a Hunt run',          target: 1, tier: 'easy', reward: { coins: 200 } },
+    { id: 'alliance_donate_once', desc: 'Donate resources to your alliance once',   target: 1, tier: 'easy', reward: { coins: 200 } },
+    { id: 'equip_relic_once',     desc: 'Equip or swap a relic in the Relics tab',  target: 1, tier: 'easy', reward: { coins: 200 } },
     // ── Standard (5) — reward: 500 coins + 5 diamonds ───────────────────────
     { id: 'kill_100',          desc: 'Kill 100 enemies in Hunt today',       target: 100, tier: 'standard', reward: { coins: 500, diamonds: 5 } },
     { id: 'clear_5_stages',    desc: 'Clear 5 Hunt stages today',            target: 5,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
     { id: 'tower_floor_5',     desc: 'Reach Tower floor 5 today',            target: 5,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
     { id: 'pull_relic',        desc: 'Pull 1 relic from the Forge today',    target: 1,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
     { id: 'tower_climb_5',     desc: 'Reach Tower floor 5 in a single run', target: 1,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
+    // W-Content-Pack-V2 standard addition (+1)
+    { id: 'forge_upgrade_3',  desc: 'Upgrade 3 Forge buildings today',       target: 3,   tier: 'standard', reward: { coins: 500, diamonds: 5 } },
     // ── Hard (3) — reward: 1500 coins + 20 diamonds + 1 fragment ────────────
     { id: 'combo_15',          desc: 'Land a 15-kill combo in Hunt',         target: 15,  tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
     { id: 'boss_defeated_1',   desc: 'Defeat 1 boss in Hunt today',          target: 1,   tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
     { id: 'tower_peak',        desc: 'Beat your Tower personal record today',target: 1,   tier: 'hard',     reward: { coins: 1500, diamonds: 20, frags: 1 } },
+    // W-Content-Pack-V2 hard addition (+1)
+    { id: 'alliance_boss_damage', desc: 'Deal 5000 damage to an Alliance Boss', target: 5000, tier: 'hard', reward: { coins: 1500, diamonds: 20, frags: 1 } },
   ];
 
   const TUNABLES = Object.freeze({
@@ -47,6 +55,14 @@
     { id: 'wk_tower_floor_15',  desc: 'Reach Tower floor 15',       target: 15,   reward: { diamonds: 200, rareMat: 1 } },
     { id: 'wk_duel_wins_15',    desc: 'Win 15 Duel matches',        target: 15,   reward: { diamonds: 80 } },
     { id: 'wk_chests_50',       desc: 'Open 50 treasure chests',    target: 50,   reward: { coins: 1500, diamonds: 60 } },
+    // W-Content-Pack-V2 weekly additions (+7)
+    { id: 'wk_boss_kills_3',    desc: 'Defeat 3 bosses in Hunt',           target: 3,   reward: { diamonds: 150, frags: 15 } },
+    { id: 'wk_alliance_boss_1', desc: 'Defeat 1 Alliance Boss',            target: 1,   reward: { diamonds: 120, frags: 5 } },
+    { id: 'wk_relics_10',       desc: 'Collect 10 relics this week',       target: 10,  reward: { diamonds: 90, frags: 10 } },
+    { id: 'wk_level_ups_3',     desc: 'Level up 3 characters',             target: 3,   reward: { diamonds: 75, rareMat: 1 } },
+    { id: 'wk_forge_upgrade_10',desc: 'Upgrade Forge buildings 10 times',  target: 10,  reward: { coins: 3000, diamonds: 80 } },
+    { id: 'wk_duel_rank_climb', desc: 'Reach your highest Duel rank',      target: 1,   reward: { diamonds: 200, rareMat: 2 } },
+    { id: 'wk_daily_logins_5',  desc: 'Log in 5 days this week',           target: 5,   reward: { coins: 1000, diamonds: 40 } },
   ];
 
   // Deterministic seeded RNG — same date + userId always yields the same mission set.
@@ -329,6 +345,7 @@
     // Boss defeated → mission + BP XP
     eng.on('boss:defeated', function() {
       increment('boss_defeated_1', 1);
+      increment('wk_boss_kills_3', 1);
       if (WG.BattlePass && WG.BattlePass.addXP) WG.BattlePass.addXP(100, 'boss-defeated');
     });
 
@@ -358,6 +375,44 @@
       increment('claim_daily_login', 1);
     });
 
+    // W-Content-Pack-V2 weekly wiring
+    eng.on('alliance-boss:defeated', function() {
+      increment('wk_alliance_boss_1', 1);
+    });
+    eng.on('relics:gained', function() {
+      increment('wk_relics_10', 1);
+    });
+    eng.on('player:level', function() {
+      increment('wk_level_ups_3', 1);
+    });
+    eng.on('forge:upgrade', function() {
+      increment('wk_forge_upgrade_10', 1);
+    });
+    eng.on('duel:rank-change', function(e) {
+      if (e && e.improved) increment('wk_duel_rank_climb', 1);
+    });
+    eng.on('daily:claimed', function() {
+      increment('wk_daily_logins_5', 1);
+    });
+
+    // W-Content-Pack-V2 new daily wiring
+    eng.on('hunt:revive-used', function() {
+      increment('hunt_revive_1', 1);
+    });
+    eng.on('alliance:donated', function() {
+      increment('alliance_donate_once', 1);
+    });
+    eng.on('relics:equipped', function() {
+      increment('equip_relic_once', 1);
+    });
+    eng.on('forge:upgrade', function() {
+      increment('forge_upgrade_3', 1);
+    });
+    eng.on('alliance-boss:damage', function(e) {
+      var dmg = (e && e.damage) ? e.damage : 1;
+      increment('alliance_boss_damage', dmg);
+    });
+
     // Daily reset — refresh missions for the new day; also check weekly
     eng.on('daily:reset', function(e) {
       var day = (e && e.day) ? e.day : (WG.MetaDailyReset ? WG.MetaDailyReset.todayStr() : '');
@@ -377,9 +432,16 @@
       forge_gold_mine: '⛏', send_gifts_3: '🎁', pickup_coins_200: '🪙',
       claim_daily_login: '📅', tower_climb_5: '🗼', boss_defeated_1: '💀',
       tower_peak: '🏔',
+      // W-Content-Pack-V2 new daily entries
+      hunt_revive_1: '💫', alliance_donate_once: '🤝', equip_relic_once: '💎',
+      forge_upgrade_3: '🔨', alliance_boss_damage: '🐉',
       // weekly
       wk_kill_500: '⚔', wk_clear_15_stages: '🏆',
       wk_tower_floor_15: '🗼', wk_duel_wins_15: '🥊', wk_chests_50: '📦',
+      // W-Content-Pack-V2 weekly
+      wk_boss_kills_3: '💀', wk_alliance_boss_1: '🐉', wk_relics_10: '💎',
+      wk_level_ups_3: '🎯', wk_forge_upgrade_10: '🔨',
+      wk_duel_rank_climb: '🥊', wk_daily_logins_5: '📅',
     };
     return icons[id] || '📋';
   }

@@ -33,8 +33,37 @@
     duel_rank_silver:   { name: 'Silver Tongue',      desc: 'Reach Silver rank in Duel',        target: 1,     reward: { gems: 25 } },
     duel_rank_gold:     { name: 'Gold Banner',        desc: 'Reach Gold rank in Duel',          target: 1,     reward: { gems: 75 } },
     duel_rank_master:   { name: 'Master of Duels',    desc: 'Reach Master rank',                target: 1,     reward: { gems: 500, rareMat: 3 } },
+
+    // ── W-Content-Pack-V2 additions (+19) ─────────────────────────────────────
+    // Hunt grinder — cumulative stage clears
+    stage_clears_10:     { name: 'Path Worn',           desc: 'Clear Hunt stages 10 times',        target: 10,    reward: { gold: 300 } },
+    stage_clears_25:     { name: 'Hollow Veteran',      desc: 'Clear Hunt stages 25 times',        target: 25,    reward: { gold: 800, gems: 20 } },
+    stage_clears_50:     { name: 'The Tireless',        desc: 'Clear Hunt stages 50 times',        target: 50,    reward: { gold: 2000, gems: 75, frags: 30 } },
+    // Tower climber — cumulative floors across all runs
+    tower_floors_50:     { name: 'Stair Walker',        desc: 'Climb 50 total Tower floors',       target: 50,    reward: { gems: 40 } },
+    tower_floors_100:    { name: 'The Long Ascent',     desc: 'Climb 100 total Tower floors',      target: 100,   reward: { gems: 100, frags: 15 } },
+    tower_floors_200:    { name: 'Pillar of the Spire', desc: 'Climb 200 total Tower floors',      target: 200,   reward: { gems: 250, rareMat: 2 } },
+    // Alliance loyal — consecutive days in an alliance
+    alliance_days_5:     { name: 'Bonded',              desc: 'Stay in an alliance for 5 days',    target: 5,     reward: { gems: 25 } },
+    alliance_days_15:    { name: 'Steadfast',           desc: 'Stay in an alliance for 15 days',   target: 15,    reward: { gems: 75, frags: 10 } },
+    alliance_days_30:    { name: 'Iron Compact',        desc: 'Stay in an alliance for 30 days',   target: 30,    reward: { gems: 200, rareMat: 1 } },
+    // Kill milestones (deeper)
+    kills_5000:          { name: 'Harvest',             desc: 'Defeat 5,000 enemies total',        target: 5000,  reward: { gold: 2500, gems: 60 } },
+    kills_25000:         { name: 'The Culling',         desc: 'Defeat 25,000 enemies total',       target: 25000, reward: { gold: 10000, gems: 250, frags: 100 } },
+    // Combo
+    combo_100:           { name: 'Fury Unbound',        desc: 'Reach 100 combo in a single stage', target: 100,   reward: { gems: 100, frags: 15 } },
+    // Craft
+    craft_50_relics:     { name: 'The Collector',       desc: 'Craft 50 relics',                   target: 50,    reward: { frags: 100, rareMat: 1 } },
+    craft_100_relics:    { name: 'The Hoarder',         desc: 'Craft 100 relics',                  target: 100,   reward: { gems: 200, frags: 200, rareMat: 3 } },
+    // Wallet whale-tier
+    spend_50000_gold:    { name: 'Empty Coffers',       desc: 'Spend 50,000 gold total',           target: 50000, reward: { gems: 60, frags: 20 } },
+    spend_250000_gold:   { name: 'Gold River',          desc: 'Spend 250,000 gold total',          target: 250000,reward: { gems: 200, rareMat: 2 } },
+    // Duel milestones
+    duel_wins_50:        { name: 'Duelist',             desc: 'Win 50 Duel matches',               target: 50,    reward: { gems: 50, frags: 10 } },
+    duel_wins_100:       { name: 'Champion of the Arena',desc: 'Win 100 Duel matches',             target: 100,   reward: { gems: 150, rareMat: 1 } },
+    duel_rank_grandmaster:{ name: 'Unbroken Crown',     desc: 'Reach Grandmaster rank',            target: 1,     reward: { gems: 1000, rareMat: 5, frags: 200 } },
   });
-  // 21 achievements; catalog frozen — edit constants here only.
+  // 40 achievements; catalog frozen — edit constants here only.
 
   function ensureState() {
     var s = WG.State.get();
@@ -182,6 +211,13 @@
     if (rankIdx >= 1) _setAtLeast('duel_rank_silver', 1);
     if (rankIdx >= 2) _setAtLeast('duel_rank_gold', 1);
     if (rankIdx >= 5) _setAtLeast('duel_rank_master', 1);
+    if (rankIdx >= 6) _setAtLeast('duel_rank_grandmaster', 1);
+
+    // Tower cumulative floors (seed from saved total if present)
+    var totalFloors = (s.towerProgress && s.towerProgress.totalFloors) || 0;
+    _setAtLeast('tower_floors_50',  Math.min(totalFloors, 50));
+    _setAtLeast('tower_floors_100', Math.min(totalFloors, 100));
+    _setAtLeast('tower_floors_200', Math.min(totalFloors, 200));
   }
 
   function _wireEvents() {
@@ -193,6 +229,8 @@
       _add('hundred_kills', 1);
       _add('thousand_kills', 1);
       _add('ten_thousand_kills', 1);
+      _add('kills_5000', 1);
+      _add('kills_25000', 1);
     });
 
     // Stage clear — check specific stageId from event payload
@@ -203,6 +241,10 @@
       if (id >= 9)  _setAtLeast('stage_9_clear', 1);
       if (id >= 15) _setAtLeast('stage_15_clear', 1);
       if (id >= 18) _setAtLeast('stage_18_clear', 1);
+      // cumulative stage clear counter
+      _add('stage_clears_10', 1);
+      _add('stage_clears_25', 1);
+      _add('stage_clears_50', 1);
     });
 
     // Tower floor — check peak floor in this run vs achievement targets
@@ -213,20 +255,27 @@
       _setAtLeast('tower_25',  Math.min(floor, 25));
       _setAtLeast('tower_50',  Math.min(floor, 50));
       _setAtLeast('tower_100', Math.min(floor, 100));
+      // cumulative floor climbed (each floor-start = 1 floor entered)
+      _add('tower_floors_50',  1);
+      _add('tower_floors_100', 1);
+      _add('tower_floors_200', 1);
     });
 
     // Combo — combo:step payload is { count } (current in-run combo length)
     eng.on('combo:step', function(e) {
       var count = e && e.count;
       if (!count) return;
-      _setAtLeast('combo_25', Math.min(count, 25));
-      _setAtLeast('combo_50', Math.min(count, 50));
+      _setAtLeast('combo_25',  Math.min(count, 25));
+      _setAtLeast('combo_50',  Math.min(count, 50));
+      _setAtLeast('combo_100', Math.min(count, 100));
     });
 
     // Gold (coins) spent — currency:change emits negative delta on spend
     eng.on('currency:change', function(e) {
       if (e && e.currency === 'coins' && e.delta < 0) {
-        _add('spend_10000_gold', -e.delta);
+        _add('spend_10000_gold',  -e.delta);
+        _add('spend_50000_gold',  -e.delta);
+        _add('spend_250000_gold', -e.delta);
       }
     });
 
@@ -239,7 +288,9 @@
 
     // Craft — each forge:craft-batch = 10 crafts
     eng.on('forge:craft-batch', function() {
-      _add('craft_10_relics', 10);
+      _add('craft_10_relics',  10);
+      _add('craft_50_relics',  10);
+      _add('craft_100_relics', 10);
     });
 
     // Duel rank tier reached
@@ -250,6 +301,22 @@
       if (idx >= 1) _setAtLeast('duel_rank_silver', 1);
       if (idx >= 2) _setAtLeast('duel_rank_gold', 1);
       if (idx >= 5) _setAtLeast('duel_rank_master', 1);
+      if (idx >= 6) _setAtLeast('duel_rank_grandmaster', 1);
+    });
+
+    // Duel wins
+    eng.on('duel:match-result', function(e) {
+      if (e && e.won) {
+        _add('duel_wins_50',  1);
+        _add('duel_wins_100', 1);
+      }
+    });
+
+    // Alliance membership days — fires daily while in an alliance
+    eng.on('alliance:day-counted', function() {
+      _add('alliance_days_5',  1);
+      _add('alliance_days_15', 1);
+      _add('alliance_days_30', 1);
     });
   }
 
@@ -265,7 +332,7 @@
   }
 
   function _categoryIcon(id) {
-    if (id.indexOf('kill') !== -1 || id === 'first_blood') return '⚔';
+    if (id.indexOf('kill') !== -1 || id === 'first_blood' || id.indexOf('kills_') === 0) return '⚔';
     if (id.indexOf('stage') !== -1) return '🏆';
     if (id.indexOf('tower') !== -1) return '🗼';
     if (id.indexOf('combo') !== -1) return '🔥';
@@ -273,6 +340,7 @@
     if (id.indexOf('unlock') !== -1 || id.indexOf('char') !== -1) return '👤';
     if (id.indexOf('craft') !== -1) return '🔨';
     if (id.indexOf('duel') !== -1) return '🥊';
+    if (id.indexOf('alliance') !== -1) return '🤝';
     return '📋';
   }
 
