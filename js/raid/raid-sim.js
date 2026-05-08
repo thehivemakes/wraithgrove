@@ -380,11 +380,74 @@
     ctx.restore();
   }
 
+  // ── DRAW DEFENSE MAP — called by playback renderer each frame ────────────
+  // Draws all placed defenses at their correct state for tSec elapsed.
+  // Reads WG.RaidLayout.SLOT_CONFIG for slot positions (nx, ny).
+  // Traps: idle → telegraph (within telegraphMs/1000 of next trigger)
+  //        → fired (within 1s window after last trigger). Turrets: HP from log.
+  function drawDefenseMap(ctx, canvasW, canvasH, layoutSlots, replayLog, tSec) {
+    if (!window.WG || !WG.RaidDefensesArt || !WG.RaidLayout || !WG.RaidDefenses) return;
+    var cfg = WG.RaidLayout.SLOT_CONFIG;
+    var log = replayLog || [];
+
+    for (var i = 0; i < layoutSlots.length; i++) {
+      var entry = layoutSlots[i];
+      if (!entry || !entry.defenseId) continue;
+      var slotDef = cfg[i];
+      if (!slotDef) continue;
+      var sx = Math.round(slotDef.nx * canvasW);
+      var sy = Math.round(slotDef.ny * canvasH);
+      var structId = 'struct_' + i;
+
+      if (slotDef.type === 'turret') {
+        var tDef = WG.RaidDefenses.getTurret(entry.defenseId);
+        if (!tDef) continue;
+        var hp = tDef.hp;
+        for (var j = 0; j < log.length; j++) {
+          var ev = log[j];
+          if (ev.tFrame > tSec) break;
+          if (ev.targetId === structId) {
+            if (ev.eventType === 'attacker_attack' || ev.eventType === 'squad_attack') hp -= ev.value;
+            if (ev.eventType === 'structure_destroyed') { hp = 0; break; }
+          }
+        }
+        if (hp <= 0) continue;
+        WG.RaidDefensesArt.drawTurret(ctx, sx, sy, entry.defenseId, Math.max(0, hp), tDef.hp, 0);
+
+      } else if (slotDef.type === 'trap') {
+        var trapDef = WG.RaidDefenses.getTrap(entry.defenseId);
+        if (!trapDef) continue;
+        // Skip if structure destroyed
+        var destroyed = false;
+        for (var d = 0; d < log.length; d++) {
+          if (log[d].targetId === structId && log[d].eventType === 'structure_destroyed' && log[d].tFrame <= tSec) { destroyed = true; break; }
+        }
+        if (destroyed) continue;
+        // Compute trap state
+        var telegSec = (trapDef.telegraphMs || 500) / 1000;
+        var lastFiredT  = -Infinity;
+        var nextTriggerT = Infinity;
+        for (var e = 0; e < log.length; e++) {
+          var le = log[e];
+          if (le.actorId === structId && (le.eventType === 'trap:hit' || le.eventType === 'trap:countered')) {
+            if (le.tFrame <= tSec) lastFiredT  = Math.max(lastFiredT, le.tFrame);
+            else if (le.tFrame < nextTriggerT) nextTriggerT = le.tFrame;
+          }
+        }
+        var trapState = 'idle';
+        if (lastFiredT > tSec - 1.0) trapState = 'fired';
+        else if (nextTriggerT !== Infinity && nextTriggerT - tSec <= telegSec) trapState = 'telegraph';
+        WG.RaidDefensesArt.drawTrap(ctx, sx, sy, entry.defenseId, trapState);
+      }
+      // Wall slots: no art drawer — intentionally skipped
+    }
+  }
+
   window.WG = window.WG || {};
   window.WG.RaidSim = {
     simulate, makeSeed, calcReward,
     SIM_LEADERBOARD,
     runVsSimOpponent,
-    buildSquadUnits, drawSquadUnit,
+    buildSquadUnits, drawSquadUnit, drawDefenseMap,
   };
 })();

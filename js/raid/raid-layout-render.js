@@ -96,7 +96,26 @@
           const def = slot.type === 'turret' ? WG.RaidDefenses.getTurret(entry.defenseId)
                     : slot.type === 'trap'   ? WG.RaidDefenses.getTrap(entry.defenseId)
                     : WG.RaidDefenses.getWall(entry.defenseId);
-          el.innerHTML = '<span style="font-size:22px;line-height:1;">' + (def ? def.icon : '?') + '</span><span style="font-size:8px;color:#c0b0d8;letter-spacing:0.5px;margin-top:2px;">' + (def ? def.name.split(' ')[0].toUpperCase() : entry.defenseId.toUpperCase()) + '</span>';
+          el.innerHTML = '';
+          // Procedural sprite for trap/turret slots; emoji fallback for walls
+          if (window.WG && WG.RaidDefensesArt && (slot.type === 'trap' || slot.type === 'turret')) {
+            var artCvs = document.createElement('canvas');
+            artCvs.width = 24; artCvs.height = 24;
+            artCvs.style.cssText = 'width:24px;height:24px;flex-shrink:0;';
+            el.appendChild(artCvs);
+            var artCtx = artCvs.getContext('2d');
+            if (slot.type === 'trap')   WG.RaidDefensesArt.drawTrap(artCtx, 12, 12, entry.defenseId, 'idle');
+            else                        WG.RaidDefensesArt.drawTurret(artCtx, 12, 12, entry.defenseId, 1, 1, 0);
+          } else {
+            var iconSpan = document.createElement('span');
+            iconSpan.style.cssText = 'font-size:22px;line-height:1;';
+            iconSpan.textContent = def ? def.icon : '?';
+            el.appendChild(iconSpan);
+          }
+          var nameLbl = document.createElement('span');
+          nameLbl.style.cssText = 'font-size:8px;color:#c0b0d8;letter-spacing:0.5px;margin-top:2px;';
+          nameLbl.textContent = def ? def.name.split(' ')[0].toUpperCase() : entry.defenseId.toUpperCase();
+          el.appendChild(nameLbl);
           el.style.background = 'linear-gradient(135deg,' + typeColor + '44,' + typeColor + '22)';
           el.style.border = '1.5px solid ' + typeColor;
           el.style.boxShadow = '0 0 8px ' + typeColor + '44';
