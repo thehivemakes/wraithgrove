@@ -1302,7 +1302,8 @@
       titleBlock.innerHTML = `
         <div style="font-size:11px;letter-spacing:2px;color:${pal.accent};opacity:0.85;text-shadow:0 1px 2px rgba(0,0,0,0.7);">STAGE ${stage.id} ${isNight?'· ☾':'· ☀'}</div>
         <div style="font-size:22px;font-weight:800;color:#fff8e0;margin-top:4px;text-shadow:0 2px 6px rgba(0,0,0,0.85);letter-spacing:1px;">${stage.name}</div>
-        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;">
+        ${stage.subtitle ? `<div style="font-size:11px;font-style:italic;color:${pal.accent};opacity:0.72;margin-top:3px;padding:0 56px;letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.8);">${stage.subtitle}</div>` : ''}
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:${stage.subtitle ? 4 : 6}px;">
           <div style="height:1px;width:54px;background:linear-gradient(to right, transparent, ${pal.accent}, transparent);opacity:0.9;"></div>
           <div style="width:5px;height:5px;border-radius:50%;background:${pal.accent};box-shadow:0 0 6px ${pal.accent};"></div>
           <div style="height:1px;width:54px;background:linear-gradient(to left, transparent, ${pal.accent}, transparent);opacity:0.9;"></div>
@@ -1310,6 +1311,22 @@
         <div style="font-size:10px;color:${pal.accent};opacity:0.85;margin-top:5px;text-shadow:0 1px 2px rgba(0,0,0,0.75);">${stage.bossId?'⚔ BOSS · ':'· WAVE · '} ${(stage.durationSec/60).toFixed(1)}m · BEST: ${best}</div>
       `;
       heroContent.appendChild(titleBlock);
+
+      // Lore info button — taps open the stage lore modal (W-Content-Stage-Lore)
+      if (stage.lore) {
+        const infoBtn = document.createElement('button');
+        infoBtn.style.cssText = `position:absolute;top:12px;right:66px;z-index:3;width:26px;height:26px;border-radius:50%;border:1px solid rgba(168,140,80,0.4);background:rgba(10,6,4,0.72);color:rgba(240,200,120,0.72);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:transform 80ms ease;`;
+        infoBtn.textContent = 'ⓘ';
+        infoBtn.addEventListener('pointerdown',()=>{infoBtn.style.transform='scale(0.88)';});
+        infoBtn.addEventListener('pointerup',()=>{infoBtn.style.transform='scale(1)';});
+        infoBtn.addEventListener('pointerleave',()=>{infoBtn.style.transform='scale(1)';});
+        infoBtn.addEventListener('click', () => {
+          const bossLine = stage.bossId ? '<span style="color:#e84040;font-weight:700;font-size:10px;letter-spacing:2px;">⚔ BOSS STAGE</span><br><br>' : '';
+          const subLine = stage.subtitle ? `<em style="opacity:0.75;display:block;margin-bottom:8px;">${stage.subtitle}</em>` : '';
+          openInfoModal(stage.name, bossLine + subLine + stage.lore);
+        });
+        heroContent.appendChild(infoBtn);
+      }
 
       // Character name plate — sits under the canvas-rendered sprite (above).
       // The sprite itself is drawn into charCanvas inside the rAF loop above.
