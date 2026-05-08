@@ -2846,6 +2846,71 @@
     drawLevelUpModal(ctx);
   }
 
+  // W-Boss-Death-Payoff §B — cinematic sequence played after boss death.
+  // runtime.bossDeathSequence = { startMs, bossX, bossY, bossSize, biomeAccent }
+  // Phase 0-300ms: ghost flashes white + scales 1→1.4.
+  // Phase 300-800ms: ghost at 0.3 alpha + radial cracks emanate.
+  // Phase 800-1500ms: blackout fade + gold "BOSS DEFEATED" text (ukiyo-e paper-card).
+  function drawBossDeathCinematic(ctx, seq) {
+    const elapsed = performance.now() - seq.startMs;
+    const W = D().width, H = D().height;
+    if (elapsed >= 1500) { runtime.bossDeathSequence = null; return; }
+    // Outside zoom transform — multiply by ZOOM to get screen pixel.
+    const scrX = (seq.bossX - camera.x) * ZOOM;
+    const scrY = (seq.bossY - camera.y) * ZOOM;
+    const ghostR = (seq.bossSize || 36) * ZOOM * 0.55;
+    if (elapsed < 300) {
+      const t = elapsed / 300;
+      ctx.save();
+      ctx.globalAlpha = 1 - t * 0.5;
+      ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 24;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(scrX, scrY, ghostR * (1 + 0.4 * t), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (elapsed < 800) {
+      const t = (elapsed - 300) / 500;
+      const r = ghostR * 1.4;
+      ctx.save();
+      ctx.globalAlpha = 0.3 * (1 - t);
+      ctx.fillStyle = seq.biomeAccent;
+      ctx.beginPath(); ctx.arc(scrX, scrY, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = (1 - t) * 0.65;
+      ctx.strokeStyle = '#fff0c0'; ctx.lineWidth = 1.5;
+      const crackLen = 18 + 48 * t;
+      for (let i = 0; i < 8; i++) {
+        const ang = (Math.PI * 2 / 8) * i + t * 0.3;
+        const startR = r * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(scrX + Math.cos(ang) * startR, scrY + Math.sin(ang) * startR);
+        ctx.lineTo(scrX + Math.cos(ang) * (startR + crackLen), scrY + Math.sin(ang) * (startR + crackLen));
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      const t = (elapsed - 800) / 700;
+      ctx.save();
+      ctx.globalAlpha = _easeInOutCubic(Math.min(1, t)) * 0.92;
+      ctx.fillStyle = '#02010a';
+      ctx.fillRect(0, 0, W, H);
+      const textT = Math.max(0, (t - 0.25) / 0.5);
+      if (textT > 0) {
+        ctx.globalAlpha = Math.min(1, textT);
+        const cardW = 300, cardH = 66;
+        const cardX = (W - cardW) / 2, cardY = H * 0.42;
+        ctx.fillStyle = 'rgba(255,244,200,0.07)';
+        ctx.fillRect(cardX, cardY, cardW, cardH);
+        ctx.strokeStyle = 'rgba(255,200,80,0.35)'; ctx.lineWidth = 1;
+        ctx.strokeRect(cardX, cardY, cardW, cardH);
+        ctx.font = 'bold 32px serif';
+        ctx.fillStyle = '#ffe870'; ctx.textAlign = 'center';
+        ctx.shadowColor = '#ffd040'; ctx.shadowBlur = 18;
+        ctx.fillText('BOSS DEFEATED', W / 2, cardY + 44);
+        ctx.textAlign = 'left'; ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+  }
+
   function drawFrame() {
     if (!runtime) return;
     // Tower Gauntlet — own render path (runtime.stage is null in tower mode)
@@ -2904,6 +2969,9 @@
     if (window.WG.HuntFX) WG.HuntFX.draw(ctx, w2s);
     ctx.restore();
     ctx.restore(); // pair with outer trauma transform save
+
+    // W-Boss-Death-Payoff §B — cinematic overlay (screen-space, outside zoom/shake).
+    if (runtime.bossDeathSequence) drawBossDeathCinematic(ctx, runtime.bossDeathSequence);
 
     // Screen-space overlays — HUD, fog, modals (drawn at native scale)
     // SPEC §0 — Night-mode darkness with carved torch/campfire holes. Drawn before
@@ -3025,12 +3093,22 @@
     WG.Engine.on('boss:defeated', () => {
       if (WG.Haptics) WG.Haptics.impact('heavy');
     });
+    // W-Boss-Death-Payoff §B — store cinematic sequence state; cleared by drawBossDeathCinematic at t=1500ms.
+    WG.Engine.on('boss:defeated', ({ boss }) => {
+      if (!runtime || !boss) return;
+      runtime.bossDeathSequence = {
+        startMs: performance.now(),
+        bossX: boss.x, bossY: boss.y,
+        bossSize: boss.size || 36,
+        biomeAccent: (boss._typeData && boss._typeData.accent) || '#a04040',
+      };
+    });
 
     // Trauma triggers (DOPAMINE_DESIGN §9 table). stump:hit excluded — would
     // shake constantly with the spinning scythe at 5 chops/sec.
+    // boss:defeated trauma owned by hunt-fx.js (W-Boss-Death-Payoff §A) — removed here.
     WG.Engine.on('enemy:killed',  () => addTrauma(0.18));
     WG.Engine.on('boss:damaged',  () => addTrauma(0.10));
-    WG.Engine.on('boss:defeated', () => addTrauma(0.65));
     WG.Engine.on('player:damaged', ({ amount }) => addTrauma(0.30 + (amount || 0) / 200));
     WG.Engine.on('player:skill',  () => addTrauma(0.45));
     WG.Engine.on('stump:chopped', () => addTrauma(0.05));
