@@ -1,5 +1,7 @@
 // WG.DuelRender — Duel tab DOM UI
 (function(){'use strict';
+  let _lbTab = 'power'; // active leaderboard sub-tab: 'power' | 'tower' | 'duel'
+
   function el(tag, attrs, ...kids) {
     const e = document.createElement(tag);
     if (attrs) for (const k in attrs) {
@@ -93,7 +95,7 @@
     }
     scroll.appendChild(matchBox);
 
-    // Recent results placeholder (server-side in production)
+    // Ranked ladder (tier reference)
     const histBox = el('div', { class:'scene-row' });
     histBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'RANKED LADDER'));
     for (const r of WG.DuelRank.RANKS) {
@@ -104,6 +106,91 @@
       histBox.appendChild(row);
     }
     scroll.appendChild(histBox);
+
+    // Seed-powered leaderboard section
+    scroll.appendChild(_buildLeaderboardSection());
+  }
+
+  // ── Leaderboard section ──────────────────────────────────────────────────────
+  function _buildLeaderboardSection() {
+    const wrap = el('div', { class:'scene-row', style:'padding:0;flex-direction:column;gap:0;' });
+
+    // Header row: label + Demo Era badge (honest: no "Live" dot)
+    const header = el('div', { style:'display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;' });
+    header.appendChild(el('span', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'LEADERBOARD'));
+    header.appendChild(el('span', {
+      style: 'font-size:9px;color:#806840;background:rgba(128,90,40,0.18);' +
+             'border:1px solid #5a3c1a;border-radius:8px;padding:2px 7px;letter-spacing:1px;',
+    }, 'DEMO ERA'));
+    wrap.appendChild(header);
+
+    // Sub-tab strip: POWER | TOWER | DUEL
+    const tabs = ['power','tower','duel'];
+    const tabLabels = { power:'⚔ POWER', tower:'🏯 TOWER', duel:'🥊 DUEL' };
+    const tabStrip = el('div', { style:'display:flex;border-bottom:1px solid #2e1e0c;' });
+    for (const t of tabs) {
+      const active = _lbTab === t;
+      const btn = el('button', {
+        style: 'flex:1;padding:7px 2px;border:none;background:' +
+               (active ? 'rgba(240,200,128,0.08)' : 'transparent') + ';' +
+               'color:' + (active ? '#f0d890' : '#705840') + ';' +
+               'font-size:9px;letter-spacing:1.2px;font-weight:' + (active ? '700' : '400') + ';' +
+               'border-bottom:2px solid ' + (active ? '#d0a840' : 'transparent') + ';' +
+               'cursor:pointer;',
+      }, tabLabels[t]);
+      btn.addEventListener('click', () => { _lbTab = t; refresh(); });
+      tabStrip.appendChild(btn);
+    }
+    wrap.appendChild(tabStrip);
+
+    // Fetch rows for active sub-tab
+    let rows = [];
+    let valLabel = 'PWR';
+    let valKey   = 'power';
+    if (window.WG.MetaLeaderboard) {
+      if (_lbTab === 'power') {
+        rows = WG.MetaLeaderboard.getTopPlayers(10);
+        valLabel = 'PWR'; valKey = 'power';
+      } else if (_lbTab === 'tower') {
+        rows = WG.MetaLeaderboard.getTowerLeaderboard(10);
+        valLabel = 'FL'; valKey = 'towerFloor';
+      } else {
+        rows = WG.MetaLeaderboard.getDuelLadder(10);
+        valLabel = 'RP'; valKey = 'duelRankPts';
+      }
+    }
+
+    const table = el('div', { style:'padding:4px 0;' });
+
+    // Separator flag: if last row has rank > 10, it's the out-of-window player
+    const hasPlayerTail = rows.length > 10 || (rows.length === 10 && rows[9].isPlayer && rows[9].rank > 10);
+    const mainRows = hasPlayerTail ? rows.slice(0, -1) : rows;
+    const tailRow  = hasPlayerTail ? rows[rows.length - 1] : null;
+
+    for (const row of mainRows) {
+      table.appendChild(_lbRow(row, valKey, valLabel));
+    }
+    if (tailRow) {
+      table.appendChild(el('div', { style:'text-align:center;font-size:10px;color:#4a3020;padding:2px 0;' }, '···'));
+      table.appendChild(_lbRow(tailRow, valKey, valLabel));
+    }
+
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function _lbRow(row, valKey, valLabel) {
+    const isPlayer = !!row.isPlayer;
+    const bg = isPlayer ? 'rgba(240,200,80,0.08)' : (row.rank % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent');
+    const nameColor = isPlayer ? '#f0d890' : '#c0a870';
+    const rankColor = row.rank === 1 ? '#f0c040' : row.rank === 2 ? '#c0c0c0' : row.rank === 3 ? '#c08040' : '#705840';
+    const val = row[valKey] !== undefined ? row[valKey] : '—';
+    const r = el('div', { style:`display:flex;align-items:center;gap:6px;padding:5px 12px;background:${bg};` });
+    r.appendChild(el('span', { style:`width:22px;text-align:right;font-size:10px;color:${rankColor};font-weight:700;flex-shrink:0;` }, '#' + row.rank));
+    r.appendChild(el('span', { style:`flex:1;font-size:11px;color:${nameColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` }, row.name || row.displayName || '—'));
+    r.appendChild(el('span', { style:`font-size:9px;color:#806840;margin-right:2px;` }, valLabel));
+    r.appendChild(el('span', { style:`font-size:11px;color:#e0b870;font-weight:600;min-width:36px;text-align:right;` }, '' + val));
+    return r;
   }
 
   function findMatch() {
