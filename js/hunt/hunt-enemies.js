@@ -22,10 +22,10 @@
 
     // Hopping Chinese vampire. Conical hat + paper amulet. AI is plain walker for
     // now; actual hop AI is V2 (would need a vertical bob + interval-step).
-    jiangshi:        { name: 'Jiangshi',       hp:50, speed:85, damage:12, cooldown:1.4, size:20, color:'#3a2018', accent:'#f8e8c8', xp:7,  mode:'night', ai:'walker' },
+    jiangshi:        { name: 'Jiangshi',       hp:50, speed:85, damage:12, cooldown:1.4, size:20, color:'#3a2018', accent:'#f8e8c8', xp:4,  mode:'night', ai:'walker' },
 
     // Armored samurai grunt — both modes (boss-tier henchman across day/night).
-    samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:10, mode:'both', ai:'walker' },
+    samurai_grunt:   { name: 'Samurai Grunt',  hp:70, speed:80, damage:15, cooldown:1.5, size:22, color:'#a82828', accent:'#ffc850', xp:7,  mode:'both', ai:'walker' },
     // W-Banshee-Enemy — Architect 2026-05-02: large Night-only rare frenzied scare.
     // SPEC §0 register. AI 'banshee_charge': erratic sin-wave pursuit + chargeDuration
     // sec of locked-on charge every shriekCooldown sec. `rare` flag → wave-spawner
@@ -34,7 +34,7 @@
     banshee: {
       name: 'Banshee',
       hp: 220, speed: 130, damage: 22, cooldown: 1.0, size: 36,
-      color: '#e8e0f0', accent: '#a060ff', xp: 30,
+      color: '#e8e0f0', accent: '#a060ff', xp: 20,
       mode: 'night', ai: 'banshee_charge', rare: true,
       shriekCooldown: 4.0,
       chargeDuration: 0.8,         // seconds of locked-on charge after shriek
@@ -49,11 +49,11 @@
     // W-Spawn-Tuning — Architect 2026-05-02: 2 new types to thicken the mix.
     // Wraith Stalker: fast Night ghost wisp, light HP, tight hitbox. Drives
     // dodge-priority panic at scale. Sprite drawn in hunt-render `drawWraithFast`.
-    wraith_fast:     { name: 'Wraith Stalker', hp:18, speed:140,damage:7,  cooldown:1.1, size:14, color:'#404858', accent:'#a8c0e8', xp:4,  mode:'night', ai:'walker' },
+    wraith_fast:     { name: 'Wraith Stalker', hp:18, speed:140,damage:7,  cooldown:1.1, size:14, color:'#404858', accent:'#a8c0e8', xp:3,  mode:'night', ai:'walker' },
     // Skull Imp: small skeletal swarmer. `swarmSize:4` is read by hunt-waves
     // spawnOne — when this type is picked, four spawn in a 30-unit jittered
     // cluster (POLISH MANDATE: feel like a CHARGE, not overlapping pile).
-    skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:0.8, size:12, color:'#e8e0d0', accent:'#3a2010', xp:2,  mode:'both',  ai:'walker', swarmSize:4 },
+    skull_swarmer:   { name: 'Skull Imp',      hp:9,  speed:95, damage:3,  cooldown:0.8, size:12, color:'#e8e0d0', accent:'#3a2010', xp:1,  mode:'both',  ai:'walker', swarmSize:4 },
 
     // ─── Ascended-tier enemies (stages 19-24) ────────────────────────────────
     // sigil_drone: small flying entity that fires glowing sigil projectiles.

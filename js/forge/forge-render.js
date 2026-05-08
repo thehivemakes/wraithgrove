@@ -142,9 +142,9 @@
 
     // Pull unlocked buildings from state — only draw what the player owns
     const buildings = WG.State.get().forge.buildings;
-    const cave     = buildings.find(b => b.id === 'cave'     && b.unlocked);
-    const pagoda   = buildings.find(b => b.id === 'forge'    && b.unlocked);
-    const campfire = buildings.find(b => b.id === 'campfire' && b.unlocked);
+    const cave     = buildings.find(b => b.id === 'gold_mine' && b.unlocked);
+    const pagoda   = buildings.find(b => b.id === 'forge'     && b.unlocked);
+    const campfire = buildings.find(b => b.id === 'campfire'  && b.unlocked);
 
     if (cave)     drawTent(ctx, W * 0.22, H * 0.55, W * 0.22, cave.level, t);
     if (pagoda)   drawHouse(ctx, W * 0.50, H * 0.50, W * 0.20, pagoda.level);
@@ -528,8 +528,8 @@
     // Daily Chest icon row + 4×2 grid
     scroll.appendChild(makeBuildingsSection());
 
-    // Anvil station (center-bottom)
-    scroll.appendChild(makeAnvilSection());
+    // Forge crafting station (center-bottom — relic crafting, separate from Anvil building)
+    scroll.appendChild(makeForgeStation());
 
     if (WG.Game && WG.Game.syncTopStrip) WG.Game.syncTopStrip();
 
@@ -553,43 +553,145 @@
     return box;
   }
 
+  // --- building stat helpers ---
+
+  function _msToHuman(ms) {
+    if (ms <= 0) return 'Ready';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + 'm';
+  }
+
+  function _buildingStatLine(b) {
+    const f = WG.State.get().forge;
+    const lv = b.level;
+    const FB = WG.ForgeBuildings;
+    switch (b.id) {
+      case 'gold_mine': {
+        const stored = f.mineStored || 0;
+        const capC = FB.capAt(lv);
+        const pct = Math.floor(stored / capC * 100);
+        return stored + '/' + capC + ' 🪙 (' + pct + '%)';
+      }
+      case 'forge':
+        return FB.craftSlotsAt(lv) + ' craft/day' + (FB.hasGuaranteedEpicAt(lv) ? ' · +Epic' : '');
+      case 'campfire':
+        return FB.campfireRegenAt(lv) + 'HP/s · r' + FB.campfireRadiusAt(lv);
+      case 'anvil': {
+        const avail = FB.availableEnchantmentsAt(lv);
+        const total = avail.reduce((s, k) => s + (f.enchantmentScrolls[k] || 0), 0);
+        const equipped = f.equippedEnchantment && f.equippedEnchantment.type;
+        return total + ' scroll' + (total !== 1 ? 's' : '') + (equipped ? ' · ✦ equipped' : '');
+      }
+      case 'cannon_battery': {
+        const shots = f.stocks.cannon_shots.length;
+        const capC = FB.shotCapAt(lv);
+        return shots + '/' + capC + ' shots';
+      }
+      case 'bow_range':
+        return (f.stocks.archer_squads || 0) + '/1 squad · ' + FB.archerCountAt(lv) + ' archers';
+      case 'barracks':
+        return (f.stocks.footman_squads || 0) + '/1 squad · ' + FB.footmanCountAt(lv) + ' footmen';
+      case 'wall_workshop': {
+        const walls = f.stocks.walls.length;
+        const capC = FB.wallCountAt(lv);
+        return walls + '/' + capC + ' walls';
+      }
+      default: return '';
+    }
+  }
+
+  function _buildingRefillLine(b) {
+    const f = WG.State.get().forge;
+    const now = Date.now();
+    const FB = WG.ForgeBuildings;
+    switch (b.id) {
+      case 'cannon_battery': {
+        const cap = FB.shotCapAt(b.level);
+        if (f.stocks.cannon_shots.length >= cap) return 'Full';
+        const iMs = FB.refillIntervalMs('cannon_battery');
+        const last = f.nextRefillAt.cannon_shots || now;
+        return _msToHuman(Math.max(0, (last + iMs) - now));
+      }
+      case 'bow_range':
+        if (f.stocks.archer_squads >= 1) return 'Ready';
+        return _msToHuman(Math.max(0, (f.nextRefillAt.archer_squads || now) + FB.refillIntervalMs('bow_range') - now));
+      case 'barracks':
+        if (f.stocks.footman_squads >= 1) return 'Ready';
+        return _msToHuman(Math.max(0, (f.nextRefillAt.footman_squads || now) + FB.refillIntervalMs('barracks') - now));
+      case 'wall_workshop': {
+        const cap = FB.wallCountAt(b.level);
+        if (f.stocks.walls.length >= cap) return 'Full';
+        const iMs = FB.refillIntervalMs('wall_workshop');
+        const last = f.nextRefillAt.walls || now;
+        return _msToHuman(Math.max(0, (last + iMs) - now));
+      }
+      default: return '';
+    }
+  }
+
   function makeBuildingTile(b) {
     const def = WG.ForgeBuildings.get(b.id);
+    const isGoldMine = b.id === 'gold_mine';
+    const f = WG.State.get().forge;
+    const statLine = _buildingStatLine(b);
+    const refillLine = _buildingRefillLine(b);
+
     const tile = el('div', {
-      class:'card-tile' + (!b.unlocked ? ' locked' : ''),
-      style:'cursor:pointer;',
-      onclick: () => {
-        if (!b.unlocked) { showLockedSlotModal(b); }
-        else            { showBuildingDetailModal(b); }
-      },
+      class: 'card-tile',
+      style: 'cursor:pointer;',
+      onclick: () => showBuildingDetailModal(b),
     });
-    tile.appendChild(el('div', { class:'icon-box' }, def.icon || '?'));
-    tile.appendChild(el('div', { class:'name' }, def.name));
-    tile.appendChild(el('div', { class:'level' }, b.unlocked ? 'Lv.' + b.level : 'LOCKED'));
+    tile.appendChild(el('div', { class: 'icon-box' }, def.icon || '?'));
+    tile.appendChild(el('div', { class: 'name' }, def.name));
+    tile.appendChild(el('div', { class: 'level' }, 'Lv.' + b.level));
+    if (statLine) {
+      tile.appendChild(el('div', {
+        style: 'font-size:9px;color:#a8d878;margin-top:1px;line-height:1.2;text-align:center;',
+      }, statLine));
+    }
+    if (refillLine) {
+      tile.appendChild(el('div', {
+        style: 'font-size:8px;color:#808060;margin-top:1px;text-align:center;',
+      }, refillLine));
+    }
+    // Collect button on Gold Mine tile when there's stored coin
+    if (isGoldMine && (f.mineStored || 0) > 0) {
+      const btn = el('button', {
+        style: 'margin-top:3px;font-size:8px;padding:2px 5px;background:#5a3a08;border:1px solid #c8a020;' +
+               'color:#fff0a0;border-radius:3px;cursor:pointer;width:100%;',
+        onclick: (e) => {
+          e.stopPropagation();
+          const r = WG.ForgeBuildings.collectMine();
+          if (r.ok) { toast('+' + r.amount + ' 🪙 collected'); refresh(); }
+        },
+      }, '+ Collect');
+      tile.appendChild(btn);
+    }
     return tile;
   }
 
-  function makeAnvilSection() {
+  function makeForgeStation() {
     const row = el('div', { class:'scene-row', style:
       'background:radial-gradient(ellipse at center,#3a2a18 0%,#1a1006 70%);padding:18px 12px;'
     });
-    // Anvil glyph centered on a stone-platform shape
+    // Forge glyph centered on stone platform
     const platform = el('div', { style:
       'width:140px;height:24px;margin:6px auto 0 auto;border-radius:50%;' +
       'background:radial-gradient(ellipse at center,#5a4828 0%,#1a1006 70%);'
     });
     row.appendChild(platform);
-    const anvil = el('div', {
+    const forgeGlyph = el('div', {
       style:'font-size:52px;text-align:center;line-height:1;margin-top:-32px;cursor:pointer;transition:transform 80ms;',
       onclick: () => {
-        anvil.style.transform = 'scale(0.92)';
-        setTimeout(() => anvil.style.transform = 'scale(1)', 90);
+        forgeGlyph.style.transform = 'scale(0.92)';
+        setTimeout(() => forgeGlyph.style.transform = 'scale(1)', 90);
         showCraftingModal();
       },
     }, '⚒');
-    row.appendChild(anvil);
+    row.appendChild(forgeGlyph);
 
-    // Craft x10 primary button + Probability Info side button
     const btnRow = el('div', { class:'modal-btn-row', style:'margin-top:10px;' });
     const s = WG.State.get();
     btnRow.appendChild(el('button', {

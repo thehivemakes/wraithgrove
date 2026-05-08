@@ -80,10 +80,31 @@
       }
       if (data.huntProgress) Object.assign(s.huntProgress, data.huntProgress);
       if (data.forge) {
-        if (Array.isArray(data.forge.buildings)) s.forge.buildings = data.forge.buildings;
-        s.forge.craftFragments = data.forge.craftFragments || s.forge.craftFragments;
-        s.forge.rareMaterials = data.forge.rareMaterials || s.forge.rareMaterials || 0;  // audit polish gap — was unrestored, breaking achievement/mission rare-mat rewards across reload
-        s.forge.lastDailyChestMs = data.forge.lastDailyChestMs || 0;
+        if (Array.isArray(data.forge.buildings))          s.forge.buildings          = data.forge.buildings;
+        // Craft resources
+        if (data.forge.wood             != null)          s.forge.wood               = data.forge.wood;
+        if (data.forge.stone            != null)          s.forge.stone              = data.forge.stone;
+        if (data.forge.woodLastRegenAt  != null)          s.forge.woodLastRegenAt    = data.forge.woodLastRegenAt;
+        if (data.forge.stoneLastRegenAt != null)          s.forge.stoneLastRegenAt   = data.forge.stoneLastRegenAt;
+        // Gold Mine offline buffer (W-Buildings-Redesign-V2)
+        if (data.forge.mineStored       != null)          s.forge.mineStored         = data.forge.mineStored;
+        if (data.forge.mineLastTickAt   != null)          s.forge.mineLastTickAt     = data.forge.mineLastTickAt;
+        // Category C raid stockpiles
+        if (data.forge.stocks)                            Object.assign(s.forge.stocks, data.forge.stocks);
+        if (data.forge.nextRefillAt)                      Object.assign(s.forge.nextRefillAt, data.forge.nextRefillAt);
+        // Category B enchantment scrolls
+        if (data.forge.enchantmentScrolls)                Object.assign(s.forge.enchantmentScrolls, data.forge.enchantmentScrolls);
+        if (data.forge.equippedEnchantment)               Object.assign(s.forge.equippedEnchantment, data.forge.equippedEnchantment);
+        if (Array.isArray(data.forge.cannon_loadout))     s.forge.cannon_loadout     = data.forge.cannon_loadout;
+        // Craft counters + daily chest
+        if (data.forge.craftFragments   != null)          s.forge.craftFragments     = data.forge.craftFragments;
+        if (data.forge.craftDailyUsed   != null)          s.forge.craftDailyUsed     = data.forge.craftDailyUsed;
+        if (data.forge.craftDailyMax    != null)          s.forge.craftDailyMax      = data.forge.craftDailyMax;
+        if (data.forge.lastDailyChestMs != null)          s.forge.lastDailyChestMs   = data.forge.lastDailyChestMs;
+        if (data.forge.dailyStreakDay    != null)          s.forge.dailyStreakDay      = data.forge.dailyStreakDay;
+        if (data.forge.streakLastClaimMs != null)         s.forge.streakLastClaimMs  = data.forge.streakLastClaimMs;
+        // Legacy field kept for old saves
+        s.forge.rareMaterials = data.forge.rareMaterials || s.forge.rareMaterials || 0;
       }
       if (data.relics) Object.assign(s.relics, data.relics);
       if (data.duel) Object.assign(s.duel, data.duel);
@@ -95,6 +116,8 @@
       if (data.firstLaunchStep !== undefined) s.firstLaunchStep = data.firstLaunchStep;
       // W-Achievements-UI: restore per-achievement progress across sessions
       if (data.achievements) s.achievements = data.achievements;
+      // W-Tutorial-Strip: persist tutorial flags (walkthroughOffered, completedFirstStage, etc.)
+      if (data.tutorial) s.tutorial = Object.assign(s.tutorial || {}, data.tutorial);
       return true;
     } catch (e) { console.warn('[cache] load failed', e); return false; }
   }
@@ -133,8 +156,10 @@
     WG.Engine.on('energy:change',   markDirty);
     WG.Engine.on('player:level',    markDirty);
     WG.Engine.on('hunt:stage-cleared', markDirty);
-    WG.Engine.on('forge:upgrade',   markDirty);
-    WG.Engine.on('relics:gained',   markDirty);
+    WG.Engine.on('forge:upgrade',           markDirty);
+    WG.Engine.on('forge:mine-collected',    markDirty);
+    WG.Engine.on('forge:enchantment-applied', markDirty);
+    WG.Engine.on('relics:gained',           markDirty);
     WG.Engine.on('duel:result',     markDirty);
     WG.Engine.on('tab:change',      markDirty);
     WG.Engine.on('iap:purchased',   markDirty);

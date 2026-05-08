@@ -302,7 +302,7 @@
     var icons = {
       kill_30: '⚔', kill_100: '⚔', clear_2_stages: '🏆', clear_5_stages: '🏆',
       tower_floor_5: '🗼', win_3_duels: '🥊', craft_1: '🔨', pull_relic: '💎',
-      pickup_50_orbs: '🔮', crit_10: '💥', combo_15: '🔥', level_up: '⬆',
+      pickup_50_orbs: '🔮', crit_10: '💥', combo_15: '🔥', level_up: '🎯',
       buff_ad_watch: '📺',
       wk_kill_500: '⚔', wk_clear_15_stages: '🏆',
       wk_tower_floor_15: '🗼', wk_duel_wins_15: '🥊', wk_chests_50: '📦',

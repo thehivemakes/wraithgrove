@@ -1427,6 +1427,7 @@
       '</div>' +
 
       '<div style="'+SL+'">TUTORIAL</div>' +
+      '<button id="cfg-walkthrough" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a4060;background:#080a18;color:#a0b8f0;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:6px;">REPLAY WALKTHROUGH</button>' +
       '<button id="cfg-reset-tutorial" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #3a4828;background:#0a1208;color:#a8d878;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;">RESET TUTORIAL</button>' +
       '<div id="cfg-reset-tutorial-msg" style="display:none;font-size:10px;text-align:center;padding:4px 0;color:#a8d878;letter-spacing:0.5px;">Tutorial reset. Play again to see all hints.</div>' +
 
@@ -1528,6 +1529,11 @@
 
     const remEl = overlay.querySelector('#cfg-reminder');
     if (remEl) remEl.addEventListener('change', (e) => { cfg.reminderTime = e.target.value; saveS(cfg); });
+
+    const walkthroughBtn = overlay.querySelector('#cfg-walkthrough');
+    if (walkthroughBtn && WG.Walkthrough) {
+      walkthroughBtn.addEventListener('click', () => { overlay.remove(); WG.Walkthrough.show(); });
+    }
 
     const resetTutBtn = overlay.querySelector('#cfg-reset-tutorial');
     const resetTutMsg = overlay.querySelector('#cfg-reset-tutorial-msg');
@@ -1697,6 +1703,7 @@
     WG.HuntRender.init();
     WG.HuntTutorial.init();
     if (WG.HuntTutorialExt && WG.HuntTutorialExt.init) WG.HuntTutorialExt.init();
+    if (WG.Walkthrough && WG.Walkthrough.init) WG.Walkthrough.init();
     if (WG.Onboarding && WG.Onboarding.init) WG.Onboarding.init();
     if (WG.HuntTowerBuffs && WG.HuntTowerBuffs.init) WG.HuntTowerBuffs.init();
     if (WG.HuntTower && WG.HuntTower.init) WG.HuntTower.init();

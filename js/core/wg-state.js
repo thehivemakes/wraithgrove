@@ -46,26 +46,48 @@
       nightModeUnlocked: {},   // stageId -> bool
     },
     forge: {
-      // W-Monetization-V2-Sub-Blockers §C — passive craft resources with offline regen.
+      // Craft resources (wood + stone) — offline regen for relic crafting
       wood: 250, woodLastRegenAt: 0,
       stone: 100, stoneLastRegenAt: 0,
+      // Gold Mine offline accumulation: fills while offline, player taps to collect
+      mineStored: 0, mineLastTickAt: 0,
+      // W-Buildings-Redesign-V2: all 8 buildings start unlocked L1, max 20.
+      // No GS gate. Categories: A=always, B=personal buffs, C=raid stockpiles.
       buildings: [
-        { id: 'cave',      level: 1, unlocked: true,  slot: 0 },
-        { id: 'forge',     level: 1, unlocked: true,  slot: 1 },
-        { id: 'campfire',  level: 1, unlocked: true,  slot: 2 },
-        { id: 'fence',     level: 0, unlocked: false, slot: 3 },
-        { id: 'cannon',    level: 0, unlocked: false, slot: 4 },
-        { id: 'blade',     level: 0, unlocked: false, slot: 5 },
-        { id: 'bow',       level: 0, unlocked: false, slot: 6 },
-        { id: 'sawtrap',   level: 0, unlocked: false, slot: 7 },
+        { id: 'gold_mine',      level: 1, unlocked: true, slot: 0 },
+        { id: 'forge',          level: 1, unlocked: true, slot: 1 },
+        { id: 'campfire',       level: 1, unlocked: true, slot: 2 },
+        { id: 'anvil',          level: 1, unlocked: true, slot: 3 },
+        { id: 'cannon_battery', level: 1, unlocked: true, slot: 4 },
+        { id: 'bow_range',      level: 1, unlocked: true, slot: 5 },
+        { id: 'barracks',       level: 1, unlocked: true, slot: 6 },
+        { id: 'wall_workshop',  level: 1, unlocked: true, slot: 7 },
       ],
+      // Category C raid stockpiles
+      stocks: {
+        cannon_shots:   [],  // array of projectile-type IDs ready to use
+        archer_squads:  0,   // 0 or 1 (full squad or none)
+        footman_squads: 0,   // 0 or 1
+        walls:          [],  // array of { hp, variant }
+      },
+      // Category B enchantment scroll inventory (Anvil)
+      enchantmentScrolls: {
+        basic_dmg: 0, bleed_chain: 0, crit_cascade: 0,
+        lifesteal_touch: 0, frost_touch: 0, void_pierce: 0,
+      },
+      // Currently applied weapon enchantment; expires after stages or raids
+      equippedEnchantment: { type: null, expiresStages: 0, expiresRaids: 0 },
+      // Cannon Battery: player-selected pre-raid loadout (3 of up to 6 types)
+      cannon_loadout: ['stone_shot', null, null],
+      // Refill timestamps for Category C buildings
+      nextRefillAt: { cannon_shots: 0, archer_squads: 0, footman_squads: 0, walls: 0 },
       craftFragments: 30,
       craftDailyUsed: 0,
-      craftDailyMax: 10,
+      craftDailyMax: 1,      // L1 Forge = 1 craft slot/day; updated by tryUpgrade
       lastDailyChestMs: 0,
       // 7-day streak tracker (Buildings tab Daily Chest)
-      dailyStreakDay: 0,        // 0 means no claim yet; 1..7 cycles
-      streakLastClaimMs: 0,     // ms of last claim — used to detect skip
+      dailyStreakDay: 0,
+      streakLastClaimMs: 0,
     },
     relics: {
       owned: {},                // relicId -> { count, level }

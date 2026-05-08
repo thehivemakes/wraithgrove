@@ -57,8 +57,8 @@
       cooldownMul: 1,
       level: 1,                  // in-stage level (Vampire Survivors style)
       xp: 0,
-      xpToNext: 12,              // Architect: HARDER. Base 12 (was 5), 1 xp/chop, 1.5x growth
-                                 // per level → 12, 18, 27, 40, 60, 90... real grind
+      xpToNext: 25,              // W-LevelUp-Storm-Tune: base 25 (was 12), 1.7x growth
+                                 // per level → 25, 43, 73, 124, 211, 359, 610, 1037...
       pickupRadius: 28,
       // active skill
       skillCd: 0,
@@ -502,14 +502,19 @@
   function levelUp() {
     const p = runtime.player;
     p.xp -= p.xpToNext;
-    p.xpToNext = Math.floor(p.xpToNext * 1.5);
+    p.xpToNext = Math.floor(p.xpToNext * 1.7);
     p.level++;
-    runtime.pendingLevelUp = true;     // hunt-render shows the 3-card draft
     WG.Engine.emit('player:level', { level: p.level });
-    // W-Dopamine-P1 §C — full-screen flash + screen shake + freeze frame
+    // W-Dopamine-P1 §C — full-screen flash + screen shake + freeze frame (every level)
     if (window.WG && WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#f0c060', 0.5, 320);
     if (window.WG && WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(0.4);
     if (window.WG && WG.Engine && WG.Engine.hitPause) WG.Engine.hitPause(200);
+    // W-LevelUp-Storm-Tune §B — queue extra level-ups instead of stacking modals
+    if (runtime.pendingLevelUp) {
+      runtime.queuedLevelUps = (runtime.queuedLevelUps || 0) + 1;
+    } else {
+      runtime.pendingLevelUp = true;
+    }
   }
 
   function applyLevelChoice(choiceId) {

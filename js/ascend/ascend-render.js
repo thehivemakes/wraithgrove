@@ -176,8 +176,8 @@
       const cost = (WG.AscendChars.rebirthCost && WG.AscendChars.rebirthCost(charId)) || 2880;
       const ready = highest >= need;
       const note = ready
-        ? `↑ Tier ${next.tier} ready · Cultivate ${cost}<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>`
-        : `↑ Tier ${next.tier} locked · clear stage ${need}`;
+        ? `Tier ${next.tier} ready · Cultivate ${cost}<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>`
+        : `Tier ${next.tier} locked · clear stage ${need}`;
       pwrBox.appendChild(el('div', {
         style: `font-size:10px;color:${ready ? '#ffd870' : '#806040'};margin-top:4px;letter-spacing:1px;`
       }, note));

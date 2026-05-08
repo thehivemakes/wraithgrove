@@ -2,27 +2,27 @@
 (function(){'use strict';
   const BOSSES = {
     pale_bride: {
-      id:'pale_bride',  name:'Pale Bride',     hp: 380, speed: 22, damage: 18, contactCd:1.4, size:36, color:'#d8c0d0', accent:'#5a3050', xp:60,
+      id:'pale_bride',  name:'Pale Bride',     hp: 380, speed: 22, damage: 18, contactCd:1.4, size:36, color:'#d8c0d0', accent:'#5a3050', xp:30,
       patterns:['summon_minions','triple_dash'], summonType:'sprite', summonCount:3, summonInterval:7.0,
     },
     frozen_crone: {
-      id:'frozen_crone', name:'Frozen Crone',  hp: 520, speed: 16, damage: 22, contactCd:1.6, size:40, color:'#c8d8e8', accent:'#3a4a6a', xp:90,
+      id:'frozen_crone', name:'Frozen Crone',  hp: 520, speed: 16, damage: 22, contactCd:1.6, size:40, color:'#c8d8e8', accent:'#3a4a6a', xp:45,
       patterns:['ice_shards','area_freeze'], shardCount:5, shardSpeed:160, shardCd:3.5, areaFreezeR:80, areaFreezeCd:9.0,
     },
     autumn_lord: {
-      id:'autumn_lord', name:'Autumn Lord',    hp: 720, speed: 24, damage: 28, contactCd:1.5, size:44, color:'#c08038', accent:'#5a3a18', xp:130,
+      id:'autumn_lord', name:'Autumn Lord',    hp: 720, speed: 24, damage: 28, contactCd:1.5, size:44, color:'#c08038', accent:'#5a3a18', xp:65,
       patterns:['leaf_storm','charge'], leafCount:8, leafSpeed:180, chargeSpeed:200, chargeCd:6.0,
     },
     temple_warden: {
-      id:'temple_warden',name:'Temple Warden', hp: 980, speed: 20, damage: 35, contactCd:1.8, size:48, color:'#e8c060', accent:'#5a3818', xp:180,
+      id:'temple_warden',name:'Temple Warden', hp: 980, speed: 20, damage: 35, contactCd:1.8, size:48, color:'#e8c060', accent:'#5a3818', xp:90,
       patterns:['shockwave','minion_squads'], shockwaveR:120, shockwaveCd:5.0, summonType:'walker', summonCount:2, summonInterval:8.0,
     },
     cave_mother: {
-      id:'cave_mother', name:'Cave Mother',    hp: 1300,speed: 14, damage: 42, contactCd:2.0, size:56, color:'#3a2a3a', accent:'#1a1018', xp:240,
+      id:'cave_mother', name:'Cave Mother',    hp: 1300,speed: 14, damage: 42, contactCd:2.0, size:56, color:'#3a2a3a', accent:'#1a1018', xp:120,
       patterns:['darkness_pulse','spawn_brood'], darknessR:140, darknessCd:7.0, broodType:'lurker', broodCount:5, broodInterval:10.0,
     },
     wraith_father: {
-      id:'wraith_father',name:'The Wraith Father', hp:2400, speed: 26, damage: 50, contactCd:1.6, size:64, color:'#1a0a30', accent:'#6020a0', xp:500,
+      id:'wraith_father',name:'The Wraith Father', hp:2400, speed: 26, damage: 50, contactCd:1.6, size:64, color:'#1a0a30', accent:'#6020a0', xp:250,
       patterns:['triple_phase','soul_volley','area_drain'],
       shardCount:12, shardSpeed:200, shardCd:4.5, areaR:160, areaCd:10.0, summonType:'caller', summonCount:3, summonInterval:12.0,
     },
@@ -32,7 +32,7 @@
     // All 3 fragments must die before the boss can be killed (see wg-game.js
     // enemy:killed handler + projectile immunity guard).
     echo_throne_keeper: {
-      id:'echo_throne_keeper', name:'Echo Throne Keeper', hp:1800, speed:18, damage:45, contactCd:1.8, size:52, color:'#2a0850', accent:'#c060ff', xp:400,
+      id:'echo_throne_keeper', name:'Echo Throne Keeper', hp:1800, speed:18, damage:45, contactCd:1.8, size:52, color:'#2a0850', accent:'#c060ff', xp:200,
       patterns:['fragment_split','sigil_burst'],
       shardCount:10, shardSpeed:175, shardCd:4.0,
       areaCd:8.0, areaR:130,
@@ -41,7 +41,7 @@
     // wraith_father_echo — faded memory of the Wraith Father. Diminished HP/speed/damage
     // but visually the same silhouette washed pale. Summons memory_husks instead of callers.
     wraith_father_echo: {
-      id:'wraith_father_echo', name:'Wraith Father Echo', hp:2000, speed:22, damage:42, contactCd:1.6, size:60, color:'#2a1040', accent:'#8040c0', xp:480,
+      id:'wraith_father_echo', name:'Wraith Father Echo', hp:2000, speed:22, damage:42, contactCd:1.6, size:60, color:'#2a1040', accent:'#8040c0', xp:240,
       patterns:['soul_volley','area_drain','echo_summon'],
       shardCount:10, shardSpeed:180, shardCd:5.0,
       areaR:150, areaCd:9.0, summonType:'memory_husk', summonCount:2, summonInterval:14.0,
