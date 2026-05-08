@@ -118,6 +118,8 @@
       if (data.achievements) s.achievements = data.achievements;
       // W-Tutorial-Strip: persist tutorial flags (walkthroughOffered, completedFirstStage, etc.)
       if (data.tutorial) s.tutorial = Object.assign(s.tutorial || {}, data.tutorial);
+      // W-Alliance-Foundation: restore full alliance object
+      if (data.alliance) s.alliance = data.alliance;
       return true;
     } catch (e) { console.warn('[cache] load failed', e); return false; }
   }
@@ -163,6 +165,7 @@
     WG.Engine.on('duel:result',     markDirty);
     WG.Engine.on('tab:change',      markDirty);
     WG.Engine.on('iap:purchased',   markDirty);
+    WG.Engine.on('alliance:changed', markDirty);
     WG.Engine.on('tick', () => autoSaveTick(performance.now()));
     // Cold-load: after sync localStorage load completes, attempt server download.
     setTimeout(_coldLoadFromServer, 0);

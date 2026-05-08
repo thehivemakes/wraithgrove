@@ -130,6 +130,8 @@
       musicOn: true,
       hapticsOn: true,
     },
+    // W-Alliance-Foundation: alliance state — null until WG.Alliance._ensureState() first call
+    alliance: null,
     meta: {
       installTimeMs: 0,
       sessionsCount: 0,

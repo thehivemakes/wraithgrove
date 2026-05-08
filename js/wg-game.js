@@ -330,7 +330,7 @@
 
   // ---- tab switching ----
   function switchTab(tab) {
-    const valid = ['duel','ascend','hunt','forge','relics'];
+    const valid = ['duel','ascend','hunt','forge','alliance','relics'];
     if (!valid.includes(tab)) return;
     // Stop the menu canvas loop when leaving Hunt; renderHero will restart it
     // when we land back on Hunt (via showHuntStageList below).
@@ -347,6 +347,7 @@
     if (tab === 'forge' && WG.ForgeRender) WG.ForgeRender.refresh();
     if (tab === 'relics' && WG.RelicsRender) WG.RelicsRender.refresh();
     if (tab === 'duel' && WG.DuelRender) WG.DuelRender.refresh();
+    if (tab === 'alliance' && WG.AllianceRender) WG.AllianceRender.refresh();
     if (tab === 'hunt') {
       // W-Character-Animate-MJ Concern D: preload active character's animated
       // WebP so it's cache-warm when renderHero() fires. Injected once per
@@ -1736,6 +1737,11 @@
     if (WG.DailyRewards && WG.DailyRewards.init) WG.DailyRewards.init();
     // W-Event-System-Scaffold — apply event buffs + register active missions
     if (WG.LtdEvents && WG.LtdEvents.init) WG.LtdEvents.init();
+    // W-Alliance-Foundation — after cache load so saved alliance state is restored
+    if (WG.Alliance && WG.Alliance.init) WG.Alliance.init();
+    if (WG.AllianceChat && WG.AllianceChat.init) WG.AllianceChat.init();
+    if (WG.AllianceMissions && WG.AllianceMissions.init) WG.AllianceMissions.init();
+    if (WG.AllianceRender && WG.AllianceRender.init) WG.AllianceRender.init();
     // Fire daily:reset now — state is loaded + all listeners registered
     if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
 

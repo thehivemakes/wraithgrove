@@ -335,6 +335,7 @@
         </div>
       </div>
       <div class="tab-panel" id="tab-forge"></div>
+      <div class="tab-panel" id="tab-alliance"></div>
       <div class="tab-panel" id="tab-relics"></div>
     </div>
   </div>
@@ -354,6 +355,10 @@
     <div class="nav-tab" data-tab="forge">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>
       <span class="label" data-i18n="nav.forge">Forge</span>
+    </div>
+    <div class="nav-tab" data-tab="alliance" id="nav-tab-alliance">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="label">Alliance</span>
     </div>
     <div class="nav-tab" data-tab="relics">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/></svg>
@@ -377,7 +382,7 @@
 
 <script>
   window.WG = window.WG || {};
-  WG.BUILD = { name: 'Unlimited Chaos', version: '0.33.0-wave1-complete-1778238038', built: '2026-05-08', anchor: 'Klovur' };
+  WG.BUILD = { name: 'Unlimited Chaos', version: '0.34.0-alliance-foundation-1778239155', built: '2026-05-08', anchor: 'Klovur' };
 
   WG.Boot = (function () {
     const overlay = document.getElementById('boot-overlay');
@@ -460,6 +465,10 @@
       'js/meta/meta-achievements.js',
       'js/meta/meta-daily-rewards.js',
       'js/meta/meta-ltd-events.js',
+      'js/meta/meta-alliance.js',
+      'js/meta/meta-alliance-chat.js',
+      'js/meta/meta-alliance-missions.js',
+      'js/meta/meta-alliance-render.js',
       'js/hunt/hunt-stage.js',
       'js/hunt/hunt-player.js',
       'js/hunt/hunt-enemies.js',
