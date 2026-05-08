@@ -765,120 +765,287 @@
     return wrap;
   }
 
-  // ---------- modals ----------
+  // ---------- modals (W-Buildings-Redesign-V2) ----------
+
+  // Upgrade ladder: shows next 5 levels with real per-level stats.
+  function _makeUpgradeLadder(b) {
+    const FB = WG.ForgeBuildings;
+    const ladder = el('div', { style:'font-size:11px;color:#c8a868;margin-top:8px;' });
+    ladder.appendChild(el('div', { style:'color:#f0d890;margin-bottom:4px;letter-spacing:1px;' }, 'UPGRADE LADDER'));
+    const maxL = FB.MAX_LEVEL;
+    let shown = 0;
+    for (let i = 0; i < 5 && b.level + i < maxL; i++) {
+      const nextLv = b.level + i + 1;
+      const peek = { id: b.id, level: b.level + i };
+      const cost = FB.upgradeCost(peek);
+      let benefit = '';
+      switch (b.id) {
+        case 'gold_mine':      benefit = FB.yieldAt(nextLv) + '/hr · cap ' + FB.capAt(nextLv); break;
+        case 'forge':          benefit = FB.craftSlotsAt(nextLv) + '/day slots' + (FB.hasGuaranteedEpicAt(nextLv) ? ' +Epic' : ''); break;
+        case 'campfire':       benefit = FB.campfireRegenAt(nextLv) + 'HP/s · r' + FB.campfireRadiusAt(nextLv); break;
+        case 'anvil':          benefit = FB.anvilScrollsAt(nextLv) + ' scrolls/day'; break;
+        case 'cannon_battery': benefit = 'cap ' + FB.shotCapAt(nextLv) + ' shots' + (FB.unlocksAt('cannon_battery', nextLv).length ? ' · unlocks ' + FB.unlocksAt('cannon_battery', nextLv).join(', ') : ''); break;
+        case 'bow_range':      benefit = FB.archerCountAt(nextLv) + ' archers' + (FB.archerCaptainsAt(nextLv) > 0 ? ' + ' + FB.archerCaptainsAt(nextLv) + ' captain' : ''); break;
+        case 'barracks':       benefit = FB.footmanCountAt(nextLv) + ' footmen' + (FB.footmanCaptainsAt(nextLv) > 0 ? ' + ' + FB.footmanCaptainsAt(nextLv) + ' captain' : ''); break;
+        case 'wall_workshop':  benefit = 'cap ' + FB.wallCountAt(nextLv) + ' walls'; break;
+        default: benefit = 'Lv.' + nextLv;
+      }
+      const isNext = i === 0;
+      const row = el('div', {
+        style: 'display:flex;justify-content:space-between;padding:3px 0;' +
+               (isNext ? 'color:#fff0c8;font-weight:600;' : 'color:#a89868;'),
+      });
+      row.appendChild(el('span', null, 'Lv.' + nextLv + ' → ' + benefit));
+      row.appendChild(el('span', null, '🪙 ' + cost));
+      ladder.appendChild(row);
+      shown++;
+    }
+    if (b.level >= maxL) ladder.appendChild(el('div', { style:'margin-top:6px;color:#80c040;' }, 'MAX LEVEL'));
+    return ladder;
+  }
+
+  // Speed-refill button for Category C buildings (20💎 instant refill).
+  const SPEED_REFILL_COST = 20;
+  function _makeSpeedRefillBtn(b, wrap) {
+    return el('button', {
+      class: 'btn',
+      onclick: () => {
+        if (!WG.State.spend('diamonds', SPEED_REFILL_COST)) { toast('Need ' + SPEED_REFILL_COST + ' 💎'); return; }
+        const f = WG.State.get().forge;
+        const FB = WG.ForgeBuildings;
+        switch (b.id) {
+          case 'cannon_battery': {
+            const cap = FB.shotCapAt(b.level);
+            while (f.stocks.cannon_shots.length < cap) f.stocks.cannon_shots.push('stone_shot');
+            f.nextRefillAt.cannon_shots = Date.now();
+            break;
+          }
+          case 'bow_range':    f.stocks.archer_squads  = 1; f.nextRefillAt.archer_squads  = Date.now(); break;
+          case 'barracks':     f.stocks.footman_squads = 1; f.nextRefillAt.footman_squads = Date.now(); break;
+          case 'wall_workshop': {
+            const cap = FB.wallCountAt(b.level);
+            while (f.stocks.walls.length < cap) f.stocks.walls.push({ hp: 200, variant: 'basic' });
+            f.nextRefillAt.walls = Date.now();
+            break;
+          }
+        }
+        WG.Engine.emit('forge:upgrade', { id: b.id, level: b.level, newUnlocks: [] });
+        wrap.remove(); refresh();
+        toast('Refilled! (' + SPEED_REFILL_COST + ' 💎)');
+      },
+    }, '⚡ Speed Refill  ' + SPEED_REFILL_COST + ' 💎');
+  }
+
   function showBuildingDetailModal(b) {
     const def = WG.ForgeBuildings.get(b.id);
-    const wrap = el('div', { class:'modal-overlay show' });
-    const card = el('div', { class:'modal-card', style:'max-width:320px;' });
-    card.appendChild(el('div', { class:'modal-title' }, def.name + ' · Lv.' + b.level));
-    card.appendChild(el('div', { class:'modal-body' }, def.desc || ''));
+    const FB  = WG.ForgeBuildings;
+    const f   = WG.State.get().forge;
+    const wrap = el('div', { class: 'modal-overlay show' });
+    const card = el('div', { class: 'modal-card', style: 'max-width:340px;' });
 
-    // Upgrade ladder: current → +5 levels (capped at 10)
-    const ladder = el('div', { style:'font-size:11px;color:#c8a868;' });
-    ladder.appendChild(el('div', { style:'color:#f0d890;margin-bottom:4px;letter-spacing:1px;' }, 'UPGRADE LADDER'));
-    for (let i = 0; i < 5 && b.level + i < 10; i++) {
-      const peek = { id: b.id, level: b.level + i };
-      const cost = WG.ForgeBuildings.upgradeCost(peek);
-      const benefit = (def.baseGen ? '+' + (def.baseGen * (b.level + i + 1)).toFixed(1) + ' coins/s' : tierBenefit(def, b.level + i + 1));
-      const isNext = i === 0;
-      ladder.appendChild(el('div', {
-        style:'display:flex;justify-content:space-between;padding:3px 0;' +
-              (isNext ? 'color:#fff0c8;font-weight:600;' : ''),
-      }, 'Lv.' + (b.level + i + 1) + '  →  ' + benefit, el('span', null, '🪙 ' + cost)));
+    card.appendChild(el('div', { class: 'modal-title' }, def.icon + ' ' + def.name + ' · Lv.' + b.level));
+    card.appendChild(el('div', { class: 'modal-body', style: 'font-size:12px;color:#a89878;' }, def.desc));
+
+    // ── Category-specific stats block ──────────────────────────────────────
+    const stats = el('div', { style: 'background:#1a1008;border:1px solid #3a2818;border-radius:6px;padding:8px;margin:8px 0;font-size:12px;line-height:1.7;' });
+
+    switch (b.id) {
+      // ── Gold Mine ──────────────────────────────────────────────────────────
+      case 'gold_mine': {
+        const stored = f.mineStored || 0;
+        const cap = FB.capAt(b.level);
+        stats.appendChild(el('div', null, '🪙 Yield: ' + FB.yieldAt(b.level) + ' coins/hr'));
+        stats.appendChild(el('div', null, '📦 Cap: ' + cap + ' coins (' + (2 + (b.level - 1) * 22 / 19).toFixed(1) + 'h)'));
+        stats.appendChild(el('div', { style: 'color:' + (stored > 0 ? '#ffd870' : '#606060') + ';font-weight:600;' },
+          '💰 Stored: ' + stored + ' / ' + cap));
+        card.appendChild(stats);
+        // Collect button (prominent if stored > 0)
+        if (stored > 0) {
+          card.appendChild(el('button', {
+            class: 'btn primary', style: 'width:100%;margin:6px 0;',
+            onclick: () => {
+              const r = FB.collectMine();
+              if (r.ok) { wrap.remove(); refresh(); toast('+' + r.amount + ' 🪙 collected!'); }
+            },
+          }, 'Collect  🪙 ' + stored));
+        }
+        break;
+      }
+
+      // ── Forge ──────────────────────────────────────────────────────────────
+      case 'forge': {
+        const used = f.craftDailyUsed || 0;
+        const max  = f.craftDailyMax  || 1;
+        stats.appendChild(el('div', null, '🔨 Craft slots/day: ' + FB.craftSlotsAt(b.level)));
+        stats.appendChild(el('div', null, '📋 Used today: ' + used + ' / ' + max));
+        if (FB.hasGuaranteedEpicAt(b.level)) {
+          stats.appendChild(el('div', { style: 'color:#c080e0;' }, '★ Guaranteed Epic craft unlocked'));
+        }
+        card.appendChild(stats);
+        break;
+      }
+
+      // ── Campfire ───────────────────────────────────────────────────────────
+      case 'campfire': {
+        stats.appendChild(el('div', null, '❤ Regen: ' + FB.campfireRegenAt(b.level) + ' HP/sec'));
+        stats.appendChild(el('div', null, '📡 Radius: ' + FB.campfireRadiusAt(b.level) + ' units'));
+        stats.appendChild(el('div', null, '🔦 Night torch: ' + (b.level >= 10 ? '50% slower decay' : 'standard decay')));
+        card.appendChild(stats);
+        break;
+      }
+
+      // ── Anvil ──────────────────────────────────────────────────────────────
+      case 'anvil': {
+        const scrollsPerDay = FB.anvilScrollsAt(b.level);
+        const available = FB.availableEnchantmentsAt(b.level);
+        stats.appendChild(el('div', null, '📜 Scrolls/day: ' + scrollsPerDay));
+        // Scroll inventory
+        const invDiv = el('div', { style: 'margin-top:4px;' });
+        for (const id of available) {
+          const enc = FB.ENCHANTMENTS[id];
+          const count = f.enchantmentScrolls[id] || 0;
+          invDiv.appendChild(el('div', {
+            style: 'display:flex;justify-content:space-between;padding:2px 0;' +
+                   (count > 0 ? 'color:#d0c870;' : 'color:#605840;'),
+          },
+          el('span', null, enc.name + ' — ' + enc.effect),
+          el('span', { style: 'font-weight:600;' }, '×' + count)));
+        }
+        stats.appendChild(invDiv);
+        // Equipped enchantment
+        const eq = f.equippedEnchantment;
+        if (eq && eq.type) {
+          const eEnc = FB.ENCHANTMENTS[eq.type];
+          stats.appendChild(el('div', {
+            style: 'margin-top:6px;padding:6px;border:1px solid #80c040;border-radius:4px;background:rgba(128,192,64,0.08);font-size:11px;',
+          }, '✦ Active: ' + (eEnc ? eEnc.name : eq.type) + ' — ' + eq.expiresStages + ' stages or ' + eq.expiresRaids + ' raid remaining'));
+        }
+        card.appendChild(stats);
+        // Enchantment apply picker
+        const enchsWithScrolls = available.filter(id => (f.enchantmentScrolls[id] || 0) > 0);
+        if (enchsWithScrolls.length > 0) {
+          const pickerLabel = el('div', { style: 'color:#f0d890;font-size:11px;letter-spacing:1px;margin:8px 0 4px 0;' }, 'APPLY ENCHANTMENT');
+          card.appendChild(pickerLabel);
+          for (const id of enchsWithScrolls) {
+            const enc = FB.ENCHANTMENTS[id];
+            const count = f.enchantmentScrolls[id];
+            card.appendChild(el('button', {
+              class: 'btn',
+              style: 'width:100%;margin-bottom:4px;text-align:left;',
+              onclick: () => {
+                const r = FB.applyEnchantment(id);
+                if (r.ok) { wrap.remove(); refresh(); toast('✦ ' + enc.name + ' applied!'); }
+                else { toast('No scrolls available'); }
+              },
+            }, enc.name + ' (×' + count + ') — ' + enc.effect));
+          }
+        }
+        break;
+      }
+
+      // ── Cannon Battery ─────────────────────────────────────────────────────
+      case 'cannon_battery': {
+        const shots = f.stocks.cannon_shots.length;
+        const cap   = FB.shotCapAt(b.level);
+        const avail = FB.availableProjectilesAt(b.level);
+        stats.appendChild(el('div', null, '💣 Shots: ' + shots + ' / ' + cap));
+        stats.appendChild(el('div', null, '⏱ Refill: 1 shot per 30 min · ' + _buildingRefillLine(b)));
+        // Available projectile types
+        const ptDiv = el('div', { style: 'margin-top:4px;' });
+        for (const id of avail) {
+          const pt = FB.PROJECTILE_TYPES[id];
+          ptDiv.appendChild(el('div', {
+            style: 'display:flex;justify-content:space-between;padding:2px 0;color:#a8c870;',
+          },
+          el('span', null, pt.name + ' — ' + pt.special),
+          el('span', null, pt.damage + ' dmg')));
+        }
+        stats.appendChild(ptDiv);
+        card.appendChild(stats);
+        // Loadout picker (3 slots, choose from available)
+        const loadoutLabel = el('div', { style: 'color:#f0d890;font-size:11px;letter-spacing:1px;margin:8px 0 4px 0;' }, 'LOADOUT (pick 3)');
+        card.appendChild(loadoutLabel);
+        for (let slot = 0; slot < 3; slot++) {
+          const current = f.cannon_loadout[slot];
+          const slotRow = el('div', { style: 'display:flex;align-items:center;gap:6px;margin-bottom:4px;' });
+          slotRow.appendChild(el('span', { style: 'font-size:11px;color:#a89878;min-width:40px;' }, 'Slot ' + (slot + 1) + ':'));
+          const sel = document.createElement('select');
+          sel.style.cssText = 'flex:1;background:#1a1008;color:#f0d890;border:1px solid #3a2818;border-radius:4px;padding:3px;font-size:11px;';
+          sel.appendChild(Object.assign(document.createElement('option'), { value: '', text: '— empty —' }));
+          for (const id of avail) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.text  = FB.PROJECTILE_TYPES[id].name;
+            if (current === id) opt.selected = true;
+            sel.appendChild(opt);
+          }
+          sel.addEventListener('change', () => {
+            f.cannon_loadout[slot] = sel.value || null;
+            WG.Engine.emit('forge:upgrade', { id: 'cannon_battery', level: b.level, newUnlocks: [] });
+          });
+          slotRow.appendChild(sel);
+          card.appendChild(slotRow);
+        }
+        break;
+      }
+
+      // ── Bow Range ──────────────────────────────────────────────────────────
+      case 'bow_range': {
+        const ready = f.stocks.archer_squads || 0;
+        stats.appendChild(el('div', null, '🏹 Archers: ' + FB.archerCountAt(b.level) + ' per squad'));
+        stats.appendChild(el('div', null, '⭐ Captains: ' + FB.archerCaptainsAt(b.level)));
+        stats.appendChild(el('div', null, '⏱ Refill: 4h · ' + (ready ? 'Ready' : _buildingRefillLine(b))));
+        stats.appendChild(el('div', null, '🪖 Squad: ' + (ready ? '✓ Ready' : 'Refilling')));
+        card.appendChild(stats);
+        break;
+      }
+
+      // ── Barracks ───────────────────────────────────────────────────────────
+      case 'barracks': {
+        const ready = f.stocks.footman_squads || 0;
+        stats.appendChild(el('div', null, '⚔ Footmen: ' + FB.footmanCountAt(b.level) + ' per squad'));
+        stats.appendChild(el('div', null, '⭐ Captains: ' + FB.footmanCaptainsAt(b.level)));
+        stats.appendChild(el('div', null, '⏱ Refill: 4h · ' + (ready ? 'Ready' : _buildingRefillLine(b))));
+        stats.appendChild(el('div', null, '🛡 Role: body-block traps · draw aggro'));
+        card.appendChild(stats);
+        break;
+      }
+
+      // ── Wall Workshop ──────────────────────────────────────────────────────
+      case 'wall_workshop': {
+        const walls = f.stocks.walls.length;
+        const cap   = FB.wallCountAt(b.level);
+        stats.appendChild(el('div', null, '🪵 Walls: ' + walls + ' / ' + cap));
+        stats.appendChild(el('div', null, '⏱ Refill: 1 wall per 90 min · ' + _buildingRefillLine(b)));
+        const featureStr = b.level >= 15 ? 'Jade-Skin variant' : b.level >= 10 ? 'Reflective Ward (20% dmg return)' : b.level >= 5 ? 'Spikes (return melee)' : 'Basic (200 HP)';
+        stats.appendChild(el('div', null, '✦ ' + featureStr));
+        card.appendChild(stats);
+        break;
+      }
+
+      default:
+        card.appendChild(stats);
     }
-    if (b.level >= 10) ladder.appendChild(el('div', { style:'margin-top:6px;' }, 'MAX LEVEL'));
-    card.appendChild(ladder);
 
-    const btnRow = el('div', { class:'modal-btn-row', style:'margin-top:12px;' });
-    if (b.level < 10) {
-      const cost = WG.ForgeBuildings.upgradeCost(b);
+    // ── Upgrade ladder ──────────────────────────────────────────────────────
+    card.appendChild(_makeUpgradeLadder(b));
+
+    // ── Button row ──────────────────────────────────────────────────────────
+    const btnRow = el('div', { class: 'modal-btn-row', style: 'flex-direction:column;align-items:stretch;gap:6px;margin-top:12px;' });
+    if (b.level < FB.MAX_LEVEL) {
+      const cost = FB.upgradeCost(b);
       btnRow.appendChild(el('button', {
-        class:'btn primary',
+        class: 'btn primary',
         onclick: () => {
-          const r = WG.ForgeBuildings.tryUpgrade(b.id);
+          const r = FB.tryUpgrade(b.id);
           if (r.ok) { wrap.remove(); refresh(); }
           else      { toast('Need ' + cost + ' 🪙'); }
         },
       }, 'Upgrade  🪙 ' + cost));
     }
-    btnRow.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'Close'));
-    card.appendChild(btnRow);
-    wrap.appendChild(card);
-    modalRoot().appendChild(wrap);
-  }
-
-  function tierBenefit(def, level) {
-    // Plain-English benefit strings per building type
-    if (def.name === 'Cave')     return '+' + (0.6 * level).toFixed(1) + ' coins/s';
-    if (def.name === 'Forge')    return 'better craft odds';
-    if (def.name === 'Campfire') return '+ HP regen in Hunt';
-    if (def.name === 'Fence')    return '+ defense bonus';
-    if (def.name === 'Cannon')   return 'unlock ranged tier 2';
-    if (def.name === 'Anvil')    return 'unlock melee tier 2';
-    if (def.name === 'Range')    return 'unlock ranged tier 3';
-    if (def.name === 'Trap')     return '+ crit bonus';
-    return '+ Power';
-  }
-
-  // Locked-slot unlock-flow modal: standard cost / Pay 200💎 bypass / Watch Ad.
-  function showLockedSlotModal(b) {
-    const def = WG.ForgeBuildings.get(b.id);
-    const power = WG.State.recomputePower();
-    const gsMet = power >= (def.unlockGS || 0);
-    const cost = def.unlockCost || {};
-    const costStr = Object.entries(cost).map(([k,v])=>v+(k==='coins'?'🪙':k==='diamonds'?'💎':'🎴')).filter(s=>!s.startsWith('0')).join(' ') || 'free';
-
-    const wrap = el('div', { class:'modal-overlay show' });
-    const card = el('div', { class:'modal-card', style:'max-width:320px;' });
-    card.appendChild(el('div', { class:'modal-title' }, 'Unlock ' + def.name));
-    card.appendChild(el('div', { class:'modal-body', style:'text-align:center;' }, def.desc || ''));
-
-    // GS gate readout (orange when not met)
-    const gsLine = el('div', { style:
-      'text-align:center;font-size:13px;margin-bottom:10px;font-weight:600;' +
-      (gsMet ? 'color:#80c040;' : 'color:#ff8838;')
-    }, gsMet ? '✓ Power ' + (def.unlockGS || 0) + ' reached' : 'Unlock at Power ' + (def.unlockGS || 0) + '  (you: ' + power + ')');
-    card.appendChild(gsLine);
-
-    const btnRow = el('div', { class:'modal-btn-row', style:'flex-direction:column;align-items:stretch;gap:6px;' });
-
-    // Standard unlock (only available if GS gate met)
-    if (gsMet) {
-      btnRow.appendChild(el('button', {
-        class:'btn primary',
-        onclick: () => {
-          const r = WG.ForgeBuildings.tryUnlock(b.id);
-          if (r.ok) { wrap.remove(); refresh(); toast(def.name + ' unlocked!'); }
-          else      { toast(r.reason === 'gs-gate' ? 'Power too low' : 'Insufficient'); }
-        },
-      }, 'Unlock  ' + costStr));
-    }
-
-    // Watch Ad bypass (placeholder ad if no SDK; real AdMob in Phase 4)
-    if (WG.ForgeBuildings.AD_REWARD_AVAILABLE && WG.Ads) {
-      btnRow.appendChild(el('button', {
-        class:'btn',
-        onclick: async () => {
-          const r = await WG.ForgeBuildings.tryUnlockByAd(b.id);
-          if (r && r.ok) { wrap.remove(); refresh(); toast(def.name + ' unlocked via ad!'); }
-          else if (r && r.reason === 'capped') { toast('Daily ad cap reached'); }
-          else { toast('Ad skipped'); }
-        },
-      }, '▶ Watch Ad to Unlock'));
-    }
-
-    // Pay diamonds bypass
-    const dCost = WG.ForgeBuildings.DIAMOND_BYPASS_COST;
-    btnRow.appendChild(el('button', {
-      class:'btn',
-      onclick: () => {
-        const r = WG.ForgeBuildings.tryUnlockByDiamonds(b.id);
-        if (r.ok) { wrap.remove(); refresh(); toast(def.name + ' unlocked!'); }
-        else      { toast('Need ' + dCost + ' 💎'); }
-      },
-    }, 'Pay ' + dCost + ' 💎'));
-
-    btnRow.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'Cancel'));
+    // Speed-Refill for Category C
+    if (def.category === 'C') btnRow.appendChild(_makeSpeedRefillBtn(b, wrap));
+    btnRow.appendChild(el('button', { class: 'btn', onclick: () => wrap.remove() }, 'Close'));
     card.appendChild(btnRow);
     wrap.appendChild(card);
     modalRoot().appendChild(wrap);
@@ -1059,19 +1226,17 @@
       if (tab === 'forge') refresh();
       else                 stopDioramaLoop();
     });
-    WG.Engine.on('currency:change', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
-    WG.Engine.on('forge:upgrade', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
-    WG.Engine.on('forge:resources-change', () => { if (WG.State.get().activeTab === 'forge') refresh(); });
+    const _onForgeChange = () => { if (WG.State.get().activeTab === 'forge') refresh(); };
+    WG.Engine.on('currency:change',           _onForgeChange);
+    WG.Engine.on('forge:upgrade',             _onForgeChange);
+    WG.Engine.on('forge:resources-change',    _onForgeChange);
+    WG.Engine.on('forge:mine-collected',      _onForgeChange);
+    WG.Engine.on('forge:mine-tick',           _onForgeChange);
+    WG.Engine.on('forge:enchantment-applied', _onForgeChange);
   }
 
-  // Public API. The `_show*` hooks let Concern B override modal behaviors
-  // without rewriting the render module.
   window.WG.ForgeRender = {
     init, refresh,
-    // overridable hooks (Concern B):
-    _showCraftingModal: null,
-    _showLockedSlotModal: null,
-    // helpers Concern B reuses:
     _modalRoot: modalRoot,
     _toast: toast,
     _showRewardModal: showRewardModal,

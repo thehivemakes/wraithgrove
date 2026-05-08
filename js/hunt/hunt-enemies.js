@@ -65,6 +65,26 @@
     memory_husk:     { name: 'Memory Husk',    hp:80, speed:16, damage:14, cooldown:1.7, size:22, color:'#5a3870', accent:'#a880c8', xp:10, mode:'both',  ai:'walker' },
   };
 
+  // W-LevelUp-Storm-Tune §C — enemy HP scales with in-stage player level so early
+  // levels feel powerful and late levels get a real challenge. HP only; damage/speed
+  // unchanged (power-creep asymmetry keeps player agency intact).
+  const LEVEL_SCALE_TUNABLES = Object.freeze({
+    HP_PER_LEVEL: 0.15,   // +15% HP per player level above 1 (tunable post-launch)
+  });
+
+  // Apply level HP scaling to a freshly-spawned enemy. Hunt + tower modes both apply;
+  // tutorial bypasses (fixed stage multipliers own difficulty there).
+  function applyLevelScaling(runtime, ent) {
+    if (!ent || !runtime) return ent;
+    if (runtime.stage && runtime.stage.isTutorial) return ent;
+    const level = (runtime.player && runtime.player.level) || 1;
+    if (level <= 1) return ent;
+    const mult = 1 + (level - 1) * LEVEL_SCALE_TUNABLES.HP_PER_LEVEL;
+    ent.hp    = Math.max(1, Math.round(ent.hp    * mult));
+    ent.maxHp = Math.max(1, Math.round(ent.maxHp * mult));
+    return ent;
+  }
+
   // W-Wave1-God-Window — smooth power-fantasy ramp over first 60s of every Hunt stage.
   // Architect ratified 2026-05-06: cubic-out ease from 60%→100% (replaces flat 50% snap
   // in PIVOT_REPORT §4). Applied at spawn time only; does NOT affect Tower Gauntlet or bosses.
@@ -268,5 +288,5 @@
   }
 
   function init() {}
-  window.WG.HuntEnemies = { init, TYPES, GOD_WINDOW, spawn, tickOne, damage, applyGodWindowScaling };
+  window.WG.HuntEnemies = { init, TYPES, GOD_WINDOW, LEVEL_SCALE_TUNABLES, spawn, tickOne, damage, applyGodWindowScaling, applyLevelScaling };
 })();

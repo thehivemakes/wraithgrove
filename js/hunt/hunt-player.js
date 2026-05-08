@@ -527,7 +527,14 @@
       case 'pickup': p.pickupRadius += 8; break;
       case 'speed':  p.speedBonus = (p.speedBonus||0) + 12; break;
     }
-    runtime.pendingLevelUp = false;
+    // W-LevelUp-Storm-Tune §B — drain queue: if more levels pending, keep modal open
+    if (runtime.queuedLevelUps && runtime.queuedLevelUps > 0) {
+      runtime.queuedLevelUps--;
+      // pendingLevelUp stays true; render will regenerate fresh cards (runtime._luOptions
+      // is cleared by the pick handler in hunt-render.js before calling applyLevelChoice)
+    } else {
+      runtime.pendingLevelUp = false;
+    }
   }
 
   function pickupTick(dt) {

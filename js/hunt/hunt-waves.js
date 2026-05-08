@@ -152,6 +152,8 @@
       applyNightScaling(runtime, e);
       // W-Wave1-God-Window — ramp from 60%→100% stats over first 60s. Hunt only; tower+boss excluded in applyGodWindowScaling.
       WG.HuntEnemies.applyGodWindowScaling(runtime, e);
+      // W-LevelUp-Storm-Tune §C — scale HP by player in-stage level so enemies toughen as player levels up.
+      WG.HuntEnemies.applyLevelScaling(runtime, e);
       runtime.creatures.push(e);
     }
     return e;

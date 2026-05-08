@@ -2634,9 +2634,15 @@
     overlay.id = 'levelup-modal';
     overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.78);z-index:150;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;pointer-events:auto';
     const title = document.createElement('div');
-    title.style.cssText = 'font:bold 18px system-ui;color:#f0d890;letter-spacing:2px;margin-bottom:18px;text-shadow:0 0 12px rgba(240,216,144,0.5)';
+    title.style.cssText = 'font:bold 18px system-ui;color:#f0d890;letter-spacing:2px;margin-bottom:10px;text-shadow:0 0 12px rgba(240,216,144,0.5)';
     title.textContent = 'LEVEL UP — Choose a Boon';
     overlay.appendChild(title);
+    // W-LevelUp-Storm-Tune §B — queue badge (hidden by default; shown when queue > 0)
+    const badge = document.createElement('div');
+    badge.id = 'lu-queue-badge';
+    badge.style.cssText = 'font:bold 11px system-ui;color:#ff8040;letter-spacing:2px;margin-bottom:10px;display:none';
+    overlay.appendChild(badge);
+    overlay._badge = badge;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:10px;width:100%;max-width:520px;justify-content:center';
     overlay.appendChild(row);
@@ -2645,10 +2651,29 @@
     _luEl = overlay;
     return overlay;
   }
+  // W-LevelUp-Storm-Tune §B — auto-dismiss timeout handle
+  let _luAutoTimer = null;
+
   function _luShow(options) {
     const el = _luBuild();
     const row = el._row;
     row.innerHTML = '';
+
+    // Cancel any prior auto-dismiss timer
+    if (_luAutoTimer) { clearTimeout(_luAutoTimer); _luAutoTimer = null; }
+
+    // Update queue badge
+    const queueCount = (runtime && runtime.queuedLevelUps) || 0;
+    if (el._badge) {
+      if (queueCount > 0) {
+        el._badge.textContent = '×' + (queueCount + 1) + ' LEVEL UPS PENDING';
+        el._badge.style.display = 'block';
+      } else {
+        el._badge.style.display = 'none';
+      }
+    }
+
+    let firstCard = null;
     for (const id of options) {
       const card = document.createElement('button');
       card.style.cssText = 'flex:1;background:linear-gradient(to bottom,#2a1c10,#1a1006);border:2px solid #806040;border-radius:10px;padding:18px 12px;color:#f0d890;font:inherit;cursor:pointer;min-height:120px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;-webkit-tap-highlight-color:rgba(255,255,255,0.15);transition:transform 80ms,border-color 80ms';
@@ -2662,6 +2687,7 @@
       const onPick = (ev) => {
         ev.preventDefault(); ev.stopPropagation();
         if (!runtime || !runtime.pendingLevelUp) return;
+        if (_luAutoTimer) { clearTimeout(_luAutoTimer); _luAutoTimer = null; }
         WG.HuntPlayer.applyLevelChoice(id);
         runtime._luOptions = null;
         _luHide();
@@ -2669,10 +2695,23 @@
       card.addEventListener('click', onPick);
       card.addEventListener('touchend', onPick);
       row.appendChild(card);
+      if (!firstCard) firstCard = card;
     }
+
+    // Auto-dismiss after 8s — fires leftmost card so player is never stuck
+    if (firstCard) {
+      _luAutoTimer = setTimeout(() => {
+        _luAutoTimer = null;
+        if (runtime && runtime.pendingLevelUp && firstCard.parentNode) {
+          firstCard.click();
+        }
+      }, 8000);
+    }
+
     el.style.display = 'flex';
   }
   function _luHide() {
+    if (_luAutoTimer) { clearTimeout(_luAutoTimer); _luAutoTimer = null; }
     if (_luEl) _luEl.style.display = 'none';
   }
   function drawLevelUpModal(ctx) {
