@@ -68,7 +68,11 @@
     const s = WG.State.get();
     if (!s.allianceBoss || s.allianceBoss.cycleIndex !== sched.cycleIndex) {
       const mc    = _memberCount();
-      const hpMax = Math.floor(5000000 * mc / 10);
+      // W-Balance-Tier2 FLAG-08: floor effective member count at 10 so a solo/tiny
+      // alliance boss is 5M HP (55% NPC seed → 2.75M remaining, ~916k/day over 3 days).
+      // was: Math.floor(5000000 * mc / 10) with no floor — solo player faced
+      // 3M boss requiring 450k dmg/day (110-450 energy/day, impossible F2P).
+      const hpMax = Math.floor(5000000 * Math.max(10, mc) / 10);
 
       // Seed NPC contributions so the boss looks alive at event start
       const contributions = {};

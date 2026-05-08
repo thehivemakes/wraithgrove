@@ -436,7 +436,9 @@
 
   function onEnemyKill(c) {
     const p = runtime.player;
-    p.xp += c._typeData.xp;
+    // W-Balance-Tier2 FLAG-06: night mode XP bonus. was: c._typeData.xp (no mult)
+    const _nightXpMul = (runtime.mode === 'night' && WG.HuntWaves && WG.HuntWaves.NIGHT_XP_MULT) ? WG.HuntWaves.NIGHT_XP_MULT : 1;
+    p.xp += Math.round(c._typeData.xp * _nightXpMul);
     if (p.xp >= p.xpToNext) levelUp();
     // 25% base orb drop; W-Fever-Mode §B multiplies roll count during fever.
     // Multiple rolls = multiple orbs, each with slight arc for visual spread.
@@ -607,8 +609,12 @@
             if (p.xp >= p.xpToNext) levelUp();
             WG.Engine.emit('pickup:orb', { x: d.x, y: d.y, amount: 1 });
           } else if (d.type === 'coin') {
-            WG.State.grant('coins', 1);
-            WG.Engine.emit('pickup:coin', { x: d.x, y: d.y, amount: 1 });
+            // W-Balance-Tier2 FLAG-06: night coin bonus (probabilistic so 1.5× = always 1 + 50% chance +1).
+            // was: WG.State.grant('coins', 1) with no night mult
+            const _ncm = (runtime.mode === 'night' && WG.HuntWaves && WG.HuntWaves.NIGHT_COIN_DROP_MULT) ? WG.HuntWaves.NIGHT_COIN_DROP_MULT : 1;
+            const _cAmt = Math.floor(_ncm) + (Math.random() < (_ncm % 1) ? 1 : 0);
+            WG.State.grant('coins', _cAmt);
+            WG.Engine.emit('pickup:coin', { x: d.x, y: d.y, amount: _cAmt });
           } else if (d.type === 'wood') {
             runtime.runWood = (runtime.runWood || 0) + 1;
             WG.Engine.emit('pickup:wood', { x: d.x, y: d.y, amount: 1 });

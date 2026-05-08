@@ -16,6 +16,10 @@
   // SPEC §0 — Night Mode is harder. Day Mode is the existing baseline (mul=1).
   const NIGHT_SPAWN_MUL = 1.6;   // applied to spawn rate when runtime.mode === 'night'
   const NIGHT_STAT_MUL  = 1.4;   // applied to enemy + boss hp/maxHp/damage at spawn
+  // W-Balance-Tier2 FLAG-06: night rewards offset the difficulty. XP mult on kills;
+  // coin mult at pickup (probabilistic so fractional value works: 1.5 → 1 always + 50% chance of +1).
+  const NIGHT_XP_MULT        = 1.3;  // was: absent (no night XP bonus)
+  const NIGHT_COIN_DROP_MULT = 1.5;  // was: absent (no night coin bonus)
 
   // W-Spawn-Tuning 2026-05-02: WAVE_RATE_MUL replaced with linear WAVE_TIER_RAMP
   // per Architect brief — compounding 1.5^N produced absurd wave-15 rates
@@ -202,6 +206,7 @@
   window.WG.HuntWaves = {
     init, spawnInWindow,
     NIGHT_SPAWN_MUL, NIGHT_STAT_MUL,
+    NIGHT_XP_MULT, NIGHT_COIN_DROP_MULT,
     WAVE_TIER_RAMP, WAVE_STAT_BASE,
     WAVE_BASE_RATE_MIN, WAVE_BASE_RATE_MAX,
     CLUSTER_JITTER_RADIUS,

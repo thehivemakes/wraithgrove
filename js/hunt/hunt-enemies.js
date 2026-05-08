@@ -36,7 +36,7 @@
       hp: 220, speed: 130, damage: 22, cooldown: 1.0, size: 36,
       color: '#e8e0f0', accent: '#a060ff', xp: 20,
       mode: 'night', ai: 'banshee_charge', rare: true,
-      shriekCooldown: 4.0,
+      shriekCooldown: 8.0,  // W-Balance-Tier2 FLAG-07: was 4.0 (reason: at 4s cd banshee shrieks 45×/180s ability window; wraith_banish has 180s cd — ability charge burn forces pay-to-counter. 8s halves pressure without removing threat)
       chargeDuration: 0.8,         // seconds of locked-on charge after shriek
       chargeSpeedMul: 1.8,         // forward-speed multiplier during charge
       shriekParticleCount: 16,     // pickupFragment burst count per shriek
