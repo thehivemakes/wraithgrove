@@ -187,17 +187,47 @@
       }
 
       // ── Trap triggers — footman body-block reduces trigger prob 5% → 3% ──
-      const aliveFoot = squadUnits.some(u => u.type === 'footman' && u.hp > 0);
-      const trapProb  = aliveFoot ? 0.03 : 0.05;
-      // Trap triggers (simplified: each alive trap in path has trapProb chance per second)
+      // attackerCounterChance (0.0–1.0): probability the attacker successfully counters
+      // each triggered trap within the 400ms counter window. Default 0 (no auto-counters).
+      const aliveFoot      = squadUnits.some(u => u.type === 'footman' && u.hp > 0);
+      const trapProb       = aliveFoot ? 0.03 : 0.05;
+      const counterChance  = (typeof params.attackerCounterChance === 'number') ? params.attackerCounterChance : 0.0;
+
       for (const s of structures) {
         if (s.hp <= 0 || s.type !== 'trap') continue;
         if (rng() < trapProb) {
           const trapDef = WG.RaidDefenses.getTrap(s.defenseId);
-          if (trapDef && trapDef.damage) {
-            const trapDmg = Math.min(trapDef.damage * attackerHp, trapDef.maxHpDamageCap * params.attackerHp);
-            attackerHp -= trapDmg;
-            log.push({ tFrame: elapsed, eventType: 'trap_trigger', actorId: s.id, targetId: 'attacker', value: +trapDmg.toFixed(1) });
+          if (!trapDef) continue;
+
+          const countered = rng() < counterChance;
+          if (countered) {
+            // Telegraph fired, player matched counterAction — trap harmless, buff spawned
+            log.push({
+              tFrame: elapsed,
+              eventType: 'trap:countered',
+              actorId: s.id,
+              targetId: 'attacker',
+              trapId: s.defenseId,
+              counterAction: trapDef.counterAction,
+              counterRewardBuff: trapDef.counterRewardBuff,
+              value: 0,
+            });
+          } else {
+            // Counter missed or not attempted — full trap effect
+            let trapDmg = 0;
+            if (trapDef.damagePctOnHit > 0) {
+              trapDmg = Math.min(trapDef.damagePctOnHit * params.attackerHp, 0.25 * params.attackerHp);
+              attackerHp -= trapDmg;
+            }
+            log.push({
+              tFrame: elapsed,
+              eventType: 'trap:hit',
+              actorId: s.id,
+              targetId: 'attacker',
+              trapId: s.defenseId,
+              counterAction: trapDef.counterAction,
+              value: +trapDmg.toFixed(1),
+            });
           }
         }
       }

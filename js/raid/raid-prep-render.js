@@ -324,10 +324,149 @@
       (win ? '<div style="font-size:13px;color:#f0d890;margin-bottom:16px;">+' + run.reward.coins + ' 🪙' + (run.reward.diamonds ? '  +' + run.reward.diamonds + ' 💎' : '') + '</div>' : '') +
       '';
 
+    // ── Squad status canvas (Concern C) ──────────────────────────────────────
+    const squadResult = run.result.squadUnits || [];
+    if (squadResult.length > 0) {
+      const squadWrap = document.createElement('div');
+      squadWrap.style.cssText = 'margin-bottom:12px;';
+      const squadLbl = document.createElement('div');
+      squadLbl.style.cssText = 'font-size:9px;color:#806090;letter-spacing:2px;margin-bottom:6px;';
+      squadLbl.textContent = 'SQUAD';
+      squadWrap.appendChild(squadLbl);
+
+      const cvs = document.createElement('canvas');
+      const CW = 240, CH = 72;
+      cvs.width  = CW;  cvs.height  = CH;
+      cvs.style.cssText = 'width:' + CW + 'px;height:' + CH + 'px;border-radius:6px;background:rgba(0,0,0,0.25);display:block;margin:0 auto;';
+      squadWrap.appendChild(cvs);
+      card.appendChild(squadWrap);
+
+      const cvsCtx = cvs.getContext('2d');
+      const spacing = CW / (squadResult.length + 1);
+
+      // Inline mini-puff particles for dead units (separate from WG.HuntFX world-space system)
+      const puffs = [];
+      squadResult.forEach((u, i) => {
+        const sx = spacing * (i + 1), sy = 34;
+        if (!u.survived) {
+          // Emit into WG.HuntFX pool (renders if a hunt canvas is active; no-op otherwise)
+          if (window.WG && WG.HuntFX) WG.HuntFX.burst(0, 0, 'enemyHit', { count: 6, life: 0.3 });
+          // Local puff on result canvas
+          for (let p = 0; p < 8; p++) {
+            const ang = Math.PI * 2 * p / 8;
+            puffs.push({ x: sx, y: sy, vx: Math.cos(ang) * 36, vy: Math.sin(ang) * 36, life: 0.45, maxLife: 0.45 });
+          }
+        }
+      });
+
+      function drawSquadCanvas(dt) {
+        cvsCtx.clearRect(0, 0, CW, CH);
+        squadResult.forEach((u, i) => {
+          const sx = spacing * (i + 1), sy = 34;
+          WG.RaidSim.drawSquadUnit(cvsCtx, sx, sy, u.type, u.hp, u.maxHp);
+          cvsCtx.font = '7px monospace';
+          cvsCtx.textAlign = 'center';
+          cvsCtx.fillStyle = u.survived ? '#88cc88' : '#cc6666';
+          cvsCtx.fillText(u.survived ? 'ALIVE' : 'KIA', sx, sy + 24);
+        });
+        // Draw puffs
+        for (const p of puffs) {
+          if (p.life <= 0) continue;
+          cvsCtx.save();
+          cvsCtx.globalAlpha = p.life / p.maxLife * 0.8;
+          cvsCtx.fillStyle = '#cc4444';
+          cvsCtx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+          cvsCtx.restore();
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.life -= dt;
+        }
+      }
+
+      let _lastTs = 0, _rafId = 0;
+      function _frame(ts) {
+        const dt = _lastTs ? Math.min((ts - _lastTs) / 1000, 0.08) : 0;
+        _lastTs = ts;
+        drawSquadCanvas(dt);
+        if (puffs.some(p => p.life > 0)) {
+          _rafId = requestAnimationFrame(_frame);
+        } else {
+          drawSquadCanvas(0); // final static draw
+        }
+      }
+      _rafId = requestAnimationFrame(_frame);
+      // Cancel animation when overlay is removed
+      overlay.addEventListener('click', () => { if (_rafId) cancelAnimationFrame(_rafId); }, { once: true });
+    }
+
+    // ── Trap events log (Concern C) ──────────────────────────────────────────
+    // Shows telegraph+counter outcome for each trap event from the sim replayLog.
+    // Real-time telegraph animation (500ms flash + 400ms COUNTER! prompt) is V2
+    // frame-loop work; here we render the outcome as a post-raid beat log.
+    const trapEvents = (run.result.replayLog || []).filter(
+      e => e.eventType === 'trap:countered' || e.eventType === 'trap:hit'
+    );
+    if (trapEvents.length > 0) {
+      const trapWrap = document.createElement('div');
+      trapWrap.style.cssText = 'margin-bottom:12px;';
+      const trapLbl = document.createElement('div');
+      trapLbl.style.cssText = 'font-size:9px;color:#806090;letter-spacing:2px;margin-bottom:6px;';
+      trapLbl.textContent = 'TRAP LOG';
+      trapWrap.appendChild(trapLbl);
+
+      trapEvents.forEach(function(ev) {
+        const countered = ev.eventType === 'trap:countered';
+        const trapDef   = WG.RaidDefenses ? WG.RaidDefenses.getTrap(ev.trapId) : null;
+        const buffDef   = (countered && WG.RaidDefenses) ? WG.RaidDefenses.getCounterBuff(ev.counterRewardBuff) : null;
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;margin-bottom:4px;' +
+          'background:' + (countered ? 'rgba(0,60,20,0.55)' : 'rgba(60,10,10,0.55)') + ';' +
+          'border:1px solid ' + (countered ? '#2a7040' : '#7a2020') + ';';
+
+        // Telegraph icon (mimics the 500ms tell flash in V2 frame loop)
+        const tellIcon = document.createElement('div');
+        tellIcon.style.cssText = 'font-size:14px;flex-shrink:0;';
+        tellIcon.textContent = trapDef ? trapDef.icon : '⚠';
+        row.appendChild(tellIcon);
+
+        // Trap name + counter action
+        const info = document.createElement('div');
+        info.style.cssText = 'flex:1;min-width:0;';
+        const trapName = trapDef ? trapDef.name : (ev.trapId || 'Trap');
+        const actionLabel = ev.counterAction ? ev.counterAction.replace(/_/g, ' ').toUpperCase() : '';
+        info.innerHTML =
+          '<div style="font-size:9px;color:' + (countered ? '#80e8a0' : '#e88080') + ';font-weight:700;letter-spacing:0.5px;">' +
+            (countered ? '⚡ COUNTERED' : '💥 HIT') + ' — ' + trapName +
+          '</div>' +
+          (actionLabel ? '<div style="font-size:8px;color:#806090;margin-top:1px;">' + actionLabel + '</div>' : '');
+        row.appendChild(info);
+
+        // Buff floater (shows what was earned on counter) or damage number on hit
+        const outcome = document.createElement('div');
+        outcome.style.cssText = 'text-align:right;flex-shrink:0;';
+        if (countered && buffDef) {
+          // Green "+BUFF" floater — emits into WG.HuntFX if hunt canvas is active
+          if (window.WG && WG.HuntFX) WG.HuntFX.burst(0, 0, 'heal', { count: 4, life: 0.4 });
+          outcome.innerHTML = '<div style="font-size:9px;color:#60e890;font-weight:700;">+' + buffDef.name.replace('Counter: ', '') + '</div>' +
+            '<div style="font-size:8px;color:#40a060;">' + buffDef.desc + '</div>';
+        } else if (!countered && ev.value > 0) {
+          outcome.innerHTML = '<div style="font-size:11px;color:#ff7070;font-weight:700;">-' + ev.value + ' HP</div>';
+        } else if (!countered) {
+          // Non-damage trap (stun/root): show effect label
+          const effectLabel = trapDef && trapDef.rootDurationMs ? 'ROOTED' : trapDef && trapDef.stunDurationMs ? 'STUNNED' : 'EFFECT';
+          outcome.innerHTML = '<div style="font-size:9px;color:#c07070;font-weight:700;">' + effectLabel + '</div>';
+        }
+        row.appendChild(outcome);
+        trapWrap.appendChild(row);
+      });
+      card.appendChild(trapWrap);
+    }
+
     const closeBtn = document.createElement('button');
     closeBtn.style.cssText = 'width:100%;padding:12px;border-radius:10px;border:1.5px solid #5a3870;background:rgba(40,20,60,0.7);color:#c090d0;font-size:12px;font-weight:700;letter-spacing:2px;cursor:pointer;';
     closeBtn.textContent = 'CONTINUE';
-    closeBtn.addEventListener('click', () => overlay.remove());
+    closeBtn.addEventListener('click', () => { overlay.remove(); });
     card.appendChild(closeBtn);
     overlay.appendChild(card);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
