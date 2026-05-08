@@ -35,8 +35,8 @@
   }
 
   var SEASONS = {
-    wraithgrove_s1: {
-      id:          'wraithgrove_s1',
+    unlimited_chaos_s1: {
+      id:          'unlimited_chaos_s1',
       name:        'Whispering Pines',
       startDate:   '2026-05-15',
       endDate:     '2026-06-15',
@@ -48,9 +48,9 @@
     }
   };
 
-  Object.freeze(SEASONS.wraithgrove_s1);
+  Object.freeze(SEASONS.unlimited_chaos_s1);
 
-  var ACTIVE_SEASON_ID = 'wraithgrove_s1';
+  var ACTIVE_SEASON_ID = 'unlimited_chaos_s1';
 
   function getSeason() { return SEASONS[ACTIVE_SEASON_ID]; }
 

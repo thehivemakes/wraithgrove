@@ -55,7 +55,7 @@
     // W-Monetization-V2-Missions-Pass §D — Season 1 battle pass premium unlock ($9.99).
     { id: 'battle_pass_s1', price: 9.99, type: 'entitlement',
       name: 'Whispering Pines Pass', display: 'Premium track unlock — 60-level Season 1 battle pass',
-      grants: { battlePassPremium: 'wraithgrove_s1' } },
+      grants: { battlePassPremium: 'unlimited_chaos_s1' } },
 
     // W-Special-Abilities §D — individual ability charge packs
     { id: 'ability_pack_wraith_banish',    price: 1.99, type: 'ability_pack',

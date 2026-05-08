@@ -19,7 +19,7 @@
   const GACHA_POOLS = {
     standard: {
       name: 'Standard Pool',
-      description: 'Relics from the Wraithgrove depths.',
+      description: 'Relics from the depths of Unlimited Chaos.',
       icon: '🔮',
       cost: { currency: 'gems', amount: 30 },
       multiCost: { currency: 'gems', amount: 270 },  // 10-pull = 10% discount

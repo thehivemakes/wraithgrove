@@ -129,7 +129,7 @@ Confirmed via Perplexity Sonar with cited Apple/Google docs (2026-05-05 query):
 ### 2.3 Recommended combination
 
 **Title:** `Unlimited Chaos` (15/30 chars)
-**Subtitle:** [ARCHITECT FILL — old subtitle options were designed for the Wraithgrove brand; Architect to choose new subtitle for Unlimited Chaos]
+**Subtitle:** [ARCHITECT FILL — choose subtitle for Unlimited Chaos; previous subtitle options are obsolete]
 **Combined keyword surface:** unlimited, chaos + subtitle terms (Architect to confirm after subtitle is selected).
 
 ---

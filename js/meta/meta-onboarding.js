@@ -133,7 +133,7 @@
 
     var title = document.createElement('div');
     title.className = 'wg-ob-title';
-    title.textContent = 'WRAITHGROVE';
+    title.textContent = 'UNLIMITED CHAOS';
     el.appendChild(title);
 
     var tagline = document.createElement('div');
