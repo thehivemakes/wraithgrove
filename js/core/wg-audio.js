@@ -217,11 +217,20 @@
     // Fade out current
     if (ambientSource && ambientGainNode) {
       const oldSrc = ambientSource, oldGain = ambientGainNode;
+      // W-Performance-Tier2: capture prevId before ambientId update so the
+      // setTimeout can evict the decoded PCM buffer (~1-2MB) once the fade
+      // completes. Guard: don't evict if user looped back to same track
+      // (ambientId === prevId check at fire time). PERFORMANCE_AUDIT.md §2B.
+      const prevId = ambientId;
       const t = ctx.currentTime;
       oldGain.gain.cancelScheduledValues(t);
       oldGain.gain.setValueAtTime(oldGain.gain.value, t);
       oldGain.gain.linearRampToValueAtTime(0, t + fadeMs / 1000);
-      setTimeout(() => { try { oldSrc.stop(); } catch (e) {} try { oldSrc.disconnect(); oldGain.disconnect(); } catch (e) {} }, fadeMs + 50);
+      setTimeout(() => {
+        try { oldSrc.stop(); } catch (e) {}
+        try { oldSrc.disconnect(); oldGain.disconnect(); } catch (e) {}
+        if (prevId && prevId !== ambientId) delete buffers[prevId];
+      }, fadeMs + 50);
     }
     ambientSource = null; ambientGainNode = null; ambientId = id;
     if (!id) return;

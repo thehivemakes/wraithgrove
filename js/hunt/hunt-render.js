@@ -255,7 +255,11 @@
     camera.x = cx; camera.y = cy;
   }
 
-  function w2s(wx, wy) { return { x: wx - camera.x, y: wy - camera.y }; }
+  // W-Performance-Tier2: reuse single scratch object — eliminates ~12k short-lived
+  // {x,y} allocations/sec (PERFORMANCE_AUDIT.md §1F). Callers that need two live
+  // results simultaneously must inline (see projectile trail fix below).
+  const _w2sBuf = { x: 0, y: 0 };
+  function w2s(wx, wy) { _w2sBuf.x = wx - camera.x; _w2sBuf.y = wy - camera.y; return _w2sBuf; }
 
   // Deterministic int hash from (x, y) — used for tile texture variation, prop placement.
   function hash2(x, y) {
@@ -2591,14 +2595,16 @@
         for (let i = 0; i < p._trail.length - 1; i++) {
           const a = (i + 1) / p._trail.length;       // 0 (oldest) → 1 (newest)
           const t1 = p._trail[i], t2 = p._trail[i + 1];
-          const s1 = w2s(t1.x, t1.y), s2 = w2s(t2.x, t2.y);
+          // Two screen positions needed simultaneously — inline to avoid shared-buffer collision.
+          const s1x = t1.x - camera.x, s1y = t1.y - camera.y;
+          const s2x = t2.x - camera.x, s2y = t2.y - camera.y;
           ctx.strokeStyle = p.color || '#ffd870';
           ctx.globalAlpha = a * 0.7;
           ctx.lineWidth = 1 + a * 2;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(s1.x, s1.y);
-          ctx.lineTo(s2.x, s2.y);
+          ctx.moveTo(s1x, s1y);
+          ctx.lineTo(s2x, s2y);
           ctx.stroke();
         }
         ctx.globalAlpha = 1;

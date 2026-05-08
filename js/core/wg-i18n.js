@@ -14,6 +14,7 @@
   async function init(code) {
     code = code || 'en';
     _locale = code;
+    document.documentElement.lang = code;
 
     // Check localStorage cache first
     try {

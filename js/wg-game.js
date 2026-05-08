@@ -1462,8 +1462,8 @@
     const LBL = 'font-size:11px;color:#a89878;font-weight:700;letter-spacing:0.5px;';
     const VAL = 'font-size:10px;color:#f0d890;font-weight:700;min-width:30px;text-align:right;';
 
-    function slHtml(id, v) {
-      return '<input id="'+id+'" type="range" min="0" max="100" value="'+Math.round(v*100)+'" style="flex:1;margin:0 8px;height:4px;accent-color:#a8d878;cursor:pointer;">';
+    function slHtml(id, v, lbl) {
+      return '<input id="'+id+'" type="range" min="0" max="100" value="'+Math.round(v*100)+'" aria-label="'+lbl+' volume" style="flex:1;margin:0 8px;height:4px;accent-color:#a8d878;cursor:pointer;">';
     }
     function togHtml(id, on) {
       const left = on ? '22px' : '2px';
@@ -1491,10 +1491,10 @@
       '<div style="font-size:14px;color:#f0d890;font-weight:700;letter-spacing:2px;text-align:center;margin-bottom:4px;">SETTINGS</div>' +
 
       '<div style="'+SL+'">AUDIO</div>' +
-      '<div style="'+ROW+'"><span style="'+LBL+'">MASTER</span>'+slHtml('cfg-sl-master',audioS.master)+'<span id="cfg-v-master" style="'+VAL+'">'+Math.round(audioS.master*100)+'</span></div>' +
-      '<div style="'+ROW+'"><span style="'+LBL+'">SFX</span>'+slHtml('cfg-sl-sfx',audioS.sfx)+'<span id="cfg-v-sfx" style="'+VAL+'">'+Math.round(audioS.sfx*100)+'</span></div>' +
-      '<div style="'+ROW+'"><span style="'+LBL+'">AMBIENT</span>'+slHtml('cfg-sl-ambient',audioS.ambient)+'<span id="cfg-v-ambient" style="'+VAL+'">'+Math.round(audioS.ambient*100)+'</span></div>' +
-      '<div style="'+ROW+'"><span style="'+LBL+'">UI</span>'+slHtml('cfg-sl-ui',audioS.ui)+'<span id="cfg-v-ui" style="'+VAL+'">'+Math.round(audioS.ui*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">MASTER</span>'+slHtml('cfg-sl-master',audioS.master,'Master')+'<span id="cfg-v-master" style="'+VAL+'">'+Math.round(audioS.master*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">SFX</span>'+slHtml('cfg-sl-sfx',audioS.sfx,'SFX')+'<span id="cfg-v-sfx" style="'+VAL+'">'+Math.round(audioS.sfx*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">AMBIENT</span>'+slHtml('cfg-sl-ambient',audioS.ambient,'Ambient')+'<span id="cfg-v-ambient" style="'+VAL+'">'+Math.round(audioS.ambient*100)+'</span></div>' +
+      '<div style="'+ROW+'"><span style="'+LBL+'">UI</span>'+slHtml('cfg-sl-ui',audioS.ui,'UI')+'<span id="cfg-v-ui" style="'+VAL+'">'+Math.round(audioS.ui*100)+'</span></div>' +
       '<div style="'+ROW+';margin-top:4px;"><span style="'+LBL+'">MUTE ALL</span>'+togHtml('cfg-mute',audioS.muted)+'</div>' +
 
       '<div style="'+SL+'">HAPTICS</div>' +
@@ -1938,6 +1938,7 @@
     img.src = url;
     img.onerror = () => { hideBossIntro(); };
     nameEl.textContent = (boss._typeData && boss._typeData.name) || boss.type || '';
+    img.alt = nameEl.textContent;
     if (titleEl) titleEl.textContent = BOSS_INTRO_TITLES[boss.type] || '';
     nameEl.classList.remove('pulsing');
     if (_bossIntroTimer) clearTimeout(_bossIntroTimer);

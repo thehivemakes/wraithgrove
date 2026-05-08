@@ -13,6 +13,10 @@
                 life: 0, maxLife: 0, color: '#fff', size: 2,
                 gravity: 0, shape: 'square' };
   }
+  // W-Performance-Tier2: ring-pointer + active count — eliminates O(200) full
+  // scan in _alloc/tick/draw (PERFORMANCE_AUDIT.md §1E).
+  let _allocPtr = 0;   // start of next free-slot search
+  let _activeCount = 0;
 
   // Per-type burst signatures — DOPAMINE_DESIGN.md §1 floating-number table
   // and §9 particle bursts catalog. Counts/lives/speeds match worker brief.
@@ -76,8 +80,13 @@
   };
 
   function _alloc() {
-    for (let i = 0; i < POOL_CAP; i++) {
-      if (!pool[i].active) return pool[i];
+    for (let n = 0; n < POOL_CAP; n++) {
+      const i = (_allocPtr + n) % POOL_CAP;
+      if (!pool[i].active) {
+        _allocPtr = (i + 1) % POOL_CAP;
+        _activeCount++;
+        return pool[i];
+      }
     }
     return null; // pool exhausted — silently drop (DOPAMINE_DESIGN §9 cap)
   }
@@ -116,21 +125,25 @@
   }
 
   function tick(dt) {
-    for (let i = 0; i < POOL_CAP; i++) {
+    let remaining = _activeCount;
+    for (let i = 0; i < POOL_CAP && remaining > 0; i++) {
       const p = pool[i];
       if (!p.active) continue;
+      remaining--;
       p.x  += p.vx * dt;
       p.y  += p.vy * dt;
       p.vy += p.gravity * dt;
       p.life -= dt;
-      if (p.life <= 0) p.active = false;
+      if (p.life <= 0) { p.active = false; _activeCount--; }
     }
   }
 
   function draw(ctx, w2s) {
-    for (let i = 0; i < POOL_CAP; i++) {
+    let remaining = _activeCount;
+    for (let i = 0; i < POOL_CAP && remaining > 0; i++) {
       const p = pool[i];
       if (!p.active) continue;
+      remaining--;
       const a = Math.max(0, Math.min(1, p.life / p.maxLife));
       ctx.globalAlpha = a;
       ctx.fillStyle = p.color;
