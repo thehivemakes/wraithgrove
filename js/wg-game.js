@@ -1784,6 +1784,10 @@
     // W-Mode5-Alliance-Boss — init after Alliance so member count is available
     if (WG.AllianceBoss && WG.AllianceBoss.init) WG.AllianceBoss.init();
     if (WG.RaidBossAttack && WG.RaidBossAttack.init) WG.RaidBossAttack.init();
+    // W-Alliance-Recruitment — init after AllianceBoss, before Render
+    if (WG.AllianceRecruitment && WG.AllianceRecruitment.init) WG.AllianceRecruitment.init();
+    // W-Alliance-War-Scheduling — init after AllianceBoss (needs member count + power), before Render
+    if (WG.AllianceWar && WG.AllianceWar.init) WG.AllianceWar.init();
     if (WG.AllianceRender && WG.AllianceRender.init) WG.AllianceRender.init();
     // Fire daily:reset now — state is loaded + all listeners registered
     if (WG.MetaDailyReset) WG.MetaDailyReset.checkAndReset();
