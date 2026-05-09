@@ -393,6 +393,13 @@
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────────
+  var _pollHandle = null;
+
+  function dispose() {
+    clearInterval(_pollHandle);
+    _pollHandle = null;
+  }
+
   function init() {
     var s = WG.State.get();
     if (!s.eventBuffs) s.eventBuffs = {};
@@ -401,15 +408,16 @@
     _registerMissions();
 
     // Re-evaluate once per hour while the app is open
-    setInterval(function() {
+    _pollHandle = setInterval(function() {
       applyBuffs();
       _registerMissions();
       _refreshBanner();
     }, 3600000);
+    window.addEventListener('beforeunload', dispose);
   }
 
   window.WG.LtdEvents = {
     CATALOG, activeEvents, applyBuffs, getBuff,
-    renderBanner, openEventModal, init,
+    renderBanner, openEventModal, init, dispose,
   };
 })();

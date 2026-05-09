@@ -107,6 +107,7 @@
     { authorId: 'npc_mend',  text: 'gifts in the pool, help yourselves' },
   ];
   let _npcMsgIdx = 0;
+  let _chatPollHandle = null;
 
   function _maybeSendNpcMsg() {
     const a = window.WG && WG.Alliance && WG.Alliance.get();
@@ -129,12 +130,18 @@
     WG.Engine.emit('alliance:msg', msg);
   }
 
+  function dispose() {
+    clearInterval(_chatPollHandle);
+    _chatPollHandle = null;
+  }
+
   function init() {
     WG.Engine.on('alliance:created', _seedHistory);
     WG.Engine.on('alliance:joined',  _seedHistory);
     // Periodic NPC message tick (every ~30s check, fires at most every 5min)
-    setInterval(_maybeSendNpcMsg, 30000);
+    _chatPollHandle = setInterval(_maybeSendNpcMsg, 30000);
+    window.addEventListener('beforeunload', dispose);
   }
 
-  window.WG.AllianceChat = { init, send, recent };
+  window.WG.AllianceChat = { init, send, recent, dispose };
 })();
