@@ -43,6 +43,13 @@
     time_warp:         { id:'time_warp',            rarity:'mythic',    weight:5,  name:'Time Warp',       desc:'All enemies move at 50% speed this floor',icon:'⌛', upgradeTo:null, minFloor:30 },
     wraithform:        { id:'wraithform',           rarity:'mythic',    weight:5,  name:'Wraithform',      desc:'8s of invulnerability; attacks phase through you',icon:'👁', upgradeTo:null, minFloor:30 },
     void_surge:        { id:'void_surge',           rarity:'mythic',    weight:5,  name:'Void Surge',      desc:'+80% damage and crit chance for this floor',icon:'🌌', upgradeTo:null, minFloor:30 },
+    // ── W-H-Buff-Catalog-Complete (+6 mythic, floor 31+ only) ──────────────
+    wraith_form:     { id:'wraith_form',     rarity:'mythic', mythic:true, weight:5, name:'Wraith Form',     desc:'Invulnerable for 5s every 30s',                 icon:'🌫', upgradeTo:null, minFloor:31, balanceTag:'invuln-cycle-5s-per-30s'     },
+    lantern_halo:    { id:'lantern_halo',    rarity:'mythic', mythic:true, weight:5, name:'Lantern Halo',    desc:'Passive AOE damage tick to all nearby enemies',  icon:'🕯', upgradeTo:null, minFloor:31, balanceTag:'aoe-tick-passive'             },
+    echo_strike:     { id:'echo_strike',     rarity:'mythic', mythic:true, weight:5, name:'Echo Strike',     desc:'Every 3rd hit triggers a copy attack on target', icon:'🔁', upgradeTo:null, minFloor:31, balanceTag:'3rd-hit-repeat'               },
+    soul_tether:     { id:'soul_tether',     rarity:'mythic', mythic:true, weight:5, name:'Soul Tether',     desc:'XP orbs auto-collect from anywhere on screen',   icon:'💫', upgradeTo:null, minFloor:31, balanceTag:'orb-vacuum-global'            },
+    lantern_wedding: { id:'lantern_wedding', rarity:'mythic', mythic:true, weight:5, name:'Lantern Wedding', desc:'Heal 1 HP per 4 enemies killed',                 icon:'🏮', upgradeTo:null, minFloor:31, balanceTag:'kill-heal-1per4'              },
+    empress_crown:   { id:'empress_crown',   rarity:'mythic', mythic:true, weight:5, name:'Empress Crown',   desc:'Gold drops doubled; enemy HP +50%',              icon:'👑', upgradeTo:null, minFloor:31, balanceTag:'gold-2x-enemy-hp-plus-50pct'  },
   };
 
   const RARITY_COLORS = {
@@ -53,8 +60,12 @@
   };
 
   // Roll `count` distinct cards from the eligible pool, weighted by rarity.
+  // Mythic cards are gated to floor > 30 regardless of individual minFloor.
   function roll(count, floor) {
-    const eligible = Object.values(CATALOG).filter(c => !c.minFloor || floor >= c.minFloor);
+    const eligible = Object.values(CATALOG).filter(c =>
+      (c.rarity !== 'mythic' || floor > 30) &&
+      (!c.minFloor || floor >= c.minFloor)
+    );
     // Build flat weighted pool
     const pool = [];
     for (const card of eligible) {
@@ -111,6 +122,13 @@
       case 'time_warp':         rt._enemySpeedMul = (rt._enemySpeedMul || 1) * 0.5; break;
       case 'wraithform':        rt._wraithformUntil = Date.now() + 8000; break;
       case 'void_surge':        rt._voidSurgeFloor = rt.floor; p._towerDmgPct = (p._towerDmgPct || 0) + 0.80; p._towerCritBonus = (p._towerCritBonus || 0) + 0.80; break;
+      // W-H-Buff-Catalog-Complete mythic (floor 31+)
+      case 'wraith_form':     rt._wraithFormCycle = true; break;
+      case 'lantern_halo':    rt._lanternHalo = true; break;
+      case 'echo_strike':     p._echoStrike = true; break;
+      case 'soul_tether':     p._soulTether = true; break;
+      case 'lantern_wedding': rt._lanternWedding = true; break;
+      case 'empress_crown':   rt._coinMultiplier = (rt._coinMultiplier || 1) * 2; rt._empressEnemyHpBonus = (rt._empressEnemyHpBonus || 0) + 0.5; break;
     }
     if (rt.buffStack) rt.buffStack.push(buffId);
     WG.Engine.emit('tower:buff-applied', { buffId, floor: rt.floor });
