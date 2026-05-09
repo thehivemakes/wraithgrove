@@ -1,0 +1,447 @@
+// WG.AscendRender — Ascend tab DOM UI
+(function(){'use strict';
+  function el(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'onclick') e.addEventListener('click', attrs[k]);
+      else if (k === 'style') e.style.cssText = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    for (const kid of kids) {
+      if (kid == null) continue;
+      if (typeof kid === 'string' && kid.includes('<')) {
+        const t = document.createElement('template');
+        t.innerHTML = kid;
+        e.appendChild(t.content.cloneNode(true));
+      } else {
+        e.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
+      }
+    }
+    return e;
+  }
+
+  function getRoot() { return document.getElementById('tab-ascend'); }
+
+  function refresh() {
+    const root = getRoot();
+    root.innerHTML = '';
+    const scroll = el('div', { class:'scroll' });
+    root.appendChild(scroll);
+
+    const ps = WG.State.get().player;
+    const charId = ps.activeCharacter || 'lantern_acolyte';
+    const character = WG.AscendChars.get(charId);
+    const tier = WG.AscendChars.currentTier(charId) || (character && character.tiers[0]);
+
+    // Character display
+    const heroBox = el('div', { class: 'scene-row' });
+    heroBox.appendChild(el('h2', null, 'Ascend'));
+
+    // Hero portrait — current Rebirth-tier appearance
+    // W-Monetization-V2-Whale-Ladder §F: Royal-purple frame when Royal Pass active
+    const _vipFrame = WG.State.isRoyalPassActive && WG.State.isRoyalPassActive()
+      ? 'border:2px solid #c080ff;box-shadow:0 0 10px rgba(192,96,255,0.5),inset 0 0 4px rgba(192,96,255,0.2);'
+      : 'border:1px solid #604020;';
+    // W-Character-Animate-MJ: try animated WebP first; fall back to static PNG
+    // (+ CSS breathe); fall back to procedural figure on static PNG error too.
+    const portrait = el('div', { style:'position:relative;width:96px;height:128px;background:linear-gradient(to bottom, rgba(20,16,10,0.6), rgba(8,4,2,0.6));' + _vipFrame + 'border-radius:6px;margin:6px 0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;' });
+    const portraitImg = document.createElement('img');
+    portraitImg.alt = '';
+    portraitImg.decoding = 'async';
+    portraitImg.loading = 'lazy';
+    const _ascAnimSrc   = 'images/portraits/anim/' + charId + '.webp';
+    const _ascStaticSrc = 'images/portraits/' + charId + '.png';
+    portraitImg.src = _ascAnimSrc;
+    // Base style without breathe — animated WebP IS the breathing.
+    const _ascBaseStyle = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 22%;transform-origin:center bottom;';
+    portraitImg.style.cssText = _ascBaseStyle;
+    portrait.appendChild(portraitImg);
+    // Procedural fallback (hidden by default; revealed on static PNG error)
+    const fig = el('div', { style:`width:30px;height:48px;background:${tier.color};border-radius:6px 6px 2px 2px;position:relative;margin-bottom:8px;display:none;` });
+    const head = el('div', { style:`position:absolute;top:-12px;left:6px;width:18px;height:18px;background:${tier.accent};border-radius:50%;border:1px solid #2a1c10;` });
+    fig.appendChild(head);
+    portrait.appendChild(fig);
+    portraitImg.addEventListener('error', () => {
+      if (portraitImg.src.endsWith('.webp')) {
+        // Animated WebP unavailable — fall back to static PNG + CSS breathe.
+        portraitImg.src = _ascStaticSrc;
+        portraitImg.style.cssText = _ascBaseStyle + 'animation:wg-char-breathe 4.6s ease-in-out infinite;';
+      } else {
+        portraitImg.style.display = 'none';
+        fig.style.display = '';
+      }
+    });
+    heroBox.appendChild(portrait);
+
+    // Name / tier / level
+    heroBox.appendChild(el('div', { style:'font-size:14px;color:#f0d890;letter-spacing:1px;' }, character.name));
+    heroBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;' }, `${tier.name} · Tier ${tier.tier} · Lv ${ps.level}`));
+
+    // Skin button
+    const skinBtnRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
+    skinBtnRow.appendChild(el('button', { class:'btn', onclick: () => showSkinPicker() }, 'SKIN'));
+    skinBtnRow.appendChild(el('button', { class:'btn primary', onclick: () => { const r = WG.AscendCharacter.tryLevelUp(); refresh(); if (!r.ok) toast('Need ' + (r.cost||0) + ' coins'); } }, `LEVEL UP (${WG.AscendCharacter.levelUpCost(ps.level)} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`));
+    heroBox.appendChild(skinBtnRow);
+
+    const ascRow = el('div', { style:'margin-top:6px;display:flex;gap:6px;' });
+    ascRow.appendChild(el('button', { class:'btn', onclick: () => { const r = WG.AscendCharacter.tryAscend(); refresh(); if(!r.ok) toast('Need lvl 30 + ' + WG.AscendCharacter.ascendCost(ps.ascendTier) + ' <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'); } }, `ASCEND (${WG.AscendCharacter.ascendCost(ps.ascendTier)} <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>)`));
+    const canCultivate = (WG.State.get().currencies.diamonds || 0) >= 5;
+    const cultivateBtn = el('button', {
+      class: 'btn' + (canCultivate ? '' : ' disabled'),
+      title: 'Cultivate · Cost: 5 💎 · Grants +2 ATK and +8 HP',
+      onclick: () => { if (canCultivate) showCultivateModal(); },
+    }, 'CULTIVATE (5 💎)');
+    if (!canCultivate) cultivateBtn.style.opacity = '0.45';
+    ascRow.appendChild(cultivateBtn);
+    heroBox.appendChild(ascRow);
+
+    scroll.appendChild(heroBox);
+
+    // 3 equipment slots
+    const eqRow = el('div', { style:'display:flex;gap:6px;margin-bottom:10px;' });
+    for (const slot of ['melee','ranged','pet']) {
+      const equipped = ps.slots[slot];
+      const w = equipped && WG.HuntWeapons.byId(equipped);
+      const tile = el('div', { class:'card-tile' + (!equipped && slot !== 'melee' ? ' locked' : ''), style:'flex:1;' });
+      tile.appendChild(el('div', { class:'icon-box' }, w ? '⚔' : '?'));
+      tile.appendChild(el('div', { class:'name' }, slot.toUpperCase()));
+      tile.appendChild(el('div', { class:'level' }, w ? w.name : 'LOCKED'));
+      if (!equipped && slot !== 'melee') {
+        const cost = WG.AscendEquipment.SLOT_UNLOCK_COSTS[slot];
+        const costStr = Object.entries(cost).map(([k,v])=>`${v}${k==='coins'?'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>':k==='diamonds'?'💎':'🎴'}`).join(' ');
+        const btn = el('button', { class:'btn', style:'margin-top:4px;font-size:9px;padding:4px 6px;', onclick: (e) => { e.stopPropagation(); const r = WG.AscendEquipment.tryUnlockSlot(slot); refresh(); if(!r.ok) toast('Insufficient'); } }, 'UNLOCK ' + costStr);
+        tile.appendChild(btn);
+      } else {
+        tile.addEventListener('click', () => showWeaponPicker(slot));
+      }
+      eqRow.appendChild(tile);
+    }
+    scroll.appendChild(eqRow);
+
+    // Stats
+    const statsBox = el('div', { class:'scene-row' });
+    statsBox.appendChild(el('h2', null, 'Stats'));
+    const stats = ps.stats;
+    const primaryLines = [
+      { label:'Attack', value: Math.round(stats.attack), upgrade:'attack' },
+      { label:'HP Max', value: Math.round(stats.hpMax), upgrade:'hpMax' },
+    ];
+    const detailLines = [
+      { label:'Defense',    value: Math.round(stats.defense), upgrade:'defense' },
+      { label:'Crit',       value: ((stats.critRate||0)*100).toFixed(0)+'%', upgrade:'critRate' },
+      { label:'Wood Yield', value: ((stats.gatherRate||0)*100).toFixed(0)+'%', upgrade:'gatherRate' },
+    ];
+
+    function makeStatRow(ln) {
+      const u = WG.AscendStats.UPGRADES[ln.upgrade];
+      const n = ps.stats['_lvl_'+ln.upgrade] || 0;
+      const cost = u.cost(n);
+      const row = el('div', { style:'display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 4px;border-bottom:1px solid rgba(96,64,32,0.3);' });
+      row.appendChild(el('span', { style:'color:#c8a868;' }, ln.label));
+      row.appendChild(el('span', { style:'color:#f0d890;font-weight:600;' }, '' + ln.value));
+      row.appendChild(el('button', { class:'btn', style:'font-size:9px;padding:4px 8px;', onclick: () => { const r = WG.AscendStats.tryUpgrade(ln.upgrade); refresh(); if(!r.ok) toast('Insufficient'); } }, '+ ' + cost + '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>'));
+      return row;
+    }
+
+    for (const ln of primaryLines) statsBox.appendChild(makeStatRow(ln));
+
+    const details = document.createElement('details');
+    details.style.cssText = 'width:100%;';
+    const summary = document.createElement('summary');
+    summary.style.cssText = 'cursor:pointer;padding:6px 4px;font-size:10px;color:#a89878;letter-spacing:1px;list-style:none;';
+    summary.textContent = 'DETAILED STATS';
+    details.appendChild(summary);
+    for (const ln of detailLines) details.appendChild(makeStatRow(ln));
+    statsBox.appendChild(details);
+
+    scroll.appendChild(statsBox);
+
+    // Power summary — annotated with the active character's tier contribution
+    // and the next-tier marker so the player can see what's coming.
+    const power = WG.State.recomputePower();
+    const charPower = (WG.AscendChars.activePower && WG.AscendChars.activePower()) || 0;
+    const pwrBox = el('div', { class:'scene-row', style:'background:linear-gradient(to bottom,#3a2818,#1a1006);' });
+    pwrBox.appendChild(el('div', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'TOTAL POWER'));
+    pwrBox.appendChild(el('div', { style:'font-size:28px;color:#ffd870;font-weight:700;' }, '' + power));
+    pwrBox.appendChild(el('div', { style:'font-size:10px;color:#a89878;margin-top:2px;' },
+      `${character.name} · Tier ${tier.tier} (+${charPower} pwr)`));
+
+    // Rebirth marker — tease the next tier's appearance + cost when it's
+    // possible to advance. Uses the Cultivate ladder from AscendChars.
+    const next = character.tiers.find(t => t.tier === tier.tier + 1);
+    if (next) {
+      const need = next.requiresStageClear || 0;
+      const highest = ps.highestStageCleared || 0;
+      const cost = (WG.AscendChars.rebirthCost && WG.AscendChars.rebirthCost(charId)) || 2880;
+      const ready = highest >= need;
+      const note = ready
+        ? `Tier ${next.tier} ready · Cultivate ${cost}<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>`
+        : `Tier ${next.tier} locked · clear stage ${need}`;
+      pwrBox.appendChild(el('div', {
+        style: `font-size:10px;color:${ready ? '#ffd870' : '#806040'};margin-top:4px;letter-spacing:1px;`
+      }, note));
+    }
+    scroll.appendChild(pwrBox);
+
+    // Rift Guests — collapsible, default collapsed (W-Rift-Mechanic-Plumbing).
+    // Slot stays ??? until Architect ratifies the first guest reveal.
+    const riftState = WG.State.get().rift || { sigils: 0 };
+    const unlockedSlots = Math.floor(riftState.sigils / 3);
+    const sigilsInProgress = riftState.sigils - unlockedSlots * 3;
+
+    const riftBox = el('div', { class:'scene-row', style:'padding:0;overflow:hidden;' });
+    const riftHeader = el('div', {
+      style:'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;user-select:none;',
+    });
+    riftHeader.appendChild(el('div', { style:'font-size:11px;color:#c8a868;letter-spacing:2px;' }, 'RIFT GUESTS'));
+    const riftArrow = el('div', { style:'font-size:10px;color:#806040;' }, '▼');
+    riftHeader.appendChild(riftArrow);
+    riftBox.appendChild(riftHeader);
+
+    const riftBody = el('div', { style:'display:none;padding:0 12px 12px 12px;' });
+
+    riftHeader.addEventListener('click', () => {
+      const collapsed = riftBody.style.display === 'none';
+      riftBody.style.display = collapsed ? 'block' : 'none';
+      riftArrow.textContent = collapsed ? '▲' : '▼';
+    });
+
+    if (unlockedSlots === 0) {
+      riftBody.appendChild(el('div', {
+        style:'font-size:11px;color:#806040;line-height:1.6;margin-bottom:10px;',
+      }, 'The boundary is intact. Collect Rift Sigils from eldritch stages.'));
+    }
+
+    // Slot 1 — always visible; locked display until 3 sigils collected.
+    const slotLocked = unlockedSlots < 1;
+    const slotTile = el('div', {
+      style:`display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.3);border:1px solid ${slotLocked?'#3a1a4a':'#6020a0'};border-radius:6px;padding:8px 10px;`,
+    });
+    const slotIcon = el('div', {
+      style:`width:36px;height:36px;border-radius:4px;background:${slotLocked?'#1a0a20':'#2a0a3a'};display:flex;align-items:center;justify-content:center;font-size:18px;`,
+    }, slotLocked ? '🔒' : '🔮');
+    slotTile.appendChild(slotIcon);
+    const slotInfo = el('div', { style:'flex:1;' });
+    slotInfo.appendChild(el('div', { style:`font-size:13px;font-weight:600;color:${slotLocked?'#604080':'#c080ff'};` }, '??? — locked'));
+    slotInfo.appendChild(el('div', { style:'font-size:10px;color:#806040;margin-top:2px;' }, 'Reveal pending.'));
+    slotTile.appendChild(slotInfo);
+    riftBody.appendChild(slotTile);
+
+    // Sigil progress toward next unlock.
+    const progressRow = el('div', { style:'margin-top:8px;' });
+    progressRow.appendChild(el('div', {
+      style:'font-size:10px;color:#806040;text-align:center;margin-bottom:4px;letter-spacing:1px;',
+    }, `${sigilsInProgress}/3 Sigils`));
+    const barTrack = el('div', { style:'height:4px;background:rgba(96,32,160,0.2);border-radius:2px;overflow:hidden;' });
+    const barFill = el('div', {
+      style:`height:100%;width:${Math.round(sigilsInProgress/3*100)}%;background:linear-gradient(to right,#6020a0,#c080ff);border-radius:2px;`,
+    });
+    barTrack.appendChild(barFill);
+    progressRow.appendChild(barTrack);
+    riftBody.appendChild(progressRow);
+
+    riftBox.appendChild(riftBody);
+    scroll.appendChild(riftBox);
+
+    syncTopStrip();
+  }
+
+  // Inject roster-picker CSS once: tap scale-bounce, active checkmark badge,
+  // and the small 3-col tile portrait.
+  function injectRosterCSS() {
+    if (document.getElementById('roster-picker-css')) return;
+    const st = document.createElement('style');
+    st.id = 'roster-picker-css';
+    st.textContent = `
+      @keyframes roster-tap-bounce {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(0.92); }
+        70%  { transform: scale(1.06); }
+        100% { transform: scale(1); }
+      }
+      .roster-tile {
+        position: relative; cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease;
+      }
+      .roster-tile.tap { animation: roster-tap-bounce 320ms ease-out; }
+      .roster-tile:active { transform: scale(0.96); }
+      .roster-tile.active { border-color: #ffd870 !important; box-shadow: 0 0 12px 1px rgba(255,216,112,0.45); }
+      .roster-tile .check {
+        position: absolute; top: 4px; right: 4px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: linear-gradient(135deg, #ffe888, #c89030);
+        color: #2a1c10; font-size: 11px; font-weight: 800;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 6px rgba(255,200,100,0.8);
+      }
+      .roster-portrait {
+        width: 56px; height: 64px; border-radius: 6px;
+        background: linear-gradient(to bottom, rgba(20,16,10,0.9), rgba(8,4,2,0.95));
+        border: 1px solid #3a2818; position: relative; overflow: hidden;
+      }
+      .roster-portrait .body {
+        position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+        width: 22px; height: 32px; border-radius: 5px 5px 2px 2px;
+      }
+      .roster-portrait .head {
+        position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%);
+        width: 14px; height: 14px; border-radius: 50%; border: 1px solid #2a1c10;
+      }
+      .roster-tag {
+        font-size: 8px; letter-spacing: 1.5px; color: #c8a868; margin-top: 2px;
+      }
+      .roster-tag.cta { color: #ffd870; font-weight: 700; text-shadow: 0 0 4px rgba(255,200,100,0.4); }
+      .roster-bonus { font-size: 8px; color: #80c8a0; margin-top: 1px; line-height: 1.2; }
+      .roster-cost-btn {
+        margin-top: 4px; font-size: 9px; padding: 3px 6px;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function showCultivateModal() {
+    const root = document.getElementById('modal-root');
+    const wrap = el('div', { class:'modal-overlay show' });
+    const card = el('div', { class:'modal-card', style:'width:88%;max-width:320px;' });
+    card.appendChild(el('div', { class:'modal-title' }, 'CULTIVATE'));
+    card.appendChild(el('div', { style:'font-size:12px;color:#c8a868;margin:10px 0 4px;' }, 'Cost'));
+    card.appendChild(el('div', { style:'font-size:16px;color:#ffd870;font-weight:700;' }, '5 💎'));
+    card.appendChild(el('div', { style:'font-size:12px;color:#c8a868;margin:10px 0 4px;' }, 'Bonus'));
+    card.appendChild(el('div', { style:'font-size:14px;color:#80c8a0;' }, '+2 ATK  /  +8 HP'));
+    const btnRow = el('div', { class:'modal-btn-row', style:'margin-top:16px;' });
+    btnRow.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'CANCEL'));
+    btnRow.appendChild(el('button', { class:'btn primary', onclick: () => {
+      const r = WG.AscendCharacter.tryCultivate();
+      if (!r.ok) { wrap.remove(); toast('Need 5 💎'); return; }
+      wrap.remove();
+      // Gold flash overlay
+      const flash = el('div', { style:'position:fixed;inset:0;background:rgba(255,216,112,0.18);pointer-events:none;z-index:600;transition:opacity 600ms;' });
+      document.getElementById('modal-root').appendChild(flash);
+      requestAnimationFrame(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 620); });
+      WG.State.recomputePower();
+      refresh();
+    } }, 'CONFIRM'));
+    card.appendChild(btnRow);
+    wrap.appendChild(card);
+    root.appendChild(wrap);
+  }
+
+  function showSkinPicker() {
+    injectRosterCSS();
+    const root = document.getElementById('modal-root');
+    const wrap = el('div', { class:'modal-overlay show' });
+    const card = el('div', { class:'modal-card', style:'width:92%;max-width:380px;' });
+    card.appendChild(el('div', { class:'modal-title' }, 'ROSTER — TAP TO PLAY'));
+
+    const grid = el('div', { style:'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;' });
+    const ps = WG.State.get().player;
+    const ownedSet = new Set(ps.ownedCharacters || ['lantern_acolyte']);
+    const activeId = ps.activeCharacter || 'lantern_acolyte';
+
+    for (const ch of WG.AscendChars.list()) {
+      const owned = ownedSet.has(ch.id);
+      // Show the player's CURRENT tier appearance for owned chars; tier-1 for locked.
+      const tier = owned ? (WG.AscendChars.currentTier(ch.id) || ch.tiers[0]) : ch.tiers[0];
+      const isActive = owned && (ch.id === activeId);
+      const tile = el('div', { class:'card-tile roster-tile' + (!owned ? ' locked' : '') + (isActive ? ' active' : '') });
+
+      // Active checkmark badge — only visible when this character is currently active.
+      if (isActive) {
+        const check = el('div', { class:'check' }, '✓');
+        tile.appendChild(check);
+      }
+
+      // Portrait: simulated body+head matching tier color/accent.
+      const portrait = el('div', { class:'roster-portrait' });
+      const body = el('div', { class:'body', style:`background:${tier.color};` });
+      const head = el('div', { class:'head', style:`background:${tier.accent};` });
+      portrait.appendChild(body);
+      portrait.appendChild(head);
+      tile.appendChild(portrait);
+
+      tile.appendChild(el('div', { class:'name' }, ch.name));
+      tile.appendChild(el('div', { class:'roster-tag' + (owned && !isActive ? ' cta' : '') },
+        isActive ? 'ACTIVE' : (owned ? 'TAP TO PLAY' : `Tier ${tier.tier}`)));
+
+      // Active bonus hint for owned characters (special effect line).
+      if (owned && ch.bonus && ch.bonus.special) {
+        tile.appendChild(el('div', { class:'roster-bonus' }, ch.bonus.special));
+      }
+
+      if (owned) {
+        tile.addEventListener('click', () => {
+          // Scale-bounce + commit + refresh after the tap animation reads.
+          tile.classList.add('tap');
+          setTimeout(() => {
+            WG.AscendChars.setActive(ch.id);
+            wrap.remove();
+            refresh();
+          }, 220);
+        });
+      } else {
+        const costStr = Object.entries(ch.cost || {}).map(([k,v]) => `${v}${k==='coins'?'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:radial-gradient(#ffe89a,#d8a838);border:1px solid #b08820;vertical-align:-2px;margin-right:2px;"></span>':k==='diamonds'?'💎':'🎴'}`).join(' ') || 'LOCKED';
+        const btn = el('button', { class:'btn roster-cost-btn',
+          onclick: (e) => {
+            e.stopPropagation();
+            const r = WG.AscendChars.tryUnlock(ch.id);
+            if (r.ok) { wrap.remove(); refresh(); }
+            else toast('Need ' + costStr);
+          }
+        }, costStr);
+        tile.appendChild(btn);
+      }
+      grid.appendChild(tile);
+    }
+    card.appendChild(grid);
+
+    const row = el('div', { class:'modal-btn-row', style:'margin-top:14px;' });
+    row.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'CLOSE'));
+    card.appendChild(row);
+    wrap.appendChild(card);
+    root.appendChild(wrap);
+  }
+
+  function showWeaponPicker(slot) {
+    const root = document.getElementById('modal-root');
+    const wrap = el('div', { class:'modal-overlay show' });
+    const card = el('div', { class:'modal-card', style:'width:90%;max-width:380px;' });
+    card.appendChild(el('div', { class:'modal-title' }, slot.toUpperCase() + ' — pick weapon'));
+    const list = WG.AscendEquipment.listAvailableForSlot(slot);
+    const grid = el('div', { style:'display:grid;grid-template-columns:repeat(2,1fr);gap:6px;' });
+    const ps = WG.State.get().player;
+    for (const w of list) {
+      const tile = el('div', { class:'card-tile', style:'cursor:pointer;' });
+      tile.appendChild(el('div', { class:'icon-box', style:`background:${w.visual.color};` }, '⚔'));
+      tile.appendChild(el('div', { class:'name' }, w.name));
+      tile.appendChild(el('div', { class:'level' }, 'DMG ' + w.damage + '  CD ' + w.cooldown.toFixed(2) + 's'));
+      if (ps.slots[slot] === w.id) tile.style.borderColor = '#f0d890';
+      tile.addEventListener('click', () => { WG.AscendEquipment.trySetEquipped(slot, w.id); wrap.remove(); refresh(); });
+      grid.appendChild(tile);
+    }
+    card.appendChild(grid);
+    const row = el('div', { class:'modal-btn-row', style:'margin-top:12px;' });
+    row.appendChild(el('button', { class:'btn', onclick: () => wrap.remove() }, 'CLOSE'));
+    card.appendChild(row);
+    wrap.appendChild(card);
+    root.appendChild(wrap);
+  }
+
+  function toast(msg) {
+    const root = document.getElementById('modal-root');
+    const t = el('div', { style:'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);background:rgba(80,20,10,0.9);color:#fff;padding:8px 16px;border-radius:6px;font-size:12px;z-index:500;' }, msg);
+    root.appendChild(t);
+    setTimeout(() => t.remove(), 1600);
+  }
+
+  function syncTopStrip() {
+    if (WG.Game && WG.Game.syncTopStrip) WG.Game.syncTopStrip();
+  }
+
+  function init() {
+    WG.Engine.on('tab:change', ({ tab }) => { if (tab === 'ascend') refresh(); });
+    WG.Engine.on('currency:change', () => { if (WG.State.get().activeTab === 'ascend') refresh(); });
+  }
+
+  window.WG.AscendRender = { init, refresh };
+})();

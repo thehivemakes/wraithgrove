@@ -1,0 +1,5 @@
+workers/
+docs/
+www/
+*.md
+sonnet-outputs/
