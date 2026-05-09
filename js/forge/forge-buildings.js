@@ -145,8 +145,15 @@
   // ── CORE API ───────────────────────────────────────────────────────────────
   function get(id) { return DEFS[id]; }
 
-  // Upgrade cost: quadratic curve. L1→2 costs ~120, L19→20 costs ~15,280.
-  function upgradeCost(b) { return Math.floor(80 + b.level * b.level * 40); }
+  // Upgrade cost: quadratic curve, halved for levels 1-5 to ease early casual access.
+  // L1→2: 60 (was 120), L2→3: 120 (was 240), L3→4: 220 (was 440), L4→5: 360 (was 720),
+  // L5→6: 540 (was 1080). Full formula resumes at L6+.
+  // Source: BALANCE_AUDIT §5 G5 — "halve the formula for levels 1–5: floor(40 + level² × 20)"
+  function upgradeCost(b) {
+    return b.level <= 5
+      ? Math.floor(40 + b.level * b.level * 20)
+      : Math.floor(80 + b.level * b.level * 40);
+  }
 
   function tryUpgrade(id) {
     const s = WG.State.get();

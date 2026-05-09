@@ -56,6 +56,9 @@
       return;
     }
     if (cost > 0 && WG.State.spendEnergy) WG.State.spendEnergy(cost);
+    // W-Stage-Transitions-Fade: snap overlay to biome color before the snap-cut
+    const _tsEntry = WG.HuntStage.get(stageId);
+    if (WG.Transitions && _tsEntry) WG.Transitions.snapAndFadeIn(_tsEntry.biome);
     buildHuntRuntime(stageId, mode);
     WG.State.get().huntProgress.currentStage = stageId;
     // Remove the stage select overlay if present
@@ -100,6 +103,10 @@
   }
 
   function exitHunt() {
+    // W-Stage-Transitions-Fade: fade out from current stage biome to lobby
+    if (WG.Transitions && huntRuntime && huntRuntime.stage) {
+      WG.Transitions.snapAndFadeIn(huntRuntime.stage.biome);
+    }
     // Clean up tower overlays if returning from a Tower run
     ['wg-buff-picker','wg-milestone-chest','wg-tower-death','wg-run-summary','wg-ch-results'].forEach(id => {
       const el = document.getElementById(id);
@@ -332,11 +339,16 @@
       WG.Engine.emit('hunt:stage-failed', { stageId, mins, kills: huntRuntime.kills });
     }
     const showResults = () => WG.HuntResults.show({ stageId, cleared, mins, kills: huntRuntime.kills, rewards, peakCombo: huntRuntime.combo ? huntRuntime.combo.peak : 0 });
+    // W-Stage-Transitions-Fade: fade to biome color before showing results
+    const _tsFinish = WG.HuntStage.get(stageId);
+    const _wrappedShowResults = (_tsFinish && WG.Transitions)
+      ? () => WG.Transitions.fadeAndThen(_tsFinish.biome, showResults)
+      : showResults;
     if (cleared && WG.AscendRebirth && WG.AscendRebirth.maybeShow) {
       huntRuntime.rebirthPending = !!WG.AscendRebirth.isEligible();
-      WG.AscendRebirth.maybeShow({ stageId, onContinue: showResults });
+      WG.AscendRebirth.maybeShow({ stageId, onContinue: _wrappedShowResults });
     } else {
-      showResults();
+      _wrappedShowResults();
     }
     // Restart loop to keep top-strip / autosave running. We keep huntRuntime.player
     // intact so the §B revive flow can restore HP from the existing entity —
@@ -1795,6 +1807,7 @@
     WG.Input.init();
     WG.Render.init();
     WG.HuntStage.init();
+    if (WG.Transitions && WG.Transitions.init) WG.Transitions.init();
     WG.HuntWeapons.init();
     WG.HuntPickups.init();
     WG.HuntEnemies.init();

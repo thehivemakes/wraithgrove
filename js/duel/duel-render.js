@@ -230,6 +230,8 @@
   }
 
   function showResultModal(result, match) {
+    const _ann = document.getElementById('a11y-announce');
+    if (_ann) _ann.textContent = result.won ? 'Duel victory' : 'Duel defeat';
     const root = document.getElementById('modal-root');
     const wrap = el('div', { class:'modal-overlay show' });
     const card = el('div', { class:'modal-card', style:'min-width:300px;text-align:center;' });

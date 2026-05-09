@@ -1,5 +1,15 @@
 // WG.Alliance — alliance state, creation, membership, points economy
+// Phase 4: server sync activates when WG.Config.SERVER_BASE_URL is set.
+// Stubs remain: all local state displays if server is unreachable.
 (function(){'use strict';
+
+  if (!window.WG.Config) window.WG.Config = {};
+  const BASE_URL = (window.WG.Config && window.WG.Config.SERVER_BASE_URL) || null;
+
+  function _authHeader() {
+    var userId = (window.WG && WG.Account && WG.Account.getDeviceId) ? WG.Account.getDeviceId() : 'local';
+    return { 'Authorization': 'Bearer stub:' + userId };
+  }
 
   // Earn rates (Architect-locked)
   const EARN_RATES = Object.freeze({
@@ -437,6 +447,31 @@
     });
   }
 
+  // Phase 4: pull server state on tab activation; merge into local if server responds.
+  // If server is unreachable, local state displays unchanged (no crash, stale data visible).
+  function syncFromServer() {
+    var a = _ensureState();
+    if (!BASE_URL || !a.id) return Promise.resolve(null);
+    return fetch(BASE_URL + '/alliance/' + a.id, { headers: _authHeader() })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.ok || !data.alliance) return null;
+        var srv = data.alliance;
+        var s = WG.State.get();
+        // Merge: server wins for roster, MOTD, points, war state
+        s.alliance.memberIds = srv.members.map(function(m) { return m.userId; });
+        s.alliance.msgOfDay  = srv.motd || s.alliance.msgOfDay;
+        s.alliance.points    = srv.points || s.alliance.points;
+        if (srv.war) s.alliance.warState = srv.war;
+        WG.Engine.emit('alliance:changed');
+        return data.alliance;
+      })
+      .catch(function(err) {
+        console.warn('[Alliance] syncFromServer error', err);
+        return null;
+      });
+  }
+
   window.WG.Alliance = {
     init, get, isUnlocked, isInAlliance,
     create, join, leave, kick, promote, demote, transferLeadership, setMOTD, setBanner,
@@ -444,6 +479,7 @@
     canPromote, canKick, canDemote, canSetMOTD, canEditBanner, canSpendPoints,
     findAlliances, getNPCMember, getNPCMembers,
     isActiveTimedBoost, boostTimeLeftMs, getActiveTimedBoosts,
+    syncFromServer,
     EARN_RATES, SPEND_POOL, CREATE_COST_COINS,
     NPC_MEMBERS,
   };

@@ -184,13 +184,26 @@
   const _s24 = STAGES.find(s => s.id === 24);
   if (_s24) { _s24.waveCount = 8; _s24.durationSec = _s24.waveCount * _s24.waveDurationSec; }
 
+  // Primary fade-overlay tint per biome — used by WG.Transitions for stage transitions.
+  // Colors are dark, saturated reads of each biome's atmosphere (not the palette ground color).
+  const BIOME_FADE_COLORS = Object.freeze({
+    forest_summer: 'rgba(10, 30, 8, 0.92)',    // deep forest green
+    forest_autumn: 'rgba(48, 20, 6, 0.92)',    // ember amber
+    cold_stone:    'rgba(15, 22, 38, 0.92)',   // slate blue-grey
+    temple:        'rgba(28, 14, 8, 0.92)',    // dark red-brown
+    cave:          'rgba(8, 6, 4, 0.95)',      // near-black
+    eldritch:      'rgba(14, 3, 22, 0.95)',    // violet-black
+    ascended:      'rgba(4, 2, 14, 0.95)',     // deep space-violet
+  });
+
   function get(id) { return STAGES.find(s => s.id === id); }
   function getBiome(name) { return BIOMES[name]; }
+  function getBiomeColor(name) { return BIOME_FADE_COLORS[name] || BIOME_FADE_COLORS.forest_summer; }
   function list() { return STAGES.slice(); }
 
   function init() {}
   window.WG.HuntStage = {
-    init, get, getBiome, list, BIOMES, STAGES,
+    init, get, getBiome, getBiomeColor, list, BIOMES, STAGES, BIOME_FADE_COLORS,
     waveCountFor, waveDurationFor, tierFor,
     WAVE_COUNT_EARLY, WAVE_COUNT_MID, WAVE_COUNT_LATE,
     WAVE_SEC_EARLY, WAVE_SEC_MID, WAVE_SEC_LATE,

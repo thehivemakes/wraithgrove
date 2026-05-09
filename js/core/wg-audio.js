@@ -74,6 +74,9 @@
     // throttleMs gates rapid-fire shrieks if multiple banshees ever stack
     // (cap is 1 alive per hunt-waves rare-roll, but defensive).
     { event: 'enemy:shriek',          id: 'banshee_screech', bus: 'sfx', throttleMs: 600, vol: 0.85 },
+    // W-Tier3-Audit-Fixes §D — forge events lacked audio; emitted by forge-buildings.js already.
+    { event: 'forge:mine-collected',     id: 'coin_pickup',   bus: 'ui',  throttleMs: 0,   vol: 0.9 },
+    { event: 'forge:enchantment-applied',id: 'craft',         bus: 'sfx', throttleMs: 0,   vol: 0.8 },
   ];
 
   // Biome → ambient track. Played on stage:enter, faded out on stage:exit.

@@ -47,6 +47,8 @@
       delete active[buffId];
       if (window.WG && WG.Engine && WG.Engine.emit) {
         WG.Engine.emit('buff:expired', { id: buffId });
+        const _ann = document.getElementById('a11y-announce');
+        if (_ann) _ann.textContent = (BUFFS[buffId] ? BUFFS[buffId].label : buffId) + ' expired';
       }
       return false;
     }
