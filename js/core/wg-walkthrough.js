@@ -7,6 +7,10 @@
     { id: 'orbs',       text: 'Pick up orbs to earn XP.\nLevel up to power your skill.',                pos: 'bottom:260px;left:50%;transform:translateX(-50%);' },
     { id: 'hp',         text: 'The bar at the top is your HP.\nDon’t let it reach zero.',           pos: 'top:82px;left:50%;transform:translateX(-50%);' },
     { id: 'skill',      text: 'The skill button charges up.\nTap it when it glows.',                    pos: 'top:112px;left:50%;transform:translateX(-50%);' },
+    // Architect 2026-05-09 — dopamine cascade discoverability
+    { id: 'surge',      text: 'PANIC BUTTON: Double-tap the screen\n(or press Q) to unleash\nSpirit Surge — slowmo + nuke.\nCharges every 60s.', pos: 'bottom:240px;left:50%;transform:translateX(-50%);' },
+    { id: 'phoenix',    text: 'If you fall, Phoenix Revive\ncatches you once per stage.\n3s godmode + 2× damage.', pos: 'top:150px;left:50%;transform:translateX(-50%);' },
+    { id: 'wraith',     text: 'Build a kill chain.\nCombo 30 / 60 / 100 triggers\nWRAITH UNLEASH cascades.', pos: 'top:60px;left:50%;transform:translateX(-50%);' },
   ];
 
   function _tut() {
