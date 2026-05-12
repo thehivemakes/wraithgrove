@@ -251,6 +251,38 @@
     // hunt-enemies.js AI now only emits the event + addTrauma. Tunables read
     // through creature._typeData so designer edits to TYPES.banshee.shriek*
     // propagate to FX without touching this file.
+    // SPIRIT SURGE (Architect 2026-05-09) — panic-button nuke moment.
+    // Big violet+gold radial burst, screen flash, "SPIRIT SURGE!" floater.
+    WG.Engine.on('player:spirit-surge', ({ x, y, radius, trauma }) => {
+      if (x == null) return;
+      burst(x, y, 'bossKill', { count: 50, life: 1.0 });
+      burst(x, y, 'levelUp', { count: 24, life: 0.9 });
+      if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(trauma || 0.55);
+      if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen('#c060ff', 0.55, 480);
+      if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
+        WG.HuntFXNumbers.spawn(x, y - 32, 'SPIRIT SURGE!', { color: '#c060ff', size: 28, duration: 1600 });
+      }
+      WG.Engine.emit('audio:spirit_surge', {});
+    });
+    // WRAITH UNLEASH (Architect 2026-05-09) — combo cascade reward moments.
+    // Tier 1 (combo 30) — gold burst + label. Tier 2 (60) — bigger + chest. Tier 3 (100) — ascendant.
+    WG.Engine.on('wraith:unleash', ({ tier, label, x, y, radius }) => {
+      if (x == null) return;
+      const colors = ['#ffe888','#fff0c0','#ffd870','#80f0ff'];
+      const tierCfg = [
+        null,
+        { count: 24, flashAlpha: 0.35, trauma: 0.30, size: 22 },
+        { count: 40, flashAlpha: 0.50, trauma: 0.45, size: 26 },
+        { count: 64, flashAlpha: 0.75, trauma: 0.70, size: 32 },
+      ][tier] || { count: 24, flashAlpha: 0.35, trauma: 0.30, size: 22 };
+      burst(x, y, 'bossKill', { count: tierCfg.count, life: 0.9 + tier * 0.2 });
+      if (window.WG.HuntRender && WG.HuntRender.addTrauma) WG.HuntRender.addTrauma(tierCfg.trauma);
+      if (window.WG.Game && WG.Game.flashScreen) WG.Game.flashScreen(colors[tier] || '#ffe888', tierCfg.flashAlpha, 420);
+      if (window.WG.HuntFXNumbers && WG.HuntFXNumbers.spawn) {
+        WG.HuntFXNumbers.spawn(x, y - 36, label || `WRAITH x${tier}`, { color: colors[tier], size: tierCfg.size, duration: 1700 });
+      }
+      WG.Engine.emit('audio:wraith_unleash', { tier });
+    });
     WG.Engine.on('enemy:shriek', ({ creature }) => {
       if (!creature) return;
       const td = creature._typeData || {};

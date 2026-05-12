@@ -77,8 +77,45 @@
       feverActive:   false,
       feverEndsAt:   0,
       feverDropMult: 1,
+      // PHOENIX REVIVE (Architect 2026-05-09): once per stage, death → 1 HP + 3s
+      // godmode + 2× damage + AOE blast. Refreshes via ad-watch in death modal.
+      phoenixAvailable: true,
+      phoenixActive:    false,
+      phoenixEndsAt:    0,
+      phoenixDmgMult:   1,
+      // SPIRIT SURGE (Architect 2026-05-09): triple-tap / long-press panic button.
+      // 1.5s slowmo + 3× scythe + 200-unit nuke. 60s CD. Charged at stage start.
+      spiritSurgeCd:    0,
+      spiritSurgeActive: false,
+      spiritSurgeEndsAt: 0,
+      // WRAITH UNLEASH (Architect 2026-05-09): combo cascade. Tracks last-fired
+      // milestone to prevent re-trigger within same combo run.
+      wraithLastTier:   0,
     };
   }
+
+  // ─── Architect 2026-05-09 tunables (post-Stage1-onboarding) ────────────────
+  const PHOENIX_TUNABLES = Object.freeze({
+    GODMODE_MS:   3000,
+    DMG_MULT:     2.0,
+    AOE_RADIUS:   220,
+    AOE_DAMAGE:   60,
+  });
+  const SPIRIT_SURGE_TUNABLES = Object.freeze({
+    CD_SEC:           60,
+    SLOWMO_MS:        1500,
+    SLOWMO_SCALE:     0.30,    // world ticks at 30% speed during slowmo
+    NUKE_RADIUS:      200,
+    NUKE_DAMAGE:      120,
+    SCYTHE_MULT:      3.0,
+    TRAUMA:           0.55,
+  });
+  const WRAITH_UNLEASH_TIERS = [
+    // count, label, behavior
+    { combo: 30,  tier: 1, label: 'WRAITH SWEEP',  aoeRadius: 180, aoeDamage: 70,  reward: null },
+    { combo: 60,  tier: 2, label: 'GOLD CASCADE',  aoeRadius: 260, aoeDamage: 110, reward: 'gold_chest' },
+    { combo: 100, tier: 3, label: 'ASCENDANT',     aoeRadius: 999, aoeDamage: 200, reward: 'ascendant_15s' },
+  ];
 
   function meleeWeapon() {
     const id = WG.State.get().player.slots.melee || 'branch_stick';
@@ -223,6 +260,8 @@
         const dx = c.x - p.x, dy = c.y - p.y;
         if (dx*dx + dy*dy < r * r) {
           let dmg = baseDamage(w);
+          // PHOENIX dmg mult: 2× during 3s godmode after revive
+          if (p.phoenixActive) dmg = Math.round(dmg * p.phoenixDmgMult);
           const isCrit = Math.random() < CRIT_TUNABLES.chance;
           if (isCrit) {
             dmg = Math.round(dmg * CRIT_TUNABLES.multiplier);
@@ -416,6 +455,30 @@
     p.hp = Math.max(0, p.hp - reduced);
     WG.Engine.emit('player:damaged', { amount: reduced, hp: p.hp, source });
     if (p.hp <= 0) {
+      // PHOENIX REVIVE (Architect 2026-05-09) — first death per stage drops you
+      // to 1 HP + 3s godmode + 2× damage + AOE blast. Higher priority than
+      // pre-armed revive buff (so the per-stage save fires first; ad-watch
+      // refresh sets phoenixAvailable=true for a 2nd death).
+      if (p.phoenixAvailable) {
+        p.phoenixAvailable = false;
+        p.phoenixActive    = true;
+        p.phoenixEndsAt    = Date.now() + PHOENIX_TUNABLES.GODMODE_MS;
+        p.phoenixDmgMult   = PHOENIX_TUNABLES.DMG_MULT;
+        p.hp = 1;
+        runtime._invulnEndsAt = p.phoenixEndsAt;
+        // AOE blast — damage all enemies within radius at revive position
+        if (runtime.creatures) {
+          for (const c of runtime.creatures) {
+            if (c.hp <= 0) continue;
+            const dx = c.x - p.x, dy = c.y - p.y;
+            if (dx*dx + dy*dy < PHOENIX_TUNABLES.AOE_RADIUS * PHOENIX_TUNABLES.AOE_RADIUS) {
+              WG.HuntEnemies.damage(c, PHOENIX_TUNABLES.AOE_DAMAGE);
+            }
+          }
+        }
+        WG.Engine.emit('player:revived', { source: 'phoenix', x: p.x, y: p.y });
+        return;
+      }
       // SPEC W-Hard-Tuning-And-Monetization §B — pre-armed revive buff
       // intercepts death once. Restores to full HP, fires player:revived,
       // does NOT emit player:died (so the death modal doesn't appear).
@@ -425,6 +488,85 @@
         return;
       }
       WG.Engine.emit('player:died', { source });
+    }
+  }
+
+  // PHOENIX tick — clears godmode flag + dmg mult when timer expires
+  function tickPhoenix() {
+    const p = runtime.player;
+    if (!p || !p.phoenixActive) return;
+    if (Date.now() >= p.phoenixEndsAt) {
+      p.phoenixActive  = false;
+      p.phoenixDmgMult = 1;
+      WG.Engine.emit('player:phoenix-end', {});
+    }
+  }
+
+  // SPIRIT SURGE — cooldown tick + trigger handler
+  function tickSpiritSurge(dt) {
+    const p = runtime.player;
+    if (!p) return;
+    if (p.spiritSurgeCd > 0) p.spiritSurgeCd = Math.max(0, p.spiritSurgeCd - dt);
+    if (p.spiritSurgeActive && Date.now() >= p.spiritSurgeEndsAt) {
+      p.spiritSurgeActive = false;
+      // _timeSlow auto-clears via wg-game.js line 173 once endsAt passes
+      WG.Engine.emit('player:spirit-surge-end', {});
+    }
+  }
+  function trySpiritSurge() {
+    const p = runtime.player;
+    if (!p || p.hp <= 0 || p.spiritSurgeCd > 0 || p.spiritSurgeActive) {
+      return { ok: false, reason: 'unavailable' };
+    }
+    p.spiritSurgeActive = true;
+    p.spiritSurgeEndsAt = Date.now() + SPIRIT_SURGE_TUNABLES.SLOWMO_MS;
+    p.spiritSurgeCd     = SPIRIT_SURGE_TUNABLES.CD_SEC;
+    // Reuse existing _timeSlow infrastructure (wg-game.js line 171)
+    runtime._timeSlow = { factor: SPIRIT_SURGE_TUNABLES.SLOWMO_SCALE, endsAt: p.spiritSurgeEndsAt };
+    // Nuke radius damage
+    if (runtime.creatures) {
+      for (const c of runtime.creatures) {
+        if (c.hp <= 0) continue;
+        const dx = c.x - p.x, dy = c.y - p.y;
+        if (dx*dx + dy*dy < SPIRIT_SURGE_TUNABLES.NUKE_RADIUS * SPIRIT_SURGE_TUNABLES.NUKE_RADIUS) {
+          WG.HuntEnemies.damage(c, SPIRIT_SURGE_TUNABLES.NUKE_DAMAGE);
+        }
+      }
+    }
+    WG.Engine.emit('player:spirit-surge', {
+      x: p.x, y: p.y,
+      radius: SPIRIT_SURGE_TUNABLES.NUKE_RADIUS,
+      trauma: SPIRIT_SURGE_TUNABLES.TRAUMA,
+    });
+    return { ok: true };
+  }
+
+  // WRAITH UNLEASH — combo milestone cascade. Called from combo:step handler.
+  function checkWraithUnleash(comboCount) {
+    const p = runtime.player;
+    if (!p) return;
+    for (const tier of WRAITH_UNLEASH_TIERS) {
+      if (comboCount >= tier.combo && p.wraithLastTier < tier.tier) {
+        p.wraithLastTier = tier.tier;
+        // AOE
+        if (runtime.creatures) {
+          for (const c of runtime.creatures) {
+            if (c.hp <= 0) continue;
+            const dx = c.x - p.x, dy = c.y - p.y;
+            if (dx*dx + dy*dy < tier.aoeRadius * tier.aoeRadius) {
+              WG.HuntEnemies.damage(c, tier.aoeDamage);
+            }
+          }
+        }
+        // Rewards
+        if (tier.reward === 'gold_chest') {
+          _pushDrop({ x: p.x, y: p.y, type: 'gold_chest', vx: 0, vy: 0 });
+        } else if (tier.reward === 'ascendant_15s') {
+          runtime._invulnEndsAt = Date.now() + 15000;
+          p.speedBonus = (p.speedBonus || 0) + 400; // +5× base 95 ≈ 475 → cap at ~+400
+        }
+        WG.Engine.emit('wraith:unleash', { tier: tier.tier, label: tier.label, x: p.x, y: p.y, radius: tier.aoeRadius });
+      }
     }
   }
 
@@ -465,6 +607,9 @@
       if (combo.count >= FEVER_TUNABLES.THRESHOLD_COMBO && !runtime.player.feverActive) {
         startFever();
       }
+      // WRAITH UNLEASH (Architect 2026-05-09): cascade rewards on combo
+      // milestones (30 / 60 / 100). Reset by combo:reset path below.
+      checkWraithUnleash(combo.count);
     }
   }
 
@@ -483,6 +628,8 @@
     if (performance.now() - combo.lastKillAt > 2500) {
       if (p && p.feverActive) endFever('broke');
       combo.count = 0;
+      // WRAITH UNLEASH — reset tier on combo break so next chain can re-trigger
+      if (p) p.wraithLastTier = 0;
       WG.Engine.emit('combo:reset', {});
     }
   }
@@ -843,6 +990,8 @@
     if (window.WG.HuntTurret && WG.HuntTurret.tick) WG.HuntTurret.tick(dt);
     tickSkill(dt);
     tickTorch(dt);
+    tickPhoenix();
+    tickSpiritSurge(dt);
     comboDecayTick();
   }
 
@@ -853,8 +1002,20 @@
   });
 
   function init() {}
+  // PHOENIX REVIVE ad-watch refresh — sets phoenixAvailable back to true.
+  // Called from death modal's "Watch Ad" button. One-shot per stage.
+  function rearmPhoenix() {
+    const p = runtime && runtime.player;
+    if (!p) return false;
+    p.phoenixAvailable = true;
+    return true;
+  }
+
   window.WG.HuntPlayer = {
     init, place, move, tick, takeDamage, heal, trySkill, applyLevelChoice,
     REPAIR_TUNABLES, CRIT_TUNABLES, HITSTOP_TIERS, FEVER_TUNABLES,
+    // Architect 2026-05-09 dopamine cascade
+    trySpiritSurge, rearmPhoenix,
+    PHOENIX_TUNABLES, SPIRIT_SURGE_TUNABLES, WRAITH_UNLEASH_TIERS,
   };
 })();

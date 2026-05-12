@@ -1774,6 +1774,31 @@
     if (gemsChip) gemsChip.addEventListener('click', () => {
       if (WG.Shop && WG.Shop.open) WG.Shop.open({ section: 'gems' });
     });
+
+    // SPIRIT SURGE (Architect 2026-05-09) — double-tap on stage to trigger panic
+    // nuke. Mobile-discoverable (no UI button); also bound to 'q' / Space on
+    // keyboard for desktop testing. Only fires in Hunt mode while alive.
+    const stageEl = document.getElementById('stage');
+    if (stageEl) {
+      let _lastTap = 0;
+      stageEl.addEventListener('pointerdown', (e) => {
+        if (WG.State.get().activeTab !== 'hunt') return;
+        if (!huntRuntime || !huntRuntime.player || huntRuntime.player.hp <= 0) return;
+        const now = Date.now();
+        if (now - _lastTap < 350) {
+          _lastTap = 0;
+          if (WG.HuntPlayer && WG.HuntPlayer.trySpiritSurge) WG.HuntPlayer.trySpiritSurge();
+        } else {
+          _lastTap = now;
+        }
+      });
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'q' && e.key !== 'Q' && e.key !== ' ') return;
+      if (WG.State.get().activeTab !== 'hunt') return;
+      if (!huntRuntime || !huntRuntime.player || huntRuntime.player.hp <= 0) return;
+      if (WG.HuntPlayer && WG.HuntPlayer.trySpiritSurge) WG.HuntPlayer.trySpiritSurge();
+    });
   }
 
   async function init() {
