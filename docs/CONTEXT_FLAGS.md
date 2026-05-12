@@ -1,3 +1,18 @@
+## CF-005 — Asset PNGs ship with baked-BG bugs; rembg > color-strip
+2026-05-09
+
+**Pattern caught:** Multiple enemy + boss sprites shipped to live with their MJ-generation backgrounds NOT properly stripped — variants included checkerboard (transparency-indicator), solid colored rectangles, magenta residue. Audits checked code paths, never opened PNGs. The visual register failure only surfaced when Architect ran a screenshot Sonnet and noticed in-game artifacts.
+
+**Root cause:** Asset-pipeline workers declared "rembg done" without pixel-level verification. Some assets had been processed by manual screenshot-of-preview save (baking the alpha indicator into RGB), others by incomplete rembg passes that left rectangular frames intact.
+
+**Worse compounding:** First attempt to fix used custom color-matching filters. Too narrow → BG remnants. Too wide → ate subject pixels (saw this on wraith_fast where dark-blue body color overlapped dark-blue checker).
+
+**Discipline going forward:**
+1. Any sprite/portrait/boss asset commit must include the corner-transparency pixel check: corners[0,1], [w-1,1], [0,h-1], [w-1,h-1] all `RGBA(_,_,_,<30)` for chibi/portrait register.
+2. Use `rembg` (ML BG removal) by default for BG strips — NOT custom color filters. `pip install rembg` + `from rembg import remove`.
+3. Visual verification via `Read` on the actual PNG before declaring asset shipped — Claude Code's image preview catches what corner-pixel checks miss.
+4. Asset workers MUST display the rendered output in-game (Chrome MCP smoke) before writing done marker — per CLAUDE.md "Test locally before claiming shipped."
+
 # CONTEXT_FLAGS — running list of biases that hurt my judgment on this project
 
 **Add to this file every time the Architect catches a wrong assumption.**
