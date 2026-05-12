@@ -121,7 +121,16 @@
       ent.speed  = ent.speed * sm;
       return ent;
     }
-    const mult = _godWindowMult(runtime.elapsed || 0);
+    // Stage 1 onboarding override: softer + longer god-window (0.25 → 1.00 over 90s)
+    // so new players can survive the swarm. Architect 2026-05-09. Later stages
+    // unchanged from the GOD_WINDOW.START_MULT=0.40 / DURATION=60s baseline.
+    let mult;
+    if (runtime.stage && runtime.stage.id === 1) {
+      const t01 = Math.min(1, (runtime.elapsed || 0) / 90);
+      mult = 0.25 + (1.00 - 0.25) * (1 - Math.pow(1 - t01, 3));
+    } else {
+      mult = _godWindowMult(runtime.elapsed || 0);
+    }
     if (mult >= GOD_WINDOW.END_MULT) return ent; // past window — skip
     ent._spawnedAtElapsed = runtime.elapsed || 0;
     ent.hp     = Math.round(ent.hp     * mult);

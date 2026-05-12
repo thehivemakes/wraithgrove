@@ -71,6 +71,11 @@
     const baseRate = WAVE_BASE_RATE_MIN + (WAVE_BASE_RATE_MAX - WAVE_BASE_RATE_MIN) * within;
     let rate = baseRate * (1 + w0 * WAVE_TIER_RAMP);
     if (runtime.mode === 'night') rate *= NIGHT_SPAWN_MUL;
+    // Stage 1 onboarding: first wave only at ÷1.5 spawn rate so new players don't
+    // get swarmed before they figure out the controls. Architect 2026-05-09 — too
+    // hard to even win Stage 1 reported. Reduces only Wave 1 of Stage 1; Wave 2+
+    // and later stages unchanged.
+    if (stage.id === 1 && wave.index === 1) rate /= 1.5;
 
     runtime.spawnAccum += rate * dt;
     while (runtime.spawnAccum >= 1) {
