@@ -2634,6 +2634,58 @@
   // V0: facing south (down). Direction-aware sprite is V1.
   // No attack ring — Wood Siege has none.
   // ─────────────────────────────────────────────────────────────────────────────
+  // Weapon overlay — rotating scythe (Vampire Survivors style). Called by
+  // drawPlayer AFTER drawPlayerSprite so it renders ABOVE both the MJ chibi
+  // sprite path AND the drawAnimeGirl procedural fallback. Architect 2026-05-09:
+  // weaponless player sprites need the engine to draw the equipped weapon
+  // as a separate overlay or it never appears in-game.
+  function drawWeaponOverlay(ctx, sx, sy, weaponRange) {
+    const VISUAL_R = 16;
+    const range = Math.min(VISUAL_R, weaponRange || VISUAL_R);
+    const t = performance.now() / 1000;
+    const ROT_SPEED = 5.0;
+    const angle = t * ROT_SPEED;
+    // Faint reach circle
+    ctx.strokeStyle = 'rgba(232,224,200,0.10)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(sx, sy, range, 0, Math.PI*2); ctx.stroke();
+    // Motion trail
+    for (let i = 1; i <= 5; i++) {
+      const a = angle - i * 0.13;
+      const tx = sx + Math.cos(a) * range;
+      const ty = sy + Math.sin(a) * range;
+      ctx.fillStyle = `rgba(248, 240, 200, ${0.30 - i * 0.05})`;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3.5 - i * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Live scythe
+    const wx = sx + Math.cos(angle) * range;
+    const wy = sy + Math.sin(angle) * range;
+    ctx.save();
+    ctx.translate(wx, wy);
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.strokeStyle = '#5a4628';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-3, 0); ctx.lineTo(8, 0); ctx.stroke();
+    ctx.strokeStyle = '#f0eee0';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(8, -2, 7, Math.PI * 0.4, Math.PI * 1.6, false);
+    ctx.stroke();
+    ctx.strokeStyle = '#a89c80';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(8, -2, 6, Math.PI * 0.4, Math.PI * 1.6, false);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffe8';
+    ctx.beginPath();
+    ctx.arc(8 + Math.cos(Math.PI*0.4) * 7, -2 + Math.sin(Math.PI*0.4) * 7, 1.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawAnimeGirl(ctx, sx, sy, weaponRange) {
     // Scythe rotates continuously 360° around the player (Vampire Survivors style).
     // Architect: 'sword too far from character' — visual radius capped tight at 16
@@ -2747,22 +2799,33 @@
       drawAnimeGirl(ctx, sx, sy, p.weaponRange || 16);
       return;
     }
+    // Concern 2 — walk anim amp. Architect: prior ±1.2px bob + ±6% stretch
+    // was too subtle to read at sprite scale. New: bob amp scales with speed
+    // (idle 1.0px → full-walk 4.5px), faster cadence (idle 2.4Hz → full-walk
+    // 8.4Hz), tighter horizontal squash (±10%), and a ±0.10rad side-tilt on
+    // horizontal velocity so lateral motion reads directional.
     const vx = p.vx || 0, vy = p.vy || 0;
     const speed = Math.sqrt(vx*vx + vy*vy);
     const stretch = Math.min(1, speed / 80);
-    const sxScale = 1 - stretch * 0.06;
-    const syScale = 1 + stretch * 0.06;
+    const sxScale = 1 - stretch * 0.10;
+    const syScale = 1 + stretch * 0.10;
     const t = performance.now() / 1000;
-    const bob = Math.sin(t * 2.4) * 1.2;
+    const bobAmp  = 1.0 + stretch * 3.5;
+    const bobFreq = 2.4 + stretch * 6.0;
+    const bob = Math.sin(t * bobFreq) * bobAmp;
+    const tilt = Math.max(-0.10, Math.min(0.10, vx / 800));
     const drawW = 40 * sxScale;
     const drawH = 40 * syScale;
     ctx.save();
     if (p.facing === 'W') {
-      ctx.translate(sx, 0);
+      ctx.translate(sx, sy - drawH * 0.85 + bob);
+      ctx.rotate(-tilt);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, -drawW/2, sy - drawH * 0.85 + bob, drawW, drawH);
+      ctx.drawImage(img, -drawW/2, 0, drawW, drawH);
     } else {
-      ctx.drawImage(img, sx - drawW/2, sy - drawH * 0.85 + bob, drawW, drawH);
+      ctx.translate(sx, sy - drawH * 0.85 + bob);
+      ctx.rotate(tilt);
+      ctx.drawImage(img, -drawW/2, 0, drawW, drawH);
     }
     ctx.restore();
   }
@@ -2796,6 +2859,7 @@
     } else {
       drawPlayerSprite(ctx, s.x, s.y, p);
     }
+    drawWeaponOverlay(ctx, s.x, s.y, visualRadius);
     if (p.hp < p.maxHp) WG.Render.drawHpBar(ctx, s.x, s.y - 22, 26, p.hp, p.maxHp);
   }
 
