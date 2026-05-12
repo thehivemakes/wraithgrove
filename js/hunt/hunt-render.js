@@ -3030,6 +3030,77 @@
       }
     }
 
+    // Architect 2026-05-09 — Phoenix Revive indicator (top-left, below resource counters)
+    // Bright orange flame icon = available. Faded gray skull = spent for this stage.
+    // Tooltip via small label next to it.
+    const phoenixX = 12, phoenixY = 142;
+    const phoenixAvail = !!p.phoenixAvailable;
+    ctx.save();
+    ctx.globalAlpha = phoenixAvail ? 1.0 : 0.35;
+    // Flame icon
+    ctx.fillStyle = phoenixAvail ? '#ff8040' : '#604040';
+    ctx.beginPath();
+    ctx.moveTo(phoenixX + 6, phoenixY);
+    ctx.quadraticCurveTo(phoenixX + 12, phoenixY + 5, phoenixX + 10, phoenixY + 14);
+    ctx.quadraticCurveTo(phoenixX + 6, phoenixY + 11, phoenixX + 2, phoenixY + 14);
+    ctx.quadraticCurveTo(phoenixX, phoenixY + 5, phoenixX + 6, phoenixY);
+    ctx.fill();
+    ctx.fillStyle = phoenixAvail ? '#ffe080' : '#3a2818';
+    ctx.beginPath();
+    ctx.moveTo(phoenixX + 6, phoenixY + 4);
+    ctx.quadraticCurveTo(phoenixX + 9, phoenixY + 7, phoenixX + 7, phoenixY + 12);
+    ctx.quadraticCurveTo(phoenixX + 4, phoenixY + 9, phoenixX + 6, phoenixY + 4);
+    ctx.fill();
+    // Label
+    ctx.globalAlpha = phoenixAvail ? 0.9 : 0.4;
+    ctx.font = 'bold 9px system-ui';
+    ctx.fillStyle = phoenixAvail ? '#ffc888' : '#807060';
+    ctx.fillText(phoenixAvail ? 'REVIVE READY' : 'REVIVE SPENT', phoenixX + 16, phoenixY + 10);
+    ctx.restore();
+
+    // Architect 2026-05-09 — Spirit Surge cooldown ring (top-right corner, above skill button)
+    // Filled violet ring when ready; pie-fill showing CD% when on cooldown.
+    const surgeX = w - 36, surgeY = 144, surgeR = 14;
+    const surgeCfg = (window.WG.HuntPlayer && WG.HuntPlayer.SPIRIT_SURGE_TUNABLES) || { CD_SEC: 60 };
+    const surgeReady = (p.spiritSurgeCd || 0) <= 0;
+    const surgeCdPct = surgeReady ? 1.0 : (1 - p.spiritSurgeCd / surgeCfg.CD_SEC);
+    ctx.save();
+    // Background ring
+    ctx.strokeStyle = 'rgba(192,96,255,0.25)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(surgeX, surgeY, surgeR, 0, Math.PI*2); ctx.stroke();
+    // Filled pie showing readiness — violet when ready, dim purple while charging
+    ctx.fillStyle = surgeReady ? 'rgba(192,96,255,0.30)' : 'rgba(80,40,120,0.20)';
+    ctx.beginPath();
+    ctx.moveTo(surgeX, surgeY);
+    ctx.arc(surgeX, surgeY, surgeR, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * surgeCdPct);
+    ctx.closePath(); ctx.fill();
+    // Active ring (full violet when ready, faint when not)
+    ctx.strokeStyle = surgeReady ? '#c060ff' : '#604080';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(surgeX, surgeY, surgeR, 0, Math.PI*2); ctx.stroke();
+    // Icon — lightning bolt centered
+    ctx.fillStyle = surgeReady ? '#ffe0ff' : '#a880c0';
+    ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡', surgeX, surgeY + 5);
+    ctx.textAlign = 'left';
+    // Tap hint below — only when ready
+    if (surgeReady) {
+      ctx.font = 'bold 8px system-ui';
+      ctx.fillStyle = '#c8a8e0';
+      ctx.textAlign = 'center';
+      ctx.fillText('SURGE', surgeX, surgeY + 24);
+      ctx.textAlign = 'left';
+    } else {
+      ctx.font = 'bold 9px system-ui';
+      ctx.fillStyle = '#806890';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.ceil(p.spiritSurgeCd) + 's', surgeX, surgeY + 24);
+      ctx.textAlign = 'left';
+    }
+    ctx.restore();
+
     // Skill button (DOM): label "Hidden Relic" + cooldown overlay
     const skillBtn = document.getElementById('hunt-skill-btn');
     if (skillBtn) {
@@ -3920,9 +3991,31 @@
     }
     const _comboHud = document.createElement('div');
     _comboHud.id = 'wg-combo-hud';
-    _comboHud.innerHTML = '<div class="combo-count"></div><div class="combo-label">COMBO</div>';
+    // Architect 2026-05-09 — WRAITH UNLEASH next-tier badge inside combo HUD
+    _comboHud.innerHTML =
+      '<div class="combo-count"></div>' +
+      '<div class="combo-label">COMBO</div>' +
+      '<div class="combo-wraith-next" style="font-size:9px;opacity:0.7;margin-top:3px;letter-spacing:1px;color:#c8a868;display:none;"></div>';
     document.body.appendChild(_comboHud);
     const _comboCt = _comboHud.querySelector('.combo-count');
+    const _comboWraith = _comboHud.querySelector('.combo-wraith-next');
+    // Set next-tier hint based on current combo count
+    function _updateWraithHint(count) {
+      if (!_comboWraith) return;
+      if (count <= 0) { _comboWraith.style.display = 'none'; return; }
+      const tiers = (window.WG && WG.HuntPlayer && WG.HuntPlayer.WRAITH_UNLEASH_TIERS) || [];
+      const next = tiers.find(t => count < t.combo);
+      if (!next) {
+        _comboWraith.textContent = '★ ASCENDANT';
+        _comboWraith.style.color = '#80f0ff';
+      } else {
+        const remaining = next.combo - count;
+        const icon = next.tier === 1 ? '⚡' : next.tier === 2 ? '🌀' : '★';
+        _comboWraith.textContent = `${icon} ${remaining} TO ${next.label}`;
+        _comboWraith.style.color = next.tier === 1 ? '#ffe888' : next.tier === 2 ? '#ffd870' : '#80f0ff';
+      }
+      _comboWraith.style.display = 'block';
+    }
 
     function _comboColor(n) {
       if (n >= 20) return '#ff4040';
@@ -3941,6 +4034,7 @@
       const pulse = count >= 20 ? ', combo-pulse 0.7s ease-in-out infinite' : '';
       _comboHud.style.animation = 'combo-pop 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards' + pulse;
       _comboHud.style.display = 'block';
+      _updateWraithHint(count);
     });
     WG.Engine.on('combo:reset', () => {
       _comboHud.style.display = 'none';
